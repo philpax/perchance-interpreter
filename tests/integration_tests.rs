@@ -512,3 +512,260 @@ fn test_grammar_methods_combined() {
     assert!(result.is_ok());
     assert_eq!(result.unwrap(), "The dogs walked.");
 }
+
+// Tests for conditional logic (ternary operator)
+
+#[test]
+fn test_ternary_operator_true() {
+    let template = "output\n\t[5 > 3 ? \"yes\" : \"no\"]\n";
+    let result = evaluate_with_seed(template, 42);
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), "yes");
+}
+
+#[test]
+fn test_ternary_operator_false() {
+    let template = "output\n\t[2 > 5 ? \"yes\" : \"no\"]\n";
+    let result = evaluate_with_seed(template, 42);
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), "no");
+}
+
+#[test]
+fn test_ternary_with_variable() {
+    let template = "output\n\t[n = 3, n < 4 ? \"low\" : \"high\"]\n";
+    let result = evaluate_with_seed(template, 42);
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), "low");
+}
+
+#[test]
+fn test_ternary_nested() {
+    let template = "output\n\t[n = 5, n < 3 ? \"low\" : n > 7 ? \"high\" : \"mid\"]\n";
+    let result = evaluate_with_seed(template, 42);
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), "mid");
+}
+
+// Tests for binary operators
+
+#[test]
+fn test_binary_op_equal() {
+    let template = "output\n\t[5 == 5 ? \"equal\" : \"not equal\"]\n";
+    let result = evaluate_with_seed(template, 42);
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), "equal");
+}
+
+#[test]
+fn test_binary_op_not_equal() {
+    let template = "output\n\t[5 != 3 ? \"different\" : \"same\"]\n";
+    let result = evaluate_with_seed(template, 42);
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), "different");
+}
+
+#[test]
+fn test_binary_op_less_than() {
+    let template = "output\n\t[3 < 5 ? \"less\" : \"not less\"]\n";
+    let result = evaluate_with_seed(template, 42);
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), "less");
+}
+
+#[test]
+fn test_binary_op_greater_than() {
+    let template = "output\n\t[7 > 4 ? \"greater\" : \"not greater\"]\n";
+    let result = evaluate_with_seed(template, 42);
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), "greater");
+}
+
+#[test]
+fn test_binary_op_less_equal() {
+    let template = "output\n\t[3 <= 3 ? \"yes\" : \"no\"]\n";
+    let result = evaluate_with_seed(template, 42);
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), "yes");
+}
+
+#[test]
+fn test_binary_op_greater_equal() {
+    let template = "output\n\t[5 >= 5 ? \"yes\" : \"no\"]\n";
+    let result = evaluate_with_seed(template, 42);
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), "yes");
+}
+
+#[test]
+fn test_binary_op_and() {
+    let template = "output\n\t[5 > 3 && 7 > 4 ? \"both\" : \"not both\"]\n";
+    let result = evaluate_with_seed(template, 42);
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), "both");
+}
+
+#[test]
+fn test_binary_op_and_false() {
+    let template = "output\n\t[5 > 3 && 2 > 4 ? \"both\" : \"not both\"]\n";
+    let result = evaluate_with_seed(template, 42);
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), "not both");
+}
+
+#[test]
+fn test_binary_op_or() {
+    let template = "output\n\t[5 > 3 || 2 > 4 ? \"at least one\" : \"neither\"]\n";
+    let result = evaluate_with_seed(template, 42);
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), "at least one");
+}
+
+#[test]
+fn test_binary_op_or_false() {
+    let template = "output\n\t[2 > 3 || 1 > 4 ? \"at least one\" : \"neither\"]\n";
+    let result = evaluate_with_seed(template, 42);
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), "neither");
+}
+
+// Tests for $output keyword
+
+#[test]
+fn test_output_keyword_simple() {
+    let template = "greeting\n\thello\n\thi\n\t$output = Welcome\n\noutput\n\t[greeting]\n";
+    let result = evaluate_with_seed(template, 42);
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), "Welcome");
+}
+
+#[test]
+fn test_output_keyword_with_reference() {
+    let template = "name\n\tAlice\n\tBob\n\ngreeting\n\titem\n\t$output = Hello [name]\n\noutput\n\t[greeting]\n";
+    let result = evaluate_with_seed(template, 42);
+    assert!(result.is_ok());
+    // Should output "Hello Alice" or "Hello Bob"
+    let output = result.unwrap();
+    assert!(output.starts_with("Hello "));
+    assert!(output == "Hello Alice" || output == "Hello Bob");
+}
+
+#[test]
+fn test_output_keyword_no_items() {
+    let template = "message\n\t$output = Fixed message\n\noutput\n\t[message]\n";
+    let result = evaluate_with_seed(template, 42);
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), "Fixed message");
+}
+
+// Tests for advanced grammar methods
+
+#[test]
+fn test_future_tense() {
+    let template = "verb\n\twalk\n\noutput\n\t[verb.futureTense]\n";
+    let result = evaluate_with_seed(template, 42);
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), "will walk");
+}
+
+#[test]
+fn test_future_tense_irregular() {
+    let template = "verb\n\tgo\n\noutput\n\t[verb.futureTense]\n";
+    let result = evaluate_with_seed(template, 42);
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), "will go");
+}
+
+#[test]
+fn test_present_tense_from_past() {
+    let template = "verb\n\twent\n\noutput\n\t[verb.presentTense]\n";
+    let result = evaluate_with_seed(template, 42);
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), "goes");
+}
+
+#[test]
+fn test_present_tense_regular() {
+    let template = "verb\n\twalk\n\noutput\n\t[verb.presentTense]\n";
+    let result = evaluate_with_seed(template, 42);
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), "walks");
+}
+
+#[test]
+fn test_negative_form() {
+    let template = "verb\n\texamine\n\noutput\n\t[verb.negativeForm]\n";
+    let result = evaluate_with_seed(template, 42);
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), "does not examine");
+}
+
+#[test]
+fn test_negative_form_be() {
+    let template = "verb\n\tis\n\noutput\n\t[verb.negativeForm]\n";
+    let result = evaluate_with_seed(template, 42);
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), "is not");
+}
+
+#[test]
+fn test_singular_form() {
+    let template = "word\n\tcities\n\noutput\n\t[word.singularForm]\n";
+    let result = evaluate_with_seed(template, 42);
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), "city");
+}
+
+#[test]
+fn test_singular_form_irregular() {
+    let template = "word\n\tchildren\n\noutput\n\t[word.singularForm]\n";
+    let result = evaluate_with_seed(template, 42);
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), "child");
+}
+
+// Tests for joinItems method
+
+#[test]
+fn test_join_items_with_comma() {
+    let template = "fruit\n\tapple\n\tbanana\n\torange\n\noutput\n\t[fruit.selectMany(3).joinItems(\", \")]\n";
+    let result = evaluate_with_seed(template, 42);
+    assert!(result.is_ok());
+    let output = result.unwrap();
+    // Should have comma separators
+    assert!(output.contains(", "));
+    // Should have 3 items (2 commas)
+    assert_eq!(output.matches(", ").count(), 2);
+}
+
+#[test]
+fn test_join_items_with_custom_separator() {
+    let template = "word\n\tfoo\n\tbar\n\tbaz\n\noutput\n\t[word.selectMany(2).joinItems(\" | \")]\n";
+    let result = evaluate_with_seed(template, 42);
+    assert!(result.is_ok());
+    let output = result.unwrap();
+    // Should have custom separator
+    assert!(output.contains(" | "));
+}
+
+#[test]
+fn test_join_items_select_unique() {
+    let template = "color\n\tred\n\tblue\n\tgreen\n\noutput\n\t[color.selectUnique(2).joinItems(\" and \")]\n";
+    let result = evaluate_with_seed(template, 42);
+    assert!(result.is_ok());
+    let output = result.unwrap();
+    // Should have " and " separator
+    assert!(output.contains(" and "));
+    // Should have exactly one " and " (2 items)
+    assert_eq!(output.matches(" and ").count(), 1);
+}
+
+#[test]
+fn test_join_items_default_separator() {
+    let template = "num\n\t1\n\t2\n\t3\n\noutput\n\t[num.selectMany(3)]\n";
+    let result = evaluate_with_seed(template, 42);
+    assert!(result.is_ok());
+    let output = result.unwrap();
+    // Default separator is space
+    assert!(output.contains(" "));
+}
