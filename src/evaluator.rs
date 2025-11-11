@@ -36,6 +36,7 @@ enum Value {
     Text(String),
     List(String), // Reference to a list by name
     ListInstance(CompiledList), // An actual list instance (for sublists)
+    Array(Vec<String>), // Multiple items (for selectMany/selectUnique before joinItems)
 }
 
 pub struct Evaluator<'a, R: Rng> {
@@ -438,6 +439,7 @@ impl<'a, R: Rng> Evaluator<'a, R> {
                 self.evaluate_list(list)
             }
             Value::ListInstance(list) => self.evaluate_list(&list),
+            Value::Array(items) => Ok(items.join(" ")), // Default: space-separated
         }
     }
 
@@ -477,6 +479,10 @@ impl<'a, R: Rng> Evaluator<'a, R> {
             }
             Value::Text(_) => Err(EvalError::TypeError(format!(
                 "Cannot access property '{}' on text value",
+                prop_name
+            ))),
+            Value::Array(_) => Err(EvalError::TypeError(format!(
+                "Cannot access property '{}' on array value",
                 prop_name
             ))),
         }
@@ -533,6 +539,15 @@ impl<'a, R: Rng> Evaluator<'a, R> {
                         Ok(Value::Text(result))
                     }
                     Value::Text(s) => Ok(Value::Text(s.clone())),
+                    Value::Array(items) => {
+                        // Select one item from the array
+                        if items.is_empty() {
+                            Ok(Value::Text(String::new()))
+                        } else {
+                            let idx = self.rng.gen_range(0..items.len());
+                            Ok(Value::Text(items[idx].clone()))
+                        }
+                    }
                 }
             }
 
@@ -597,6 +612,10 @@ impl<'a, R: Rng> Evaluator<'a, R> {
                         Ok(Value::Text(results.join(" ")))
                     }
                     Value::Text(s) => Ok(Value::Text(s.clone())),
+                    Value::Array(items) => {
+                        // selectAll on an array just returns the array
+                        Ok(Value::Array(items.clone()))
+                    }
                 }
             }
 
@@ -638,7 +657,7 @@ impl<'a, R: Rng> Evaluator<'a, R> {
                                 results.push(self.evaluate_content(&item.content)?);
                             }
                         }
-                        Ok(Value::Text(results.join(" ")))
+                        Ok(Value::Array(results))
                     }
                     Value::ListInstance(list) => {
                         let mut results = Vec::new();
@@ -655,9 +674,20 @@ impl<'a, R: Rng> Evaluator<'a, R> {
                                 results.push(self.evaluate_content(&item.content)?);
                             }
                         }
-                        Ok(Value::Text(results.join(" ")))
+                        Ok(Value::Array(results))
                     }
                     Value::Text(s) => Ok(Value::Text(s.clone())),
+                    Value::Array(items) => {
+                        // selectMany on an array
+                        let mut results = Vec::new();
+                        for _ in 0..n {
+                            if !items.is_empty() {
+                                let idx = self.rng.gen_range(0..items.len());
+                                results.push(items[idx].clone());
+                            }
+                        }
+                        Ok(Value::Array(results))
+                    }
                 }
             }
 
@@ -710,7 +740,7 @@ impl<'a, R: Rng> Evaluator<'a, R> {
                                 results.push(self.evaluate_content(&item.content)?);
                             }
                         }
-                        Ok(Value::Text(results.join(" ")))
+                        Ok(Value::Array(results))
                     }
                     Value::ListInstance(list) => {
                         if n > list.items.len() {
@@ -739,9 +769,28 @@ impl<'a, R: Rng> Evaluator<'a, R> {
                                 results.push(self.evaluate_content(&item.content)?);
                             }
                         }
-                        Ok(Value::Text(results.join(" ")))
+                        Ok(Value::Array(results))
                     }
                     Value::Text(s) => Ok(Value::Text(s.clone())),
+                    Value::Array(items) => {
+                        // selectUnique on an array
+                        if n > items.len() {
+                            return Err(EvalError::InvalidMethodCall(format!(
+                                "Cannot select {} unique items from array with {} items",
+                                n, items.len()
+                            )));
+                        }
+
+                        let mut available_indices: Vec<usize> = (0..items.len()).collect();
+                        let mut results = Vec::new();
+
+                        for _ in 0..n {
+                            let idx = self.rng.gen_range(0..available_indices.len());
+                            let item_idx = available_indices.remove(idx);
+                            results.push(items[item_idx].clone());
+                        }
+                        Ok(Value::Array(results))
+                    }
                 }
             }
 
@@ -758,6 +807,47 @@ impl<'a, R: Rng> Evaluator<'a, R> {
             "possessiveForm" => {
                 let s = self.value_to_string(value.clone())?;
                 Ok(Value::Text(to_possessive(&s)))
+            }
+
+            "futureTense" => {
+                let s = self.value_to_string(value.clone())?;
+                Ok(Value::Text(to_future_tense(&s)))
+            }
+
+            "presentTense" => {
+                let s = self.value_to_string(value.clone())?;
+                Ok(Value::Text(to_present_tense(&s)))
+            }
+
+            "negativeForm" => {
+                let s = self.value_to_string(value.clone())?;
+                Ok(Value::Text(to_negative_form(&s)))
+            }
+
+            "singularForm" => {
+                let s = self.value_to_string(value.clone())?;
+                Ok(Value::Text(to_singular(&s)))
+            }
+
+            "joinItems" => {
+                // Join array items with a separator
+                let separator = if method.args.is_empty() {
+                    " ".to_string() // Default separator
+                } else {
+                    self.evaluate_expression(&method.args[0])?
+                };
+
+                match value {
+                    Value::Array(items) => {
+                        Ok(Value::Text(items.join(&separator)))
+                    }
+                    Value::Text(s) => Ok(Value::Text(s.clone())),
+                    _ => {
+                        // Try converting to string first
+                        let s = self.value_to_string(value.clone())?;
+                        Ok(Value::Text(s))
+                    }
+                }
             }
 
             _ => Err(EvalError::InvalidMethodCall(format!(
@@ -904,6 +994,156 @@ fn to_possessive(s: &str) -> String {
     } else {
         format!("{}'s", s_trimmed)
     }
+}
+
+fn to_future_tense(s: &str) -> String {
+    let s_trimmed = s.trim();
+    if s_trimmed.is_empty() {
+        return s.to_string();
+    }
+
+    // Future tense in English is typically "will" + base form
+    format!("will {}", s_trimmed)
+}
+
+fn to_present_tense(s: &str) -> String {
+    let s_trimmed = s.trim();
+    if s_trimmed.is_empty() {
+        return s.to_string();
+    }
+
+    let lower = s_trimmed.to_lowercase();
+
+    // Common irregular present tense (third person singular)
+    let irregulars = [
+        ("be", "is"), ("have", "has"), ("do", "does"),
+        ("go", "goes"), ("was", "is"), ("were", "are"),
+        ("had", "has"), ("did", "does"), ("went", "goes"),
+        ("got", "gets"), ("made", "makes"), ("knew", "knows"),
+        ("thought", "thinks"), ("took", "takes"), ("saw", "sees"),
+        ("came", "comes"), ("gave", "gives"), ("found", "finds"),
+        ("told", "tells"), ("asked", "asks"), ("felt", "feels"),
+        ("left", "leaves"), ("put", "puts"), ("meant", "means"),
+        ("kept", "keeps"), ("let", "lets"), ("began", "begins"),
+        ("seemed", "seems"), ("showed", "shows"), ("heard", "hears"),
+        ("ran", "runs"), ("moved", "moves"), ("lived", "lives"),
+        ("brought", "brings"), ("wrote", "writes"), ("sat", "sits"),
+        ("stood", "stands"), ("lost", "loses"), ("paid", "pays"),
+        ("met", "meets"), ("set", "sets"), ("led", "leads"),
+        ("understood", "understands"), ("followed", "follows"),
+        ("stopped", "stops"), ("spoke", "speaks"), ("read", "reads"),
+        ("spent", "spends"), ("grew", "grows"), ("walked", "walks"),
+        ("won", "wins"), ("taught", "teaches"), ("remembered", "remembers"),
+        ("appeared", "appears"), ("bought", "buys"), ("served", "serves"),
+        ("died", "dies"), ("sent", "sends"), ("built", "builds"),
+        ("stayed", "stays"), ("fell", "falls"), ("cut", "cuts"),
+        ("reached", "reaches"), ("killed", "kills"), ("raised", "raises"),
+        ("passed", "passes"), ("sold", "sells"), ("decided", "decides"),
+        ("returned", "returns"), ("explained", "explains"), ("hoped", "hopes"),
+        ("carried", "carries"), ("broke", "breaks"), ("received", "receives"),
+        ("agreed", "agrees"), ("hit", "hits"), ("produced", "produces"),
+        ("ate", "eats"), ("caught", "catches"), ("drew", "draws"),
+    ];
+
+    for (past, present) in &irregulars {
+        if lower == *past {
+            return present.to_string();
+        }
+    }
+
+    // If it already looks like present tense (ends with common patterns)
+    if lower.ends_with("s") || lower.ends_with("es") {
+        return s_trimmed.to_string();
+    }
+
+    // Regular present tense (third person singular)
+    if lower.ends_with("y") && s_trimmed.len() > 1 {
+        let second_last = s_trimmed.chars().nth(s_trimmed.len() - 2).unwrap();
+        if !"aeiou".contains(second_last.to_ascii_lowercase()) {
+            return format!("{}ies", &s_trimmed[..s_trimmed.len() - 1]);
+        }
+    } else if lower.ends_with("s") || lower.ends_with("ss") || lower.ends_with("sh")
+        || lower.ends_with("ch") || lower.ends_with("x") || lower.ends_with("z") {
+        return format!("{}es", s_trimmed);
+    } else if lower.ends_with("o") {
+        return format!("{}es", s_trimmed);
+    }
+
+    // Default: add 's'
+    format!("{}s", s_trimmed)
+}
+
+fn to_negative_form(s: &str) -> String {
+    let s_trimmed = s.trim();
+    if s_trimmed.is_empty() {
+        return s.to_string();
+    }
+
+    let lower = s_trimmed.to_lowercase();
+
+    // Special cases for common verbs
+    if lower == "is" || lower == "are" || lower == "am" || lower == "was" || lower == "were" {
+        return format!("{} not", s_trimmed);
+    } else if lower == "have" || lower == "has" || lower == "had" {
+        return format!("{} not", s_trimmed);
+    } else if lower == "do" || lower == "does" || lower == "did" {
+        return format!("{} not", s_trimmed);
+    } else if lower == "will" || lower == "would" || lower == "should" || lower == "could"
+        || lower == "can" || lower == "may" || lower == "might" || lower == "must" {
+        return format!("{} not", s_trimmed);
+    }
+
+    // For regular verbs, use "does not" + base form
+    // This is a simplification; ideally we'd convert to base form
+    format!("does not {}", s_trimmed)
+}
+
+fn to_singular(s: &str) -> String {
+    let s_trimmed = s.trim();
+    if s_trimmed.is_empty() {
+        return s.to_string();
+    }
+
+    let lower = s_trimmed.to_lowercase();
+
+    // Common irregular plurals (reversed from to_plural)
+    let irregulars = [
+        ("children", "child"), ("people", "person"), ("men", "man"),
+        ("women", "woman"), ("teeth", "tooth"), ("feet", "foot"),
+        ("mice", "mouse"), ("geese", "goose"), ("oxen", "ox"),
+        ("sheep", "sheep"), ("deer", "deer"), ("fish", "fish"),
+    ];
+
+    for (plural, singular) in &irregulars {
+        if lower == *plural {
+            return singular.to_string();
+        }
+    }
+
+    // Regular plural rules (reversed)
+    if lower.ends_with("ies") && s_trimmed.len() > 3 {
+        return format!("{}y", &s_trimmed[..s_trimmed.len() - 3]);
+    } else if lower.ends_with("ves") && s_trimmed.len() > 3 {
+        // Could be knife -> knives or life -> lives
+        return format!("{}fe", &s_trimmed[..s_trimmed.len() - 3]);
+    } else if lower.ends_with("oes") && s_trimmed.len() > 3 {
+        return format!("{}o", &s_trimmed[..s_trimmed.len() - 2]);
+    } else if lower.ends_with("ses") && s_trimmed.len() > 3 {
+        return format!("{}", &s_trimmed[..s_trimmed.len() - 2]);
+    } else if lower.ends_with("xes") || lower.ends_with("zes")
+        || lower.ends_with("ches") || lower.ends_with("shes") {
+        if s_trimmed.len() > 2 {
+            return format!("{}", &s_trimmed[..s_trimmed.len() - 2]);
+        }
+    } else if lower.ends_with("s") && !lower.ends_with("ss") {
+        // Simple plural - just remove 's'
+        if s_trimmed.len() > 1 {
+            return format!("{}", &s_trimmed[..s_trimmed.len() - 1]);
+        }
+    }
+
+    // If no rule matched, return as-is
+    s_trimmed.to_string()
 }
 
 pub fn evaluate<R: Rng>(

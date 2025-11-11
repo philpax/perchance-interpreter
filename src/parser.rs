@@ -292,9 +292,20 @@ impl Parser {
             return self.parse_string_literal();
         }
 
-        // Parse identifier
+        // Parse identifier (or numeric literal)
         let ident = self.parse_identifier()?;
-        let mut expr = Expression::Simple(Identifier::new(ident));
+
+        // Check if it's a numeric literal
+        let mut expr = if ident.chars().all(|c| c.is_ascii_digit()) {
+            // It's a number literal
+            Expression::Literal(ident)
+        } else if ident.starts_with('-') && ident.len() > 1 && ident[1..].chars().all(|c| c.is_ascii_digit()) {
+            // Negative number literal
+            Expression::Literal(ident)
+        } else {
+            // It's an identifier
+            Expression::Simple(Identifier::new(ident))
+        };
 
         // Parse accessors (property, dynamic, method)
         loop {
