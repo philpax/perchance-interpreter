@@ -24,9 +24,9 @@ This interpreter implements core Perchance functionality:
 - **Hierarchical lists** - Full support for nested sublists
 - **Property access** - Chained property access like `[character.wizard.name]`
 - **Methods without parentheses** - `[word.upperCase]` works correctly
+- **selectOne method** - Full support including property access `[c = list.selectOne, c.property]`
 
 ### 🚧 Partially Implemented
-- `selectOne` method with property access - Returns string instead of value (1 failing test)
 - Dynamic sub-list referencing with `[list[variable]]`
 
 ### ❌ Not Implemented (Out of Scope)
@@ -136,7 +136,7 @@ cargo test --test integration_tests
 
 ## Known Issues
 
-1. **selectOne with property access**: `[c = character.selectOne, c.name]` doesn't preserve properties. The selectOne method returns an evaluated string instead of keeping the value structure for further property access.
+None! All core features are working correctly.
 
 ## Architecture
 
@@ -147,7 +147,7 @@ cargo test --test integration_tests
 
 ## Test Results
 
-Current test status: **36 out of 37 integration tests passing (97%)**
+Current test status: **37 out of 37 integration tests passing (100%)** ✨
 
 All categories working:
 - ✅ Basic list selection and determinism
@@ -161,16 +161,16 @@ All categories working:
 - ✅ **Hierarchical lists** (all depths)
 - ✅ **Property access** (chained)
 - ✅ **Methods** (upperCase, lowerCase, titleCase, sentenceCase)
-- ⚠️ selectOne method with subsequent property access (1 test)
+- ✅ **selectOne with property access** - Fully working!
 
 ## Future Work
 
-To complete the core implementation:
-1. Fix selectOne to return Value instead of String for property chaining
-2. Add dynamic sub-list referencing support `[list[variable]]`
-3. Implement remaining methods (pluralForm, pastTense, futureTense, etc.)
-4. Add special inline functions (`{a}`, `{s}` for grammar)
-5. Implement `selectMany`, `selectUnique`, `selectAll` methods
+Potential enhancements:
+1. Add dynamic sub-list referencing support `[list[variable]]`
+2. Implement remaining methods (pluralForm, pastTense, futureTense, etc.)
+3. Add special inline functions (`{a}`, `{s}` for automatic article/pluralization)
+4. Implement `selectMany`, `selectUnique`, `selectAll` methods
+5. Add more text transformation methods from the Perchance spec
 
 ## License
 
