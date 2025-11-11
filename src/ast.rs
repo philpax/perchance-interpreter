@@ -68,6 +68,24 @@ pub enum Expression {
 
     // Letter range: {a-z}
     LetterRange(char, char),
+
+    // Conditional: condition ? trueExpr : falseExpr
+    Conditional(Box<Expression>, Box<Expression>, Box<Expression>),
+
+    // Binary operations: ==, !=, <, >, <=, >=, &&, ||
+    BinaryOp(Box<Expression>, BinaryOperator, Box<Expression>),
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum BinaryOperator {
+    Equal,        // ==
+    NotEqual,     // !=
+    LessThan,     // <
+    GreaterThan,  // >
+    LessEqual,    // <=
+    GreaterEqual, // >=
+    And,          // &&
+    Or,           // ||
 }
 
 #[derive(Debug, Clone, PartialEq)]
