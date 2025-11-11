@@ -10,7 +10,7 @@ This interpreter implements core Perchance functionality:
 - Basic list selection
 - Weighted selection with `^` operator
 - Inline lists with `{option1|option2}` syntax
-- Number ranges `{1-10}`
+- Number ranges `{1-10}`, including negative ranges `{-5-5}`
 - Letter ranges `{a-z}`, `{A-Z}`
 - Escape sequences (`\s`, `\t`, `\\`, `\[`, `\]`, `\{`, `\}`, `\=`, `\^`)
 - Comments with `//`
@@ -18,14 +18,15 @@ This interpreter implements core Perchance functionality:
 - Two-space or tab indentation
 - Multiple list references
 - Nested inline lists
-- Variable assignment and references
+- Variable assignment and references in sequences `[x = animal, x]`
 - String literals in expressions (evaluated for references)
-- Some text transformation methods (`upperCase`, `lowerCase`, `titleCase`, `sentenceCase`)
+- Text transformation methods (`upperCase`, `lowerCase`, `titleCase`, `sentenceCase`)
+- **Hierarchical lists** - Full support for nested sublists
+- **Property access** - Chained property access like `[character.wizard.name]`
+- **Methods without parentheses** - `[word.upperCase]` works correctly
 
 ### 🚧 Partially Implemented
-- Hierarchical lists (parsing issues with deep nesting)
-- Property access (basic support, needs refinement)
-- Methods (some methods work, others need implementation)
+- `selectOne` method with property access - Returns string instead of value (1 failing test)
 - Dynamic sub-list referencing with `[list[variable]]`
 
 ### ❌ Not Implemented (Out of Scope)
@@ -135,10 +136,7 @@ cargo test --test integration_tests
 
 ## Known Issues
 
-1. **Hierarchical Lists**: Deep nesting (3+ levels) has parsing issues
-2. **Methods**: Not all methods from the spec are implemented
-3. **Properties**: Property access needs better support for nested structures
-4. **selectOne**: The explicit `.selectOne` method call needs proper implementation
+1. **selectOne with property access**: `[c = character.selectOne, c.name]` doesn't preserve properties. The selectOne method returns an evaluated string instead of keeping the value structure for further property access.
 
 ## Architecture
 
@@ -149,26 +147,30 @@ cargo test --test integration_tests
 
 ## Test Results
 
-Current test status: **26 out of 37 integration tests passing**
+Current test status: **36 out of 37 integration tests passing (97%)**
 
-Passing categories:
-- Basic list selection and determinism
-- Weighted selection
-- Inline lists
-- Number/letter ranges
-- Escape sequences
-- Comments
-- Simple variable assignment
-- String literals with references
+All categories working:
+- ✅ Basic list selection and determinism
+- ✅ Weighted selection
+- ✅ Inline lists with weights
+- ✅ Number/letter ranges (including negative)
+- ✅ Escape sequences
+- ✅ Comments
+- ✅ Variable assignment in sequences
+- ✅ String literals with references
+- ✅ **Hierarchical lists** (all depths)
+- ✅ **Property access** (chained)
+- ✅ **Methods** (upperCase, lowerCase, titleCase, sentenceCase)
+- ⚠️ selectOne method with subsequent property access (1 test)
 
 ## Future Work
 
 To complete the core implementation:
-1. Fix hierarchical list parsing for deep nesting
-2. Implement remaining methods (pluralForm, pastTense, etc.)
-3. Add proper support for `.selectOne` explicit calls
-4. Improve property access for nested structures
-5. Add dynamic sub-list referencing support
+1. Fix selectOne to return Value instead of String for property chaining
+2. Add dynamic sub-list referencing support `[list[variable]]`
+3. Implement remaining methods (pluralForm, pastTense, futureTense, etc.)
+4. Add special inline functions (`{a}`, `{s}` for grammar)
+5. Implement `selectMany`, `selectUnique`, `selectAll` methods
 
 ## License
 
