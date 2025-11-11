@@ -33,14 +33,14 @@ This interpreter implements core Perchance functionality:
 - **Conditional logic** - Ternary operator `[condition ? true : false]`
 - **Binary operators** - `==`, `!=`, `<`, `>`, `<=`, `>=`, `&&`, `||`
 - **$output keyword** - Custom output for lists without random selection
+- **consumableList** - Stateful lists where items are removed after selection
 
 ### ❌ Not Implemented (Out of Scope)
 - JavaScript code execution
 - Plugin system
-- `this` keyword for accessing sibling properties
-- `consumableList` and stateful lists
+- `this` keyword for accessing sibling properties (partially implemented, needs property assignment syntax)
 - HTML/CSS rendering
-- Import/export between generators with `{import:name}` syntax
+- Import/export between generators with `{import:name}` syntax (requires multi-file architecture)
 - Long-form if/else statements (ternary is supported)
 
 ## Installation
@@ -212,6 +212,21 @@ output
 
 Output: "banana, banana, orange" (or similar with comma separation)
 
+### consumableList for Unique Selection
+
+```
+card
+	ace
+	king
+	queen
+	jack
+
+output
+	[deck = card.consumableList][deck], [deck], [deck], [deck]
+```
+
+Output: "king, ace, jack, queen" (each card appears exactly once, in random order)
+
 ## Testing
 
 ```bash
@@ -235,7 +250,7 @@ None! All core features are working correctly.
 
 ## Test Results
 
-Current test status: **55 out of 55 integration tests passing (100%)** ✨
+Current test status: **89 out of 89 integration tests passing (100%)** ✨
 
 All categories working:
 - ✅ Basic list selection and determinism
@@ -255,20 +270,20 @@ All categories working:
 - ✅ **joinItems method** (custom separators for lists)
 - ✅ **Conditional logic** (ternary operator, binary operators)
 - ✅ **$output keyword** (custom list output)
+- ✅ **consumableList** (stateful unique selection)
 
 ## Future Work
 
 Potential enhancements:
-1. **consumableList** - Stateful lists where items are removed after selection
-2. **Import/export system** - `{import:name}` syntax for composing generators
-3. **`this` keyword** - Access sibling properties within $output (e.g., `[this.name]`)
-4. **Long-form if/else** - `[if (cond) {a} else {b}]` syntax alongside ternary
-5. Add more sophisticated article selection (handle words like "university", "hour")
-6. Add number-to-word conversion method
-7. Implement string manipulation methods (substring, replace, trim, etc.)
-8. Add mathematical expression evaluation (+, -, *, /, etc.)
-9. Improve plural/past tense rules for edge cases
-10. Add comparative/superlative grammar forms
+1. **Import/export system** - `{import:name}` syntax for composing generators (requires multi-file architecture)
+2. **`this` keyword** - Complete implementation with property assignment syntax (e.g., `property = value`)
+3. **Long-form if/else** - `[if (cond) {a} else {b}]` syntax alongside ternary
+4. Add more sophisticated article selection (handle words like "university", "hour")
+5. Add number-to-word conversion method
+6. Implement string manipulation methods (substring, replace, trim, etc.)
+7. Add mathematical expression evaluation (+, -, *, /, etc.)
+8. Improve plural/past tense rules for edge cases
+9. Add comparative/superlative grammar forms
 
 ## License
 
