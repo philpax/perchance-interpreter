@@ -383,6 +383,69 @@ impl<'a, R: Rng> Evaluator<'a, R> {
                 let random_byte = self.rng.gen_range(start_byte..=end_byte);
                 Ok((random_byte as char).to_string())
             }
+
+            Expression::Conditional(cond, true_expr, false_expr) => {
+                // Evaluate condition
+                let cond_result = self.evaluate_expression(cond)?;
+
+                // Check if condition is truthy
+                if self.is_truthy(&cond_result) {
+                    self.evaluate_expression(true_expr)
+                } else {
+                    self.evaluate_expression(false_expr)
+                }
+            }
+
+            Expression::BinaryOp(left, op, right) => {
+                let left_val = self.evaluate_expression(left)?;
+                let right_val = self.evaluate_expression(right)?;
+
+                let result = match op {
+                    BinaryOperator::Equal => left_val == right_val,
+                    BinaryOperator::NotEqual => left_val != right_val,
+                    BinaryOperator::LessThan => {
+                        self.compare_values(&left_val, &right_val)? < 0
+                    }
+                    BinaryOperator::GreaterThan => {
+                        self.compare_values(&left_val, &right_val)? > 0
+                    }
+                    BinaryOperator::LessEqual => {
+                        self.compare_values(&left_val, &right_val)? <= 0
+                    }
+                    BinaryOperator::GreaterEqual => {
+                        self.compare_values(&left_val, &right_val)? >= 0
+                    }
+                    BinaryOperator::And => {
+                        self.is_truthy(&left_val) && self.is_truthy(&right_val)
+                    }
+                    BinaryOperator::Or => {
+                        self.is_truthy(&left_val) || self.is_truthy(&right_val)
+                    }
+                };
+
+                Ok(if result { "true" } else { "false" }.to_string())
+            }
+        }
+    }
+
+    fn is_truthy(&self, s: &str) -> bool {
+        // Empty string, "false", "0" are falsy
+        !s.is_empty() && s != "false" && s != "0"
+    }
+
+    fn compare_values(&self, left: &str, right: &str) -> Result<i32, EvalError> {
+        // Try to parse as numbers first
+        if let (Ok(l), Ok(r)) = (left.parse::<f64>(), right.parse::<f64>()) {
+            if l < r {
+                Ok(-1)
+            } else if l > r {
+                Ok(1)
+            } else {
+                Ok(0)
+            }
+        } else {
+            // String comparison
+            Ok(left.cmp(right) as i32)
         }
     }
 

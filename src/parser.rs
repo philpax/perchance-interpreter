@@ -261,8 +261,8 @@ impl Parser {
     fn parse_expression(&mut self) -> Result<Expression, ParseError> {
         self.skip_spaces();
 
-        // Check for sequence (comma-separated expressions)
-        let first = self.parse_single_expression()?;
+        // Check for comma-separated sequences first
+        let first = self.parse_ternary_expression()?;
 
         self.skip_spaces();
         if self.peek_char() == Some(',') {
@@ -272,7 +272,7 @@ impl Parser {
                 self.consume_char(',');
                 self.skip_spaces();
 
-                exprs.push(self.parse_single_expression()?);
+                exprs.push(self.parse_ternary_expression()?);
                 self.skip_spaces();
             }
 
@@ -281,6 +281,124 @@ impl Parser {
             Ok(Expression::Sequence(exprs, output.map(Box::new)))
         } else {
             Ok(first)
+        }
+    }
+
+    fn parse_ternary_expression(&mut self) -> Result<Expression, ParseError> {
+        // Parse ternary conditional: condition ? true_expr : false_expr
+        let first = self.parse_or_expression()?;
+
+        self.skip_spaces();
+        if self.peek_char() == Some('?') {
+            self.consume_char('?');
+            self.skip_spaces();
+            let true_expr = self.parse_or_expression()?;
+            self.skip_spaces();
+
+            if self.peek_char() != Some(':') {
+                return Err(ParseError::InvalidSyntax(
+                    "Expected ':' in ternary expression".to_string(),
+                    self.line,
+                ));
+            }
+            self.consume_char(':');
+            self.skip_spaces();
+
+            let false_expr = self.parse_ternary_expression()?;
+            return Ok(Expression::Conditional(
+                Box::new(first),
+                Box::new(true_expr),
+                Box::new(false_expr),
+            ));
+        }
+
+        Ok(first)
+    }
+
+    fn parse_or_expression(&mut self) -> Result<Expression, ParseError> {
+        let mut left = self.parse_and_expression()?;
+
+        loop {
+            self.skip_spaces();
+            if self.peek_two_chars() == Some(('|', '|')) {
+                self.advance();
+                self.advance();
+                self.skip_spaces();
+                let right = self.parse_and_expression()?;
+                left = Expression::BinaryOp(Box::new(left), BinaryOperator::Or, Box::new(right));
+            } else {
+                break;
+            }
+        }
+
+        Ok(left)
+    }
+
+    fn parse_and_expression(&mut self) -> Result<Expression, ParseError> {
+        let mut left = self.parse_comparison_expression()?;
+
+        loop {
+            self.skip_spaces();
+            if self.peek_two_chars() == Some(('&', '&')) {
+                self.advance();
+                self.advance();
+                self.skip_spaces();
+                let right = self.parse_comparison_expression()?;
+                left = Expression::BinaryOp(Box::new(left), BinaryOperator::And, Box::new(right));
+            } else {
+                break;
+            }
+        }
+
+        Ok(left)
+    }
+
+    fn parse_comparison_expression(&mut self) -> Result<Expression, ParseError> {
+        let left = self.parse_single_expression()?;
+
+        self.skip_spaces();
+
+        // Check for comparison operators
+        let op = if self.peek_two_chars() == Some(('=', '=')) {
+            self.advance();
+            self.advance();
+            Some(BinaryOperator::Equal)
+        } else if self.peek_two_chars() == Some(('!', '=')) {
+            self.advance();
+            self.advance();
+            Some(BinaryOperator::NotEqual)
+        } else if self.peek_two_chars() == Some(('<', '=')) {
+            self.advance();
+            self.advance();
+            Some(BinaryOperator::LessEqual)
+        } else if self.peek_two_chars() == Some(('>', '=')) {
+            self.advance();
+            self.advance();
+            Some(BinaryOperator::GreaterEqual)
+        } else if self.peek_char() == Some('<') {
+            self.advance();
+            Some(BinaryOperator::LessThan)
+        } else if self.peek_char() == Some('>') {
+            self.advance();
+            Some(BinaryOperator::GreaterThan)
+        } else {
+            None
+        };
+
+        if let Some(operator) = op {
+            self.skip_spaces();
+            let right = self.parse_single_expression()?;
+            Ok(Expression::BinaryOp(Box::new(left), operator, Box::new(right)))
+        } else {
+            Ok(left)
+        }
+    }
+
+    fn peek_two_chars(&self) -> Option<(char, char)> {
+        if self.pos + 1 < self.input.len() {
+            Some((self.input[self.pos], self.input[self.pos + 1]))
+        } else {
+            None
         }
     }
 
