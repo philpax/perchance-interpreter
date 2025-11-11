@@ -190,7 +190,16 @@ impl<'a, R: Rng> Evaluator<'a, R> {
 
             Expression::Property(base, prop) => {
                 let base_value = self.evaluate_to_value(base)?;
-                self.get_property(&base_value, &prop.name)
+                // Try as property first, then as a zero-argument method
+                match self.get_property(&base_value, &prop.name) {
+                    Ok(result) => Ok(result),
+                    Err(EvalError::UndefinedProperty(_, _)) => {
+                        // Try as a method call with no arguments
+                        let method = MethodCall::new(prop.name.clone());
+                        self.call_method(&base_value, &method)
+                    }
+                    Err(e) => Err(e),
+                }
             }
 
             Expression::Dynamic(base, index) => {
@@ -266,9 +275,17 @@ impl<'a, R: Rng> Evaluator<'a, R> {
 
             Expression::Property(base, prop) => {
                 let base_value = self.evaluate_to_value(base)?;
-                // For properties, we need to get the property and return it as a value
-                let prop_str = self.get_property(&base_value, &prop.name)?;
-                Ok(Value::Text(prop_str))
+                // Try as property first, then as a zero-argument method
+                match self.get_property_value(&base_value, &prop.name) {
+                    Ok(value) => Ok(value),
+                    Err(EvalError::UndefinedProperty(_, _)) => {
+                        // Try as a method call with no arguments
+                        let method = MethodCall::new(prop.name.clone());
+                        let result = self.call_method(&base_value, &method)?;
+                        Ok(Value::Text(result))
+                    }
+                    Err(e) => Err(e),
+                }
             }
 
             Expression::Method(base, method) => {
@@ -298,7 +315,7 @@ impl<'a, R: Rng> Evaluator<'a, R> {
         }
     }
 
-    fn get_property(&mut self, value: &Value, prop_name: &str) -> Result<String, EvalError> {
+    fn get_property_value(&mut self, value: &Value, prop_name: &str) -> Result<Value, EvalError> {
         match value {
             Value::List(list_name) => {
                 // Look up the list
@@ -307,12 +324,11 @@ impl<'a, R: Rng> Evaluator<'a, R> {
                     .get_list(list_name)
                     .ok_or_else(|| EvalError::UndefinedList(list_name.clone()))?;
 
-                // Check if any item has this property as a sublist
-                // For simplicity, we'll select an item and look for the property
-                let item = self.select_weighted_item(&list.items, list.total_weight)?.clone();
-
-                if let Some(sublist) = item.sublists.get(prop_name) {
-                    return self.evaluate_list(sublist);
+                // Search through all items to find one with this property as a sublist
+                for item in &list.items {
+                    if let Some(sublist) = item.sublists.get(prop_name) {
+                        return Ok(Value::ListInstance(sublist.clone()));
+                    }
                 }
 
                 Err(EvalError::UndefinedProperty(
@@ -321,11 +337,11 @@ impl<'a, R: Rng> Evaluator<'a, R> {
                 ))
             }
             Value::ListInstance(list) => {
-                // Look for property in the list items
-                let item = self.select_weighted_item(&list.items, list.total_weight)?.clone();
-
-                if let Some(sublist) = item.sublists.get(prop_name) {
-                    return self.evaluate_list(sublist);
+                // Search through all items to find one with this property
+                for item in &list.items {
+                    if let Some(sublist) = item.sublists.get(prop_name) {
+                        return Ok(Value::ListInstance(sublist.clone()));
+                    }
                 }
 
                 Err(EvalError::UndefinedProperty(
@@ -338,6 +354,11 @@ impl<'a, R: Rng> Evaluator<'a, R> {
                 prop_name
             ))),
         }
+    }
+
+    fn get_property(&mut self, value: &Value, prop_name: &str) -> Result<String, EvalError> {
+        let prop_value = self.get_property_value(value, prop_name)?;
+        self.value_to_string(prop_value)
     }
 
     fn call_method(&mut self, value: &Value, method: &MethodCall) -> Result<String, EvalError> {

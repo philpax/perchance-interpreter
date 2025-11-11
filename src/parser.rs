@@ -134,30 +134,59 @@ impl Parser {
         self.skip_to_newline();
         self.consume_char('\n');
 
-        let mut item = Item::new(content);
+        let mut item = Item::new(content.clone());
         if let Some(w) = weight {
             item = item.with_weight(w);
         }
 
-        // Parse sublists
-        while !self.is_eof() {
-            self.skip_empty_lines();
-            if self.is_eof() {
-                break;
-            }
-
-            let indent = self.get_indentation_level();
-
-            if indent <= expected_indent {
-                // End of sublists
-                break;
-            } else if indent == expected_indent + 1 {
-                // This is a sublist
-                let sublist = self.parse_list(expected_indent + 1)?;
-                item.add_sublist(sublist);
+        // Check if content is just a simple identifier (potential sublist name)
+        let simple_name = if content.len() == 1 {
+            if let ContentPart::Text(ref s) = content[0] {
+                // Check if it's a valid identifier (letters, numbers, underscore only)
+                if s.chars().all(|c| c.is_alphanumeric() || c == '_') && !s.is_empty() {
+                    Some(s.clone())
+                } else {
+                    None
+                }
             } else {
-                // Skip further nested items (they belong to the sublist)
-                break;
+                None
+            }
+        } else {
+            None
+        };
+
+        // Parse sublists
+        // If we have a simple name and indented content, treat it as a sublist
+        if let Some(sublist_name) = simple_name {
+            // Check if there are indented items
+            self.skip_empty_lines();
+            if !self.is_eof() && self.get_indentation_level() == expected_indent + 1 {
+                // Parse all the indented items as a single sublist
+                let mut sublist = List::new(sublist_name);
+                let sublist_indent = expected_indent + 1;
+
+                while !self.is_eof() {
+                    self.skip_empty_lines();
+                    if self.is_eof() {
+                        break;
+                    }
+
+                    let indent = self.get_indentation_level();
+                    if indent < sublist_indent {
+                        break;
+                    } else if indent == sublist_indent {
+                        self.skip_indent(sublist_indent);
+                        let subitem = self.parse_item(sublist_indent)?;
+                        sublist.add_item(subitem);
+                    } else {
+                        // Deeper nesting belongs to the subitem
+                        break;
+                    }
+                }
+
+                // Clear the content and add the sublist
+                item.content.clear();
+                item.add_sublist(sublist);
             }
         }
 
@@ -243,17 +272,13 @@ impl Parser {
                 self.consume_char(',');
                 self.skip_spaces();
 
-                // Check if this is the final output expression
-                if self.peek_char() == Some('"') {
-                    let literal = self.parse_string_literal()?;
-                    return Ok(Expression::Sequence(exprs, Some(Box::new(literal))));
-                }
-
                 exprs.push(self.parse_single_expression()?);
                 self.skip_spaces();
             }
 
-            Ok(Expression::Sequence(exprs, None))
+            // The last expression is the output
+            let output = exprs.pop();
+            Ok(Expression::Sequence(exprs, output.map(Box::new)))
         } else {
             Ok(first)
         }
