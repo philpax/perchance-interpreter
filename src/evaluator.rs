@@ -32,11 +32,18 @@ impl std::fmt::Display for EvalError {
 impl std::error::Error for EvalError {}
 
 #[derive(Debug, Clone)]
+struct ConsumableListState {
+    source_list_name: String,
+    remaining_indices: Vec<usize>,
+}
+
+#[derive(Debug, Clone)]
 enum Value {
     Text(String),
     List(String), // Reference to a list by name
     ListInstance(CompiledList), // An actual list instance (for sublists)
     Array(Vec<String>), // Multiple items (for selectMany/selectUnique before joinItems)
+    ConsumableList(String), // Reference to a consumable list by unique ID
 }
 
 pub struct Evaluator<'a, R: Rng> {
@@ -45,6 +52,8 @@ pub struct Evaluator<'a, R: Rng> {
     variables: HashMap<String, Value>,
     last_number: Option<i64>, // Track last number for {s} pluralization
     current_item: Option<CompiledItem>, // Track current item for `this` keyword
+    consumable_lists: HashMap<String, ConsumableListState>, // Track consumable lists
+    consumable_list_counter: usize, // Counter for generating unique IDs
 }
 
 impl<'a, R: Rng> Evaluator<'a, R> {
@@ -55,6 +64,8 @@ impl<'a, R: Rng> Evaluator<'a, R> {
             variables: HashMap::new(),
             last_number: None,
             current_item: None,
+            consumable_lists: HashMap::new(),
+            consumable_list_counter: 0,
         }
     }
 
@@ -585,6 +596,66 @@ impl<'a, R: Rng> Evaluator<'a, R> {
             }
             Value::ListInstance(list) => self.evaluate_list(&list),
             Value::Array(items) => Ok(items.join(" ")), // Default: space-separated
+            Value::ConsumableList(id) => {
+                // Get the consumable list state
+                let state = self.consumable_lists.get(&id).ok_or_else(|| {
+                    EvalError::UndefinedList(format!("Consumable list not found: {}", id))
+                })?;
+
+                // Check if there are any items left
+                if state.remaining_indices.is_empty() {
+                    return Err(EvalError::EmptyList(format!(
+                        "Consumable list '{}' has been exhausted",
+                        state.source_list_name
+                    )));
+                }
+
+                // Get the source list
+                let source_list_name = state.source_list_name.clone();
+                let source_list = self
+                    .program
+                    .get_list(&source_list_name)
+                    .ok_or_else(|| EvalError::UndefinedList(source_list_name.clone()))?;
+
+                // Clone the remaining indices before selecting
+                let remaining_indices = state.remaining_indices.clone();
+
+                // Select a random index from remaining_indices
+                let idx = self.rng.gen_range(0..remaining_indices.len());
+                let item_idx = remaining_indices[idx];
+
+                // Get the item
+                let item = source_list.items.get(item_idx).ok_or_else(|| {
+                    EvalError::EmptyList(format!(
+                        "Invalid index {} in consumable list",
+                        item_idx
+                    ))
+                })?;
+
+                // Remove the selected index from remaining_indices
+                let mut new_remaining = remaining_indices;
+                new_remaining.remove(idx);
+
+                // Update the consumable list state
+                self.consumable_lists.insert(
+                    id.clone(),
+                    ConsumableListState {
+                        source_list_name,
+                        remaining_indices: new_remaining,
+                    },
+                );
+
+                // Evaluate the item
+                if !item.sublists.is_empty() {
+                    let sublist_names: Vec<_> = item.sublists.keys().cloned().collect();
+                    let sidx = self.rng.gen_range(0..sublist_names.len());
+                    let sublist_name = &sublist_names[sidx];
+                    let sublist = item.sublists.get(sublist_name).unwrap();
+                    self.evaluate_list(sublist)
+                } else {
+                    self.evaluate_content(&item.content)
+                }
+            }
         }
     }
 
@@ -628,6 +699,10 @@ impl<'a, R: Rng> Evaluator<'a, R> {
             ))),
             Value::Array(_) => Err(EvalError::TypeError(format!(
                 "Cannot access property '{}' on array value",
+                prop_name
+            ))),
+            Value::ConsumableList(_) => Err(EvalError::TypeError(format!(
+                "Cannot access property '{}' on consumable list",
                 prop_name
             ))),
         }
@@ -692,6 +767,11 @@ impl<'a, R: Rng> Evaluator<'a, R> {
                             let idx = self.rng.gen_range(0..items.len());
                             Ok(Value::Text(items[idx].clone()))
                         }
+                    }
+                    Value::ConsumableList(_) => {
+                        // For consumable lists, convert to string (which consumes an item)
+                        let result = self.value_to_string(value.clone())?;
+                        Ok(Value::Text(result))
                     }
                 }
             }
@@ -760,6 +840,12 @@ impl<'a, R: Rng> Evaluator<'a, R> {
                     Value::Array(items) => {
                         // selectAll on an array just returns the array
                         Ok(Value::Array(items.clone()))
+                    }
+                    Value::ConsumableList(_) => {
+                        // selectAll is not meaningful for consumable lists
+                        Err(EvalError::InvalidMethodCall(
+                            "selectAll cannot be called on consumable lists".to_string(),
+                        ))
                     }
                 }
             }
@@ -832,6 +918,12 @@ impl<'a, R: Rng> Evaluator<'a, R> {
                             }
                         }
                         Ok(Value::Array(results))
+                    }
+                    Value::ConsumableList(_) => {
+                        // selectMany with repetition doesn't make sense for consumable lists
+                        Err(EvalError::InvalidMethodCall(
+                            "selectMany cannot be called on consumable lists (use selectUnique instead)".to_string(),
+                        ))
                     }
                 }
             }
@@ -936,6 +1028,15 @@ impl<'a, R: Rng> Evaluator<'a, R> {
                         }
                         Ok(Value::Array(results))
                     }
+                    Value::ConsumableList(_id) => {
+                        // For consumable lists, consume n items
+                        let mut results = Vec::new();
+                        for _ in 0..n {
+                            let result = self.value_to_string(value.clone())?;
+                            results.push(result);
+                        }
+                        Ok(Value::Array(results))
+                    }
                 }
             }
 
@@ -991,6 +1092,49 @@ impl<'a, R: Rng> Evaluator<'a, R> {
                         // Try converting to string first
                         let s = self.value_to_string(value.clone())?;
                         Ok(Value::Text(s))
+                    }
+                }
+            }
+
+            "consumableList" => {
+                // Create a consumable copy of the list
+                match value {
+                    Value::List(name) => {
+                        let list = self
+                            .program
+                            .get_list(name)
+                            .ok_or_else(|| EvalError::UndefinedList(name.clone()))?;
+
+                        // Generate unique ID for this consumable list
+                        let id = format!("__consumable_{}__", self.consumable_list_counter);
+                        self.consumable_list_counter += 1;
+
+                        // Create list of all item indices
+                        let remaining_indices: Vec<usize> = (0..list.items.len()).collect();
+
+                        // Store the consumable list state
+                        self.consumable_lists.insert(
+                            id.clone(),
+                            ConsumableListState {
+                                source_list_name: name.clone(),
+                                remaining_indices,
+                            },
+                        );
+
+                        // Return reference to consumable list
+                        Ok(Value::ConsumableList(id))
+                    }
+                    Value::ListInstance(_list) => {
+                        // For list instances, we can't create a consumable version
+                        // because we don't have a source list name
+                        Err(EvalError::InvalidMethodCall(
+                            "consumableList can only be called on named lists".to_string(),
+                        ))
+                    }
+                    _ => {
+                        Err(EvalError::InvalidMethodCall(
+                            "consumableList can only be called on lists".to_string(),
+                        ))
                     }
                 }
             }

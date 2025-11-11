@@ -769,3 +769,68 @@ fn test_join_items_default_separator() {
     // Default separator is space
     assert!(output.contains(" "));
 }
+
+// Tests for consumableList
+#[test]
+fn test_consumable_list_basic() {
+    let template = "item\n\ta\n\tb\n\tc\n\noutput\n\t[c = item.consumableList][c] [c] [c]\n";
+    let result = evaluate_with_seed(template, 42);
+    assert!(result.is_ok());
+    let output = result.unwrap();
+    // Should have 3 items (space-separated)
+    assert_eq!(output.split_whitespace().count(), 3);
+    // Each item should be one of a, b, c
+    let parts: Vec<&str> = output.split_whitespace().collect();
+    for part in &parts {
+        assert!(part == &"a" || part == &"b" || part == &"c");
+    }
+}
+
+#[test]
+fn test_consumable_list_exhaustion() {
+    let template = "item\n\ta\n\tb\n\noutput\n\t[c = item.consumableList][c] [c] [c]\n";
+    let result = evaluate_with_seed(template, 42);
+    // Should fail because we try to consume 3 items from a 2-item list
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_consumable_list_select_unique() {
+    let template = "item\n\ta\n\tb\n\tc\n\td\n\noutput\n\t[item.consumableList.selectUnique(3).joinItems(\", \")]\n";
+    let result = evaluate_with_seed(template, 42);
+    assert!(result.is_ok());
+    let output = result.unwrap();
+    // Should have 3 unique items
+    let parts: Vec<&str> = output.split(", ").collect();
+    assert_eq!(parts.len(), 3);
+    // All items should be unique
+    let mut sorted = parts.clone();
+    sorted.sort();
+    sorted.dedup();
+    assert_eq!(sorted.len(), 3);
+}
+
+#[test]
+fn test_consumable_list_no_duplicates() {
+    // Test that consumableList doesn't repeat items until exhausted
+    let template = "item\n\ta\n\tb\n\tc\n\noutput\n\t[c = item.consumableList][c], [c], [c]\n";
+    let result = evaluate_with_seed(template, 42);
+    assert!(result.is_ok());
+    let output = result.unwrap();
+    let parts: Vec<&str> = output.split(", ").collect();
+    assert_eq!(parts.len(), 3);
+    // All three should be different
+    let mut sorted = parts.clone();
+    sorted.sort();
+    sorted.dedup();
+    assert_eq!(sorted.len(), 3, "Expected all items to be unique, got: {}", output);
+}
+
+#[test]
+fn test_consumable_list_independent_instances() {
+    // Test that different consumableList instances are independent
+    let template = "item\n\ta\n\tb\n\tc\n\noutput\n\t[c1 = item.consumableList][c2 = item.consumableList][c1] [c2]\n";
+    let result = evaluate_with_seed(template, 42);
+    assert!(result.is_ok());
+    // Both c1 and c2 should work independently
+}
