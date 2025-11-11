@@ -281,8 +281,7 @@ impl<'a, R: Rng> Evaluator<'a, R> {
                     Err(EvalError::UndefinedProperty(_, _)) => {
                         // Try as a method call with no arguments
                         let method = MethodCall::new(prop.name.clone());
-                        let result = self.call_method(&base_value, &method)?;
-                        Ok(Value::Text(result))
+                        self.call_method_value(&base_value, &method)
                     }
                     Err(e) => Err(e),
                 }
@@ -290,8 +289,7 @@ impl<'a, R: Rng> Evaluator<'a, R> {
 
             Expression::Method(base, method) => {
                 let base_value = self.evaluate_to_value(base)?;
-                let result = self.call_method(&base_value, method)?;
-                Ok(Value::Text(result))
+                self.call_method_value(&base_value, method)
             }
 
             _ => {
@@ -362,53 +360,72 @@ impl<'a, R: Rng> Evaluator<'a, R> {
     }
 
     fn call_method(&mut self, value: &Value, method: &MethodCall) -> Result<String, EvalError> {
+        let value_result = self.call_method_value(value, method)?;
+        self.value_to_string(value_result)
+    }
+
+    fn call_method_value(&mut self, value: &Value, method: &MethodCall) -> Result<Value, EvalError> {
         match method.name.as_str() {
             "selectOne" => {
-                // Select one item from the list
+                // Select one item from the list and return it as a Value
                 match value {
                     Value::List(name) => {
                         let list = self
                             .program
                             .get_list(name)
                             .ok_or_else(|| EvalError::UndefinedList(name.clone()))?;
-                        // Select an item and store it as a ListInstance
-                        let item =
-                            self.select_weighted_item(&list.items, list.total_weight)?.clone();
 
-                        // If item has sublists, pick one
+                        let item = self.select_weighted_item(&list.items, list.total_weight)?.clone();
+
+                        // If item has sublists, pick one randomly and return it
                         if !item.sublists.is_empty() {
                             let sublist_names: Vec<_> = item.sublists.keys().cloned().collect();
                             let idx = self.rng.gen_range(0..sublist_names.len());
                             let sublist_name = &sublist_names[idx];
                             let sublist = item.sublists.get(sublist_name).unwrap();
-                            return self.evaluate_list(sublist);
+                            return Ok(Value::ListInstance(sublist.clone()));
                         }
 
-                        self.evaluate_content(&item.content)
+                        // No sublists, evaluate content directly
+                        let result = self.evaluate_content(&item.content)?;
+                        Ok(Value::Text(result))
                     }
-                    Value::ListInstance(list) => self.evaluate_list(list),
-                    Value::Text(s) => Ok(s.clone()),
+                    Value::ListInstance(list) => {
+                        let item = self.select_weighted_item(&list.items, list.total_weight)?.clone();
+
+                        if !item.sublists.is_empty() {
+                            let sublist_names: Vec<_> = item.sublists.keys().cloned().collect();
+                            let idx = self.rng.gen_range(0..sublist_names.len());
+                            let sublist_name = &sublist_names[idx];
+                            let sublist = item.sublists.get(sublist_name).unwrap();
+                            return Ok(Value::ListInstance(sublist.clone()));
+                        }
+
+                        let result = self.evaluate_content(&item.content)?;
+                        Ok(Value::Text(result))
+                    }
+                    Value::Text(s) => Ok(Value::Text(s.clone())),
                 }
             }
 
             "upperCase" => {
                 let s = self.value_to_string(value.clone())?;
-                Ok(s.to_uppercase())
+                Ok(Value::Text(s.to_uppercase()))
             }
 
             "lowerCase" => {
                 let s = self.value_to_string(value.clone())?;
-                Ok(s.to_lowercase())
+                Ok(Value::Text(s.to_lowercase()))
             }
 
             "titleCase" => {
                 let s = self.value_to_string(value.clone())?;
-                Ok(to_title_case(&s))
+                Ok(Value::Text(to_title_case(&s)))
             }
 
             "sentenceCase" => {
                 let s = self.value_to_string(value.clone())?;
-                Ok(to_sentence_case(&s))
+                Ok(Value::Text(to_sentence_case(&s)))
             }
 
             _ => Err(EvalError::InvalidMethodCall(format!(
