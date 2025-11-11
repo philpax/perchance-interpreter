@@ -44,6 +44,7 @@ pub struct Evaluator<'a, R: Rng> {
     rng: &'a mut R,
     variables: HashMap<String, Value>,
     last_number: Option<i64>, // Track last number for {s} pluralization
+    current_item: Option<CompiledItem>, // Track current item for `this` keyword
 }
 
 impl<'a, R: Rng> Evaluator<'a, R> {
@@ -53,6 +54,7 @@ impl<'a, R: Rng> Evaluator<'a, R> {
             rng,
             variables: HashMap::new(),
             last_number: None,
+            current_item: None,
         }
     }
 
@@ -65,17 +67,35 @@ impl<'a, R: Rng> Evaluator<'a, R> {
     }
 
     fn evaluate_list(&mut self, list: &CompiledList) -> Result<String, EvalError> {
-        // Check if list has $output property
-        if let Some(output_content) = &list.output {
-            return self.evaluate_content(output_content);
-        }
-
-        if list.items.is_empty() {
+        if list.items.is_empty() && list.output.is_none() {
             return Err(EvalError::EmptyList(list.name.clone()));
         }
 
-        // Select an item based on weights
-        let item = self.select_weighted_item(&list.items, list.total_weight)?.clone();
+        // Select an item based on weights (if there are items)
+        let item = if !list.items.is_empty() {
+            Some(self.select_weighted_item(&list.items, list.total_weight)?.clone())
+        } else {
+            None
+        };
+
+        // Check if list has $output property
+        if let Some(output_content) = &list.output {
+            // Set current_item for `this` keyword access
+            let old_item = self.current_item.take();
+            if let Some(ref selected_item) = item {
+                self.current_item = Some(selected_item.clone());
+            }
+
+            let result = self.evaluate_content(output_content);
+
+            // Restore previous context
+            self.current_item = old_item;
+
+            return result;
+        }
+
+        // No $output, use normal evaluation
+        let item = item.unwrap(); // Safe because we checked items.is_empty() above
 
         // If the item has sublists, first select a sublist, then select from it
         if !item.sublists.is_empty() {
@@ -310,6 +330,13 @@ impl<'a, R: Rng> Evaluator<'a, R> {
     fn evaluate_expression(&mut self, expr: &Expression) -> Result<String, EvalError> {
         match expr {
             Expression::Simple(ident) => {
+                // Check for "this" keyword
+                if ident.name == "this" {
+                    return Err(EvalError::TypeError(
+                        "Cannot use 'this' without property access (use this.property)".to_string()
+                    ));
+                }
+
                 // Check if it's a variable first
                 if let Some(value) = self.variables.get(&ident.name) {
                     return self.value_to_string(value.clone());
@@ -323,6 +350,28 @@ impl<'a, R: Rng> Evaluator<'a, R> {
             }
 
             Expression::Property(base, prop) => {
+                // Special handling for "this" keyword
+                if let Expression::Simple(ident) = base.as_ref() {
+                    if ident.name == "this" {
+                        // Access property from current_item and evaluate it
+                        if let Some(ref item) = self.current_item {
+                            if let Some(sublist) = item.sublists.get(&prop.name) {
+                                let sublist_clone = sublist.clone();
+                                return self.evaluate_list(&sublist_clone);
+                            } else {
+                                return Err(EvalError::UndefinedProperty(
+                                    "this".to_string(),
+                                    prop.name.clone(),
+                                ));
+                            }
+                        } else {
+                            return Err(EvalError::TypeError(
+                                "'this' keyword can only be used within $output".to_string()
+                            ));
+                        }
+                    }
+                }
+
                 let base_value = self.evaluate_to_value(base)?;
                 // Try as property first, then as a zero-argument method
                 match self.get_property(&base_value, &prop.name) {
@@ -457,6 +506,13 @@ impl<'a, R: Rng> Evaluator<'a, R> {
     fn evaluate_to_value(&mut self, expr: &Expression) -> Result<Value, EvalError> {
         match expr {
             Expression::Simple(ident) => {
+                // Handle "this" keyword
+                if ident.name == "this" {
+                    return Err(EvalError::TypeError(
+                        "Cannot use 'this' without property access (use this.property)".to_string()
+                    ));
+                }
+
                 // Check variables first
                 if let Some(value) = self.variables.get(&ident.name) {
                     return Ok(value.clone());
@@ -471,6 +527,27 @@ impl<'a, R: Rng> Evaluator<'a, R> {
             }
 
             Expression::Property(base, prop) => {
+                // Special handling for "this" keyword
+                if let Expression::Simple(ident) = base.as_ref() {
+                    if ident.name == "this" {
+                        // Access property from current_item
+                        if let Some(ref item) = self.current_item {
+                            if let Some(sublist) = item.sublists.get(&prop.name) {
+                                return Ok(Value::ListInstance(sublist.clone()));
+                            } else {
+                                return Err(EvalError::UndefinedProperty(
+                                    "this".to_string(),
+                                    prop.name.clone(),
+                                ));
+                            }
+                        } else {
+                            return Err(EvalError::TypeError(
+                                "'this' keyword can only be used within $output".to_string()
+                            ));
+                        }
+                    }
+                }
+
                 let base_value = self.evaluate_to_value(base)?;
                 // Try as property first, then as a zero-argument method
                 match self.get_property_value(&base_value, &prop.name) {
