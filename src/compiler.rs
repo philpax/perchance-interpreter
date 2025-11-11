@@ -12,6 +12,7 @@ pub struct CompiledList {
     pub name: String,
     pub items: Vec<CompiledItem>,
     pub total_weight: f64,
+    pub output: Option<Vec<ContentPart>>, // $output property
 }
 
 #[derive(Debug, Clone)]
@@ -64,6 +65,7 @@ impl CompiledList {
             name,
             items: Vec::new(),
             total_weight: 0.0,
+            output: None,
         }
     }
 
@@ -108,7 +110,7 @@ pub fn compile(program: &Program) -> Result<CompiledProgram, CompileError> {
 }
 
 fn compile_list(list: &List) -> Result<CompiledList, CompileError> {
-    if list.items.is_empty() {
+    if list.items.is_empty() && list.output.is_none() {
         return Err(CompileError::EmptyList(list.name.clone()));
     }
 
@@ -118,6 +120,9 @@ fn compile_list(list: &List) -> Result<CompiledList, CompileError> {
         let compiled_item = compile_item(item)?;
         compiled_list.add_item(compiled_item);
     }
+
+    // Copy the output field
+    compiled_list.output = list.output.clone();
 
     Ok(compiled_list)
 }

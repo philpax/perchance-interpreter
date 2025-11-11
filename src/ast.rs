@@ -9,6 +9,7 @@ pub struct Program {
 pub struct List {
     pub name: String,
     pub items: Vec<Item>,
+    pub output: Option<Vec<ContentPart>>, // $output property
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -118,11 +119,16 @@ impl List {
         List {
             name,
             items: Vec::new(),
+            output: None,
         }
     }
 
     pub fn add_item(&mut self, item: Item) {
         self.items.push(item);
+    }
+
+    pub fn set_output(&mut self, output: Vec<ContentPart>) {
+        self.output = Some(output);
     }
 }
 

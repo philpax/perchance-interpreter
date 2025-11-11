@@ -108,8 +108,35 @@ impl Parser {
             } else if indent == item_indent {
                 // Parse item
                 self.skip_indent(item_indent);
-                let item = self.parse_item(item_indent)?;
-                list.add_item(item);
+
+                // Check if this is a $output line
+                if self.peek_identifier() == "$output" {
+                    let _ = self.parse_identifier(); // consume "$output"
+                    self.skip_spaces();
+
+                    // Expect = sign
+                    if self.peek_char() == Some('=') {
+                        self.consume_char('=');
+                        self.skip_spaces();
+
+                        // Parse the output content
+                        let output_content = self.parse_content_until_newline()?;
+                        list.set_output(output_content);
+
+                        self.skip_to_newline();
+                        if !self.is_eof() {
+                            self.consume_char('\n');
+                        }
+                    } else {
+                        return Err(ParseError::InvalidSyntax(
+                            "Expected '=' after $output".to_string(),
+                            self.line,
+                        ));
+                    }
+                } else {
+                    let item = self.parse_item(item_indent)?;
+                    list.add_item(item);
+                }
             } else {
                 // Too much indentation
                 return Err(ParseError::InvalidIndentation(self.line));
@@ -707,12 +734,39 @@ impl Parser {
         }
     }
 
+    fn peek_identifier(&self) -> String {
+        let mut ident = String::new();
+        let mut pos = self.pos;
+
+        // First character must be letter, underscore, or $
+        if pos < self.input.len() {
+            let ch = self.input[pos];
+            if ch.is_ascii_alphabetic() || ch == '_' || ch == '$' {
+                ident.push(ch);
+                pos += 1;
+            }
+        }
+
+        // Subsequent characters can be alphanumeric or underscore
+        while pos < self.input.len() {
+            let ch = self.input[pos];
+            if ch.is_ascii_alphanumeric() || ch == '_' {
+                ident.push(ch);
+                pos += 1;
+            } else {
+                break;
+            }
+        }
+
+        ident
+    }
+
     fn parse_identifier(&mut self) -> Result<String, ParseError> {
         let mut ident = String::new();
 
-        // First character must be letter or underscore
+        // First character must be letter, underscore, or $
         if let Some(&ch) = self.peek_char_ref() {
-            if ch.is_ascii_alphabetic() || ch == '_' {
+            if ch.is_ascii_alphabetic() || ch == '_' || ch == '$' {
                 ident.push(ch);
                 self.advance();
             }

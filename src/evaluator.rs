@@ -65,6 +65,11 @@ impl<'a, R: Rng> Evaluator<'a, R> {
     }
 
     fn evaluate_list(&mut self, list: &CompiledList) -> Result<String, EvalError> {
+        // Check if list has $output property
+        if let Some(output_content) = &list.output {
+            return self.evaluate_content(output_content);
+        }
+
         if list.items.is_empty() {
             return Err(EvalError::EmptyList(list.name.clone()));
         }
