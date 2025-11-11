@@ -25,9 +25,10 @@ This interpreter implements core Perchance functionality:
 - **Property access** - Chained property access like `[character.wizard.name]`
 - **Methods without parentheses** - `[word.upperCase]` works correctly
 - **selectOne method** - Full support including property access `[c = list.selectOne, c.property]`
-
-### 🚧 Partially Implemented
-- Dynamic sub-list referencing with `[list[variable]]`
+- **Dynamic sub-list referencing** - `[list[variable]]` for computed property access
+- **Selection methods** - `selectMany(n)`, `selectUnique(n)`, `selectAll` for bulk selection
+- **Special inline functions** - `{a}` for smart articles, `{s}` for pluralization
+- **Grammar methods** - `pluralForm`, `pastTense`, `possessiveForm` for linguistic transformations
 
 ### ❌ Not Implemented (Out of Scope)
 - JavaScript code execution
@@ -38,8 +39,7 @@ This interpreter implements core Perchance functionality:
 - Import/export between generators
 - Conditional logic (if/else)
 - Loops and repetition
-- Grammar methods (`pluralForm`, `pastTense`, etc.)
-- Special inline functions (`{a}`, `{s}`)
+- Advanced grammar methods (`futureTense`, `negativeForm`, etc.)
 
 ## Installation
 
@@ -124,6 +124,51 @@ output
 	[x = animal, x] and [x]
 ```
 
+### Special Inline Functions
+
+```
+output
+	I saw {a} elephant and {a} dog.
+	I have 1 apple{s} and 3 orange{s}.
+```
+
+Output: "I saw an elephant and a dog. I have 1 apple and 3 oranges."
+
+### Grammar Methods
+
+```
+noun
+	child
+	city
+
+verb
+	run
+	walk
+
+name
+	James
+
+output
+	The [noun.pluralForm] [verb.pastTense].
+	[name.possessiveForm] book.
+```
+
+Output: "The children ran. James' book."
+
+### Selection Methods
+
+```
+color
+	red
+	blue
+	green
+
+output
+	[color.selectMany(3)]
+	[color.selectUnique(2)]
+	[color.selectAll]
+```
+
 ## Testing
 
 ```bash
@@ -147,7 +192,7 @@ None! All core features are working correctly.
 
 ## Test Results
 
-Current test status: **37 out of 37 integration tests passing (100%)** ✨
+Current test status: **55 out of 55 integration tests passing (100%)** ✨
 
 All categories working:
 - ✅ Basic list selection and determinism
@@ -160,17 +205,20 @@ All categories working:
 - ✅ String literals with references
 - ✅ **Hierarchical lists** (all depths)
 - ✅ **Property access** (chained)
-- ✅ **Methods** (upperCase, lowerCase, titleCase, sentenceCase)
-- ✅ **selectOne with property access** - Fully working!
+- ✅ **Text transformation methods** (upperCase, lowerCase, titleCase, sentenceCase)
+- ✅ **Selection methods** (selectOne, selectMany, selectUnique, selectAll)
+- ✅ **Special inline functions** ({a} for articles, {s} for pluralization)
+- ✅ **Grammar methods** (pluralForm, pastTense, possessiveForm)
 
 ## Future Work
 
 Potential enhancements:
-1. Add dynamic sub-list referencing support `[list[variable]]`
-2. Implement remaining methods (pluralForm, pastTense, futureTense, etc.)
-3. Add special inline functions (`{a}`, `{s}` for automatic article/pluralization)
-4. Implement `selectMany`, `selectUnique`, `selectAll` methods
-5. Add more text transformation methods from the Perchance spec
+1. Add more grammar methods (futureTense, negativeForm, comparative/superlative forms)
+2. Implement more sophisticated article selection (handle words like "university", "hour")
+3. Add number-to-word conversion method
+4. Implement string manipulation methods (substring, replace, trim, etc.)
+5. Add mathematical expression evaluation
+6. Improve plural/past tense rules for edge cases
 
 ## License
 

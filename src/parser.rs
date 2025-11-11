@@ -395,6 +395,26 @@ impl Parser {
         let start_line = self.line;
         self.consume_char('{');
 
+        // Check for special inline functions: {a} and {s}
+        if self.peek_char() == Some('a') {
+            let next_pos = self.pos + 1;
+            if next_pos < self.input.len() && self.input[next_pos] == '}' {
+                self.consume_char('a');
+                self.consume_char('}');
+                // Return a special inline that's handled differently in evaluator
+                return Ok(InlineList::new(vec![InlineChoice::new(vec![ContentPart::Article])]));
+            }
+        }
+
+        if self.peek_char() == Some('s') {
+            let next_pos = self.pos + 1;
+            if next_pos < self.input.len() && self.input[next_pos] == '}' {
+                self.consume_char('s');
+                self.consume_char('}');
+                return Ok(InlineList::new(vec![InlineChoice::new(vec![ContentPart::Pluralize])]));
+            }
+        }
+
         // Check for number range: {n-m}
         if self.is_number_range() {
             return self.parse_inline_number_range();

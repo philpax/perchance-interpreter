@@ -42,6 +42,7 @@ pub struct Evaluator<'a, R: Rng> {
     program: &'a CompiledProgram,
     rng: &'a mut R,
     variables: HashMap<String, Value>,
+    last_number: Option<i64>, // Track last number for {s} pluralization
 }
 
 impl<'a, R: Rng> Evaluator<'a, R> {
@@ -50,6 +51,7 @@ impl<'a, R: Rng> Evaluator<'a, R> {
             program,
             rng,
             variables: HashMap::new(),
+            last_number: None,
         }
     }
 
@@ -109,17 +111,81 @@ impl<'a, R: Rng> Evaluator<'a, R> {
     fn evaluate_content(&mut self, content: &[ContentPart]) -> Result<String, EvalError> {
         let mut result = String::new();
 
-        for part in content {
+        for (i, part) in content.iter().enumerate() {
             match part {
-                ContentPart::Text(text) => result.push_str(text),
+                ContentPart::Text(text) => {
+                    result.push_str(text);
+                    // Track numbers for {s} pluralization
+                    if let Some(num) = self.extract_number(text) {
+                        self.last_number = Some(num);
+                    }
+                }
                 ContentPart::Escape(ch) => result.push(*ch),
                 ContentPart::Reference(expr) => {
                     let value = self.evaluate_expression(expr)?;
+                    // Track numbers for {s} pluralization
+                    if let Ok(num) = value.parse::<i64>() {
+                        self.last_number = Some(num);
+                    }
                     result.push_str(&value);
                 }
                 ContentPart::Inline(inline) => {
+                    // Check if this is a special inline: {a} or {s}
+                    if inline.choices.len() == 1 && inline.choices[0].content.len() == 1 {
+                        match &inline.choices[0].content[0] {
+                            ContentPart::Article => {
+                                // {a} - choose "a" or "an" based on next word
+                                let next_word = self.peek_next_word(content, i + 1)?;
+                                if self.starts_with_vowel_sound(&next_word) {
+                                    result.push_str("an");
+                                } else {
+                                    result.push_str("a");
+                                }
+                                continue;
+                            }
+                            ContentPart::Pluralize => {
+                                // {s} - add "s" if last number != 1
+                                if let Some(num) = self.last_number {
+                                    if num != 1 && num != -1 {
+                                        result.push('s');
+                                    }
+                                } else {
+                                    // Default to plural if no number context
+                                    result.push('s');
+                                }
+                                continue;
+                            }
+                            _ => {}
+                        }
+                    }
+
+                    // Regular inline evaluation
                     let value = self.evaluate_inline(inline)?;
+                    // Track numbers for {s} pluralization
+                    if let Ok(num) = value.parse::<i64>() {
+                        self.last_number = Some(num);
+                    }
                     result.push_str(&value);
+                }
+                ContentPart::Article => {
+                    // {a} - choose "a" or "an" based on next word
+                    let next_word = self.peek_next_word(content, i + 1)?;
+                    if self.starts_with_vowel_sound(&next_word) {
+                        result.push_str("an");
+                    } else {
+                        result.push_str("a");
+                    }
+                }
+                ContentPart::Pluralize => {
+                    // {s} - add "s" if last number != 1
+                    if let Some(num) = self.last_number {
+                        if num != 1 && num != -1 {
+                            result.push('s');
+                        }
+                    } else {
+                        // Default to plural if no number context
+                        result.push('s');
+                    }
                 }
             }
         }
@@ -171,6 +237,68 @@ impl<'a, R: Rng> Evaluator<'a, R> {
 
         // Fallback
         self.evaluate_content(&inline.choices[inline.choices.len() - 1].content)
+    }
+
+    // Helper function to extract a number from text
+    fn extract_number(&self, text: &str) -> Option<i64> {
+        // Look for any number in the text (last one wins)
+        let mut last_num = None;
+        for word in text.split_whitespace() {
+            if let Ok(num) = word.trim_matches(|c: char| !c.is_ascii_digit() && c != '-').parse::<i64>() {
+                last_num = Some(num);
+            }
+        }
+        last_num
+    }
+
+    // Helper function to peek at the next word in content
+    fn peek_next_word(&mut self, content: &[ContentPart], start_idx: usize) -> Result<String, EvalError> {
+        for part in &content[start_idx..] {
+            match part {
+                ContentPart::Text(text) => {
+                    // Get the first word from the text
+                    if let Some(word) = text.split_whitespace().next() {
+                        if !word.is_empty() {
+                            return Ok(word.to_string());
+                        }
+                    }
+                }
+                ContentPart::Reference(expr) => {
+                    // Evaluate the reference to get the word
+                    let value = self.evaluate_expression(expr)?;
+                    if let Some(word) = value.split_whitespace().next() {
+                        if !word.is_empty() {
+                            return Ok(word.to_string());
+                        }
+                    }
+                }
+                ContentPart::Inline(inline) => {
+                    // Evaluate the inline to get the word
+                    let value = self.evaluate_inline(inline)?;
+                    if let Some(word) = value.split_whitespace().next() {
+                        if !word.is_empty() {
+                            return Ok(word.to_string());
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+        // If no word found, default to consonant article "a"
+        Ok(String::from("word"))
+    }
+
+    // Helper function to check if a word starts with a vowel sound
+    fn starts_with_vowel_sound(&self, word: &str) -> bool {
+        if word.is_empty() {
+            return false;
+        }
+
+        let first_char = word.chars().next().unwrap().to_ascii_lowercase();
+
+        // Simple vowel check - could be enhanced with special cases
+        // (e.g., "hour" starts with vowel sound, "university" doesn't)
+        matches!(first_char, 'a' | 'e' | 'i' | 'o' | 'u')
     }
 
     fn evaluate_expression(&mut self, expr: &Expression) -> Result<String, EvalError> {
@@ -428,6 +556,210 @@ impl<'a, R: Rng> Evaluator<'a, R> {
                 Ok(Value::Text(to_sentence_case(&s)))
             }
 
+            "selectAll" => {
+                // Return all items as a joined string
+                match value {
+                    Value::List(name) => {
+                        let list = self
+                            .program
+                            .get_list(name)
+                            .ok_or_else(|| EvalError::UndefinedList(name.clone()))?;
+
+                        let mut results = Vec::new();
+                        for item in &list.items {
+                            if !item.sublists.is_empty() {
+                                let sublist_names: Vec<_> = item.sublists.keys().cloned().collect();
+                                for sublist_name in sublist_names {
+                                    if let Some(sublist) = item.sublists.get(&sublist_name) {
+                                        results.push(self.evaluate_list(sublist)?);
+                                    }
+                                }
+                            } else {
+                                results.push(self.evaluate_content(&item.content)?);
+                            }
+                        }
+                        Ok(Value::Text(results.join(" ")))
+                    }
+                    Value::ListInstance(list) => {
+                        let mut results = Vec::new();
+                        for item in &list.items {
+                            if !item.sublists.is_empty() {
+                                let sublist_names: Vec<_> = item.sublists.keys().cloned().collect();
+                                for sublist_name in sublist_names {
+                                    if let Some(sublist) = item.sublists.get(&sublist_name) {
+                                        results.push(self.evaluate_list(sublist)?);
+                                    }
+                                }
+                            } else {
+                                results.push(self.evaluate_content(&item.content)?);
+                            }
+                        }
+                        Ok(Value::Text(results.join(" ")))
+                    }
+                    Value::Text(s) => Ok(Value::Text(s.clone())),
+                }
+            }
+
+            "selectMany" => {
+                // Select n items with repetition
+                let n = if method.args.is_empty() {
+                    return Err(EvalError::InvalidMethodCall(
+                        "selectMany requires an argument".to_string(),
+                    ));
+                } else {
+                    // Evaluate the argument to get the number
+                    let arg_str = self.evaluate_expression(&method.args[0])?;
+                    arg_str.parse::<usize>().map_err(|_| {
+                        EvalError::InvalidMethodCall(format!(
+                            "selectMany argument must be a number, got: {}",
+                            arg_str
+                        ))
+                    })?
+                };
+
+                match value {
+                    Value::List(name) => {
+                        let list = self
+                            .program
+                            .get_list(name)
+                            .ok_or_else(|| EvalError::UndefinedList(name.clone()))?;
+
+                        let mut results = Vec::new();
+                        for _ in 0..n {
+                            let item = self.select_weighted_item(&list.items, list.total_weight)?.clone();
+                            if !item.sublists.is_empty() {
+                                let sublist_names: Vec<_> = item.sublists.keys().cloned().collect();
+                                let idx = self.rng.gen_range(0..sublist_names.len());
+                                let sublist_name = &sublist_names[idx];
+                                if let Some(sublist) = item.sublists.get(sublist_name) {
+                                    results.push(self.evaluate_list(sublist)?);
+                                }
+                            } else {
+                                results.push(self.evaluate_content(&item.content)?);
+                            }
+                        }
+                        Ok(Value::Text(results.join(" ")))
+                    }
+                    Value::ListInstance(list) => {
+                        let mut results = Vec::new();
+                        for _ in 0..n {
+                            let item = self.select_weighted_item(&list.items, list.total_weight)?.clone();
+                            if !item.sublists.is_empty() {
+                                let sublist_names: Vec<_> = item.sublists.keys().cloned().collect();
+                                let idx = self.rng.gen_range(0..sublist_names.len());
+                                let sublist_name = &sublist_names[idx];
+                                if let Some(sublist) = item.sublists.get(sublist_name) {
+                                    results.push(self.evaluate_list(sublist)?);
+                                }
+                            } else {
+                                results.push(self.evaluate_content(&item.content)?);
+                            }
+                        }
+                        Ok(Value::Text(results.join(" ")))
+                    }
+                    Value::Text(s) => Ok(Value::Text(s.clone())),
+                }
+            }
+
+            "selectUnique" => {
+                // Select n unique items without repetition
+                let n = if method.args.is_empty() {
+                    return Err(EvalError::InvalidMethodCall(
+                        "selectUnique requires an argument".to_string(),
+                    ));
+                } else {
+                    let arg_str = self.evaluate_expression(&method.args[0])?;
+                    arg_str.parse::<usize>().map_err(|_| {
+                        EvalError::InvalidMethodCall(format!(
+                            "selectUnique argument must be a number, got: {}",
+                            arg_str
+                        ))
+                    })?
+                };
+
+                match value {
+                    Value::List(name) => {
+                        let list = self
+                            .program
+                            .get_list(name)
+                            .ok_or_else(|| EvalError::UndefinedList(name.clone()))?;
+
+                        if n > list.items.len() {
+                            return Err(EvalError::InvalidMethodCall(format!(
+                                "Cannot select {} unique items from list with {} items",
+                                n, list.items.len()
+                            )));
+                        }
+
+                        let mut available_indices: Vec<usize> = (0..list.items.len()).collect();
+                        let mut results = Vec::new();
+
+                        for _ in 0..n {
+                            let idx = self.rng.gen_range(0..available_indices.len());
+                            let item_idx = available_indices.remove(idx);
+                            let item = &list.items[item_idx];
+
+                            if !item.sublists.is_empty() {
+                                let sublist_names: Vec<_> = item.sublists.keys().cloned().collect();
+                                let sidx = self.rng.gen_range(0..sublist_names.len());
+                                let sublist_name = &sublist_names[sidx];
+                                if let Some(sublist) = item.sublists.get(sublist_name) {
+                                    results.push(self.evaluate_list(sublist)?);
+                                }
+                            } else {
+                                results.push(self.evaluate_content(&item.content)?);
+                            }
+                        }
+                        Ok(Value::Text(results.join(" ")))
+                    }
+                    Value::ListInstance(list) => {
+                        if n > list.items.len() {
+                            return Err(EvalError::InvalidMethodCall(format!(
+                                "Cannot select {} unique items from list with {} items",
+                                n, list.items.len()
+                            )));
+                        }
+
+                        let mut available_indices: Vec<usize> = (0..list.items.len()).collect();
+                        let mut results = Vec::new();
+
+                        for _ in 0..n {
+                            let idx = self.rng.gen_range(0..available_indices.len());
+                            let item_idx = available_indices.remove(idx);
+                            let item = &list.items[item_idx];
+
+                            if !item.sublists.is_empty() {
+                                let sublist_names: Vec<_> = item.sublists.keys().cloned().collect();
+                                let sidx = self.rng.gen_range(0..sublist_names.len());
+                                let sublist_name = &sublist_names[sidx];
+                                if let Some(sublist) = item.sublists.get(sublist_name) {
+                                    results.push(self.evaluate_list(sublist)?);
+                                }
+                            } else {
+                                results.push(self.evaluate_content(&item.content)?);
+                            }
+                        }
+                        Ok(Value::Text(results.join(" ")))
+                    }
+                    Value::Text(s) => Ok(Value::Text(s.clone())),
+                }
+            }
+
+            "pluralForm" => {
+                let s = self.value_to_string(value.clone())?;
+                Ok(Value::Text(to_plural(&s)))
+            }
+
+            "pastTense" => {
+                let s = self.value_to_string(value.clone())?;
+                Ok(Value::Text(to_past_tense(&s)))
+            }
+
+            "possessiveForm" => {
+                let s = self.value_to_string(value.clone())?;
+                Ok(Value::Text(to_possessive(&s)))
+            }
+
             _ => Err(EvalError::InvalidMethodCall(format!(
                 "Unknown method: {}",
                 method.name
@@ -454,6 +786,123 @@ fn to_sentence_case(s: &str) -> String {
     match chars.next() {
         None => String::new(),
         Some(first) => first.to_uppercase().collect::<String>() + chars.as_str(),
+    }
+}
+
+fn to_plural(s: &str) -> String {
+    let s_trimmed = s.trim();
+    if s_trimmed.is_empty() {
+        return s.to_string();
+    }
+
+    let lower = s_trimmed.to_lowercase();
+
+    // Common irregular plurals
+    let irregulars = [
+        ("child", "children"), ("person", "people"), ("man", "men"),
+        ("woman", "women"), ("tooth", "teeth"), ("foot", "feet"),
+        ("mouse", "mice"), ("goose", "geese"), ("ox", "oxen"),
+        ("sheep", "sheep"), ("deer", "deer"), ("fish", "fish"),
+    ];
+
+    for (singular, plural) in &irregulars {
+        if lower == *singular {
+            return plural.to_string();
+        }
+    }
+
+    // Regular plural rules
+    if lower.ends_with("s") || lower.ends_with("ss") || lower.ends_with("sh")
+        || lower.ends_with("ch") || lower.ends_with("x") || lower.ends_with("z") {
+        return format!("{}es", s_trimmed);
+    } else if lower.ends_with("y") && s_trimmed.len() > 1 {
+        let second_last = s_trimmed.chars().nth(s_trimmed.len() - 2).unwrap();
+        if !"aeiou".contains(second_last.to_ascii_lowercase()) {
+            return format!("{}ies", &s_trimmed[..s_trimmed.len() - 1]);
+        }
+    } else if lower.ends_with("f") {
+        return format!("{}ves", &s_trimmed[..s_trimmed.len() - 1]);
+    } else if lower.ends_with("fe") {
+        return format!("{}ves", &s_trimmed[..s_trimmed.len() - 2]);
+    } else if lower.ends_with("o") && s_trimmed.len() > 1 {
+        let second_last = s_trimmed.chars().nth(s_trimmed.len() - 2).unwrap();
+        if !"aeiou".contains(second_last.to_ascii_lowercase()) {
+            return format!("{}es", s_trimmed);
+        }
+    }
+
+    // Default: add 's'
+    format!("{}s", s_trimmed)
+}
+
+fn to_past_tense(s: &str) -> String {
+    let s_trimmed = s.trim();
+    if s_trimmed.is_empty() {
+        return s.to_string();
+    }
+
+    let lower = s_trimmed.to_lowercase();
+
+    // Common irregular verbs
+    let irregulars = [
+        ("be", "was"), ("have", "had"), ("do", "did"), ("say", "said"),
+        ("go", "went"), ("get", "got"), ("make", "made"), ("know", "knew"),
+        ("think", "thought"), ("take", "took"), ("see", "saw"), ("come", "came"),
+        ("want", "wanted"), ("give", "gave"), ("use", "used"), ("find", "found"),
+        ("tell", "told"), ("ask", "asked"), ("work", "worked"), ("feel", "felt"),
+        ("leave", "left"), ("put", "put"), ("mean", "meant"), ("keep", "kept"),
+        ("let", "let"), ("begin", "began"), ("seem", "seemed"), ("help", "helped"),
+        ("show", "showed"), ("hear", "heard"), ("play", "played"), ("run", "ran"),
+        ("move", "moved"), ("live", "lived"), ("believe", "believed"), ("bring", "brought"),
+        ("write", "wrote"), ("sit", "sat"), ("stand", "stood"), ("lose", "lost"),
+        ("pay", "paid"), ("meet", "met"), ("include", "included"), ("continue", "continued"),
+        ("set", "set"), ("learn", "learned"), ("change", "changed"), ("lead", "led"),
+        ("understand", "understood"), ("watch", "watched"), ("follow", "followed"),
+        ("stop", "stopped"), ("create", "created"), ("speak", "spoke"), ("read", "read"),
+        ("spend", "spent"), ("grow", "grew"), ("open", "opened"), ("walk", "walked"),
+        ("win", "won"), ("teach", "taught"), ("offer", "offered"), ("remember", "remembered"),
+        ("consider", "considered"), ("appear", "appeared"), ("buy", "bought"), ("serve", "served"),
+        ("die", "died"), ("send", "sent"), ("build", "built"), ("stay", "stayed"),
+        ("fall", "fell"), ("cut", "cut"), ("reach", "reached"), ("kill", "killed"),
+        ("raise", "raised"), ("pass", "passed"), ("sell", "sold"), ("decide", "decided"),
+        ("return", "returned"), ("explain", "explained"), ("hope", "hoped"), ("develop", "developed"),
+        ("carry", "carried"), ("break", "broke"), ("receive", "received"), ("agree", "agreed"),
+        ("support", "supported"), ("hit", "hit"), ("produce", "produced"), ("eat", "ate"),
+        ("cover", "covered"), ("catch", "caught"), ("draw", "drew"),
+    ];
+
+    for (present, past) in &irregulars {
+        if lower == *present {
+            return past.to_string();
+        }
+    }
+
+    // Regular past tense rules
+    if lower.ends_with("e") {
+        return format!("{}d", s_trimmed);
+    } else if lower.ends_with("y") && s_trimmed.len() > 1 {
+        let second_last = s_trimmed.chars().nth(s_trimmed.len() - 2).unwrap();
+        if !"aeiou".contains(second_last.to_ascii_lowercase()) {
+            return format!("{}ied", &s_trimmed[..s_trimmed.len() - 1]);
+        }
+    }
+
+    // Default: add 'ed'
+    format!("{}ed", s_trimmed)
+}
+
+fn to_possessive(s: &str) -> String {
+    let s_trimmed = s.trim();
+    if s_trimmed.is_empty() {
+        return s.to_string();
+    }
+
+    // If it ends with 's', just add apostrophe
+    // Otherwise add apostrophe + s
+    if s_trimmed.ends_with('s') {
+        format!("{}'", s_trimmed)
+    } else {
+        format!("{}'s", s_trimmed)
     }
 }
 

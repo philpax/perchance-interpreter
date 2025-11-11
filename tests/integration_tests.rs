@@ -362,3 +362,153 @@ fn test_literal_string_in_sequence() {
     assert!(result.is_ok());
     assert_eq!(result.unwrap(), "Hello World");
 }
+
+#[test]
+fn test_article_consonant() {
+    let template = "output\n\tI saw {a} cat.\n";
+    let result = evaluate_with_seed(template, 42);
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), "I saw a cat.");
+}
+
+#[test]
+fn test_article_vowel() {
+    let template = "output\n\tI saw {a} elephant.\n";
+    let result = evaluate_with_seed(template, 42);
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), "I saw an elephant.");
+}
+
+#[test]
+fn test_article_with_reference() {
+    let template = "animal\n\tapple\n\tdog\n\noutput\n\tI saw {a} [animal].\n";
+    let result = evaluate_with_seed(template, 42);
+    assert!(result.is_ok());
+    let output = result.unwrap();
+    // Should be either "I saw an apple." or "I saw a dog."
+    assert!(output == "I saw an apple." || output == "I saw a dog.");
+}
+
+#[test]
+fn test_pluralize_singular() {
+    let template = "output\n\t1 apple{s}\n";
+    let result = evaluate_with_seed(template, 42);
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), "1 apple");
+}
+
+#[test]
+fn test_pluralize_plural() {
+    let template = "output\n\t3 apple{s}\n";
+    let result = evaluate_with_seed(template, 42);
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), "3 apples");
+}
+
+#[test]
+fn test_pluralize_with_zero() {
+    let template = "output\n\t0 apple{s}\n";
+    let result = evaluate_with_seed(template, 42);
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), "0 apples");
+}
+
+#[test]
+fn test_pluralize_with_reference() {
+    let template = "output\n\t{1-6} apple{s}\n";
+    let result = evaluate_with_seed(template, 42);
+    assert!(result.is_ok());
+    let output = result.unwrap();
+    // Should match pattern: "N apple(s)" where N is 1-6
+    assert!(output.ends_with(" apple") || output.ends_with(" apples"));
+}
+
+#[test]
+fn test_article_and_pluralize_combined() {
+    let template = "output\n\tI want {a} {1-3} orange{s}.\n";
+    let result = evaluate_with_seed(template, 42);
+    assert!(result.is_ok());
+    let output = result.unwrap();
+    // Should have proper article and pluralization
+    assert!(output.starts_with("I want a ") || output.starts_with("I want an "));
+}
+
+#[test]
+fn test_plural_form_regular() {
+    let template = "word\n\tcat\n\noutput\n\t[word.pluralForm]\n";
+    let result = evaluate_with_seed(template, 42);
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), "cats");
+}
+
+#[test]
+fn test_plural_form_irregular() {
+    let template = "word\n\tchild\n\noutput\n\t[word.pluralForm]\n";
+    let result = evaluate_with_seed(template, 42);
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), "children");
+}
+
+#[test]
+fn test_plural_form_es() {
+    let template = "word\n\tbox\n\noutput\n\t[word.pluralForm]\n";
+    let result = evaluate_with_seed(template, 42);
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), "boxes");
+}
+
+#[test]
+fn test_plural_form_y_to_ies() {
+    let template = "word\n\tcity\n\noutput\n\t[word.pluralForm]\n";
+    let result = evaluate_with_seed(template, 42);
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), "cities");
+}
+
+#[test]
+fn test_past_tense_regular() {
+    let template = "verb\n\twalk\n\noutput\n\t[verb.pastTense]\n";
+    let result = evaluate_with_seed(template, 42);
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), "walked");
+}
+
+#[test]
+fn test_past_tense_irregular() {
+    let template = "verb\n\tgo\n\noutput\n\t[verb.pastTense]\n";
+    let result = evaluate_with_seed(template, 42);
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), "went");
+}
+
+#[test]
+fn test_past_tense_ends_with_e() {
+    let template = "verb\n\tlove\n\noutput\n\t[verb.pastTense]\n";
+    let result = evaluate_with_seed(template, 42);
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), "loved");
+}
+
+#[test]
+fn test_possessive_form() {
+    let template = "name\n\tJohn\n\noutput\n\t[name.possessiveForm] book\n";
+    let result = evaluate_with_seed(template, 42);
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), "John's book");
+}
+
+#[test]
+fn test_possessive_form_ends_with_s() {
+    let template = "name\n\tJames\n\noutput\n\t[name.possessiveForm] book\n";
+    let result = evaluate_with_seed(template, 42);
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), "James' book");
+}
+
+#[test]
+fn test_grammar_methods_combined() {
+    let template = "noun\n\tdog\n\nverb\n\twalk\n\noutput\n\tThe [noun.pluralForm] [verb.pastTense].\n";
+    let result = evaluate_with_seed(template, 42);
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), "The dogs walked.");
+}

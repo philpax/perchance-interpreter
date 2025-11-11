@@ -24,6 +24,9 @@ pub enum ContentPart {
     Reference(Expression),
     Inline(InlineList),
     Escape(char),
+    // Special inline functions
+    Article,    // {a} - outputs "a" or "an" based on next word
+    Pluralize,  // {s} - outputs "s" for plural or "" for singular based on previous number
 }
 
 #[derive(Debug, Clone, PartialEq)]
