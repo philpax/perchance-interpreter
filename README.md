@@ -28,18 +28,20 @@ This interpreter implements core Perchance functionality:
 - **Dynamic sub-list referencing** - `[list[variable]]` for computed property access
 - **Selection methods** - `selectMany(n)`, `selectUnique(n)`, `selectAll` for bulk selection
 - **Special inline functions** - `{a}` for smart articles, `{s}` for pluralization
-- **Grammar methods** - `pluralForm`, `pastTense`, `possessiveForm` for linguistic transformations
+- **Grammar methods** - `pluralForm`, `pastTense`, `possessiveForm`, `futureTense`, `presentTense`, `negativeForm`, `singularForm`
+- **joinItems method** - Custom separators for list results: `[list.selectMany(3).joinItems(", ")]`
+- **Conditional logic** - Ternary operator `[condition ? true : false]`
+- **Binary operators** - `==`, `!=`, `<`, `>`, `<=`, `>=`, `&&`, `||`
+- **$output keyword** - Custom output for lists without random selection
 
 ### ❌ Not Implemented (Out of Scope)
 - JavaScript code execution
 - Plugin system
-- `$output` keyword
+- `this` keyword for accessing sibling properties
 - `consumableList` and stateful lists
 - HTML/CSS rendering
-- Import/export between generators
-- Conditional logic (if/else)
-- Loops and repetition
-- Advanced grammar methods (`futureTense`, `negativeForm`, etc.)
+- Import/export between generators with `{import:name}` syntax
+- Long-form if/else statements (ternary is supported)
 
 ## Installation
 
@@ -169,6 +171,47 @@ output
 	[color.selectAll]
 ```
 
+### Conditional Logic
+
+```
+number
+	{1-6}
+
+output
+	[n = number, n < 4 ? "Too bad" : "Nice!"]
+	[n > 2 && n < 5 ? "Middle" : "Edge"]
+	[n == 6 ? "Perfect!" : "Keep trying"]
+```
+
+### $output Keyword
+
+```
+greeting
+	hello
+	hi
+	hey
+	$output = Welcome to our service
+
+output
+	[greeting]
+```
+
+Output: "Welcome to our service" (always the same, no random selection)
+
+### joinItems with Custom Separator
+
+```
+fruit
+	apple
+	banana
+	orange
+
+output
+	[fruit.selectMany(3).joinItems(", ")]
+```
+
+Output: "banana, banana, orange" (or similar with comma separation)
+
 ## Testing
 
 ```bash
@@ -208,17 +251,24 @@ All categories working:
 - ✅ **Text transformation methods** (upperCase, lowerCase, titleCase, sentenceCase)
 - ✅ **Selection methods** (selectOne, selectMany, selectUnique, selectAll)
 - ✅ **Special inline functions** ({a} for articles, {s} for pluralization)
-- ✅ **Grammar methods** (pluralForm, pastTense, possessiveForm)
+- ✅ **Grammar methods** (pluralForm, pastTense, possessiveForm, futureTense, presentTense, negativeForm, singularForm)
+- ✅ **joinItems method** (custom separators for lists)
+- ✅ **Conditional logic** (ternary operator, binary operators)
+- ✅ **$output keyword** (custom list output)
 
 ## Future Work
 
 Potential enhancements:
-1. Add more grammar methods (futureTense, negativeForm, comparative/superlative forms)
-2. Implement more sophisticated article selection (handle words like "university", "hour")
-3. Add number-to-word conversion method
-4. Implement string manipulation methods (substring, replace, trim, etc.)
-5. Add mathematical expression evaluation
-6. Improve plural/past tense rules for edge cases
+1. **consumableList** - Stateful lists where items are removed after selection
+2. **Import/export system** - `{import:name}` syntax for composing generators
+3. **`this` keyword** - Access sibling properties within $output (e.g., `[this.name]`)
+4. **Long-form if/else** - `[if (cond) {a} else {b}]` syntax alongside ternary
+5. Add more sophisticated article selection (handle words like "university", "hour")
+6. Add number-to-word conversion method
+7. Implement string manipulation methods (substring, replace, trim, etc.)
+8. Add mathematical expression evaluation (+, -, *, /, etc.)
+9. Improve plural/past tense rules for edge cases
+10. Add comparative/superlative grammar forms
 
 ## License
 
