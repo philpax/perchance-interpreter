@@ -1,5 +1,8 @@
 # Perchance Interpreter
 
+[![CI](https://github.com/philpax/perchance-interpreter/workflows/CI/badge.svg)](https://github.com/philpax/perchance-interpreter/actions/workflows/ci.yml)
+[![Frontend CI](https://github.com/philpax/perchance-interpreter/workflows/Frontend%20CI/badge.svg)](https://github.com/philpax/perchance-interpreter/actions/workflows/frontend.yml)
+
 A Rust implementation of the Perchance template language with deterministic random generation.
 
 ## Features
@@ -68,6 +71,20 @@ This project includes a beautiful web-based frontend built with React, TypeScrip
 - **Modern UI**: Responsive design with Tailwind CSS
 
 ### Running the Frontend
+
+#### Quick Start (Recommended)
+
+Use the cross-platform Python build script:
+
+```bash
+# Setup and start development server
+python build-frontend.py --dev
+
+# Or just build for production
+python build-frontend.py --build
+```
+
+#### Manual Setup
 
 1. Build the WASM module:
    ```bash

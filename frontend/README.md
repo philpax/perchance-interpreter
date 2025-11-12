@@ -15,11 +15,26 @@ A beautiful, interactive web frontend for the Perchance template language interp
 
 ### Prerequisites
 
+- Python 3.7+
 - Node.js (v18 or later recommended)
 - Rust toolchain with `wasm-pack` installed
-- The WASM module built from `../perchance-wasm`
 
-### Setup
+### Quick Start (Recommended)
+
+From the project root, use the Python build script:
+
+```bash
+# Build WASM and start development server
+python build-frontend.py --dev
+
+# Build for production
+python build-frontend.py --build
+
+# See all options
+python build-frontend.py --help
+```
+
+### Manual Setup
 
 1. Build the WASM module:
    ```bash
