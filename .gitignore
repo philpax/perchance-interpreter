@@ -13,3 +13,12 @@ Cargo.lock
 # Added by cargo
 
 /target
+
+# Frontend
+/frontend/node_modules
+/frontend/dist
+/frontend/.vite
+
+# WASM build artifacts
+/frontend/src/wasm
+/perchance-wasm/target

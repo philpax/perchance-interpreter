@@ -1,5 +1,8 @@
 # Perchance Interpreter
 
+[![CI](https://github.com/philpax/perchance-interpreter/workflows/CI/badge.svg)](https://github.com/philpax/perchance-interpreter/actions/workflows/ci.yml)
+[![Frontend CI](https://github.com/philpax/perchance-interpreter/workflows/Frontend%20CI/badge.svg)](https://github.com/philpax/perchance-interpreter/actions/workflows/frontend.yml)
+
 A Rust implementation of the Perchance template language with deterministic random generation.
 
 ## Features
@@ -56,6 +59,48 @@ This interpreter implements core Perchance functionality:
 ```bash
 cargo build --release
 ```
+
+## Web Frontend
+
+This project includes a beautiful web-based frontend built with React, TypeScript, and WebAssembly. The frontend provides:
+
+- **Live Preview**: Real-time evaluation as you type
+- **Interactive Editor**: Syntax-highlighted editor with auto-completion
+- **Multiple Samples**: Generate many outputs from the same template
+- **Error Display**: Clear, helpful error messages
+- **Modern UI**: Responsive design with Tailwind CSS
+
+### Running the Frontend
+
+#### Quick Start (Recommended)
+
+Use the cross-platform Python build script:
+
+```bash
+# Setup and start development server
+python build-frontend.py --dev
+
+# Or just build for production
+python build-frontend.py --build
+```
+
+#### Manual Setup
+
+1. Build the WASM module:
+   ```bash
+   wasm-pack build perchance-wasm --target web --out-dir ../frontend/src/wasm
+   ```
+
+2. Start the development server:
+   ```bash
+   cd frontend
+   npm install
+   npm run dev
+   ```
+
+3. Open http://localhost:5173 in your browser
+
+For more details, see [frontend/README.md](frontend/README.md).
 
 ## Usage
 
