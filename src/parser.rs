@@ -170,10 +170,22 @@ impl Parser {
         // Parse item content until newline or weight
         let content = self.parse_content_until_newline()?;
 
-        // Check for weight (^number)
+        // Check for weight (^number or ^[expression])
         let weight = if self.peek_char() == Some('^') {
             self.consume_char('^');
-            Some(self.parse_number()?)
+            if self.peek_char() == Some('[') {
+                // Dynamic weight: ^[expression]
+                self.consume_char('[');
+                let expr = self.parse_expression_in_reference()?;
+                if self.peek_char() != Some(']') {
+                    return Err(ParseError::UnterminatedReference(self.line));
+                }
+                self.consume_char(']');
+                Some(ItemWeight::Dynamic(Box::new(expr)))
+            } else {
+                // Static weight: ^number
+                Some(ItemWeight::Static(self.parse_number()?))
+            }
         } else {
             None
         };
@@ -303,6 +315,11 @@ impl Parser {
         self.consume_char(']');
 
         Ok(expr)
+    }
+
+    fn parse_expression_in_reference(&mut self) -> Result<Expression, ParseError> {
+        // Similar to parse_reference but assumes '[' is already consumed
+        self.parse_expression()
     }
 
     fn parse_expression(&mut self) -> Result<Expression, ParseError> {
@@ -644,9 +661,21 @@ impl Parser {
                     content_buffer.push(ContentPart::Inline(inline));
                 }
                 '^' => {
-                    // Weight for this choice
+                    // Weight for this choice (^number or ^[expression])
                     self.consume_char('^');
-                    let weight = self.parse_number()?;
+                    let weight = if self.peek_char() == Some('[') {
+                        // Dynamic weight: ^[expression]
+                        self.consume_char('[');
+                        let expr = self.parse_expression_in_reference()?;
+                        if self.peek_char() != Some(']') {
+                            return Err(ParseError::UnterminatedReference(self.line));
+                        }
+                        self.consume_char(']');
+                        ItemWeight::Dynamic(Box::new(expr))
+                    } else {
+                        // Static weight: ^number
+                        ItemWeight::Static(self.parse_number()?)
+                    };
                     let mut choice = InlineChoice::new(content_buffer.clone());
                     choice = choice.with_weight(weight);
                     choices.push(choice);
@@ -1164,8 +1193,8 @@ mod tests {
         let input = "animal\n\tdog^2\n\tcat^0.5\n\tbird\n";
         let result = parse(input);
         let program = result.unwrap();
-        assert_eq!(program.lists[0].items[0].weight, Some(2.0));
-        assert_eq!(program.lists[0].items[1].weight, Some(0.5));
+        assert_eq!(program.lists[0].items[0].weight, Some(ItemWeight::Static(2.0)));
+        assert_eq!(program.lists[0].items[1].weight, Some(ItemWeight::Static(0.5)));
         assert_eq!(program.lists[0].items[2].weight, None);
     }
 }

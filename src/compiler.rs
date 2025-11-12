@@ -19,7 +19,8 @@ pub struct CompiledList {
 #[derive(Debug, Clone)]
 pub struct CompiledItem {
     pub content: Vec<ContentPart>,
-    pub weight: f64,
+    pub weight: f64,  // For static weights and as default for dynamic ones
+    pub dynamic_weight: Option<Expression>,  // For dynamic weights like ^[condition]
     pub sublists: HashMap<String, CompiledList>,
 }
 
@@ -93,6 +94,16 @@ impl CompiledItem {
         CompiledItem {
             content,
             weight,
+            dynamic_weight: None,
+            sublists: HashMap::new(),
+        }
+    }
+
+    pub fn new_with_dynamic_weight(content: Vec<ContentPart>, dynamic_weight: Expression) -> Self {
+        CompiledItem {
+            content,
+            weight: 0.0,  // Will be calculated at runtime
+            dynamic_weight: Some(dynamic_weight),
             sublists: HashMap::new(),
         }
     }
@@ -137,15 +148,23 @@ fn compile_list(list: &List) -> Result<CompiledList, CompileError> {
 }
 
 fn compile_item(item: &Item) -> Result<CompiledItem, CompileError> {
-    let weight = item.weight.unwrap_or(1.0);
-
-    if weight < 0.0 {
-        return Err(CompileError::InvalidWeight(
-            "Weight cannot be negative".to_string(),
-        ));
-    }
-
-    let mut compiled_item = CompiledItem::new(item.content.clone(), weight);
+    let mut compiled_item = match &item.weight {
+        Some(ItemWeight::Static(w)) => {
+            if *w < 0.0 {
+                return Err(CompileError::InvalidWeight(
+                    "Weight cannot be negative".to_string(),
+                ));
+            }
+            CompiledItem::new(item.content.clone(), *w)
+        }
+        Some(ItemWeight::Dynamic(expr)) => {
+            CompiledItem::new_with_dynamic_weight(item.content.clone(), *expr.clone())
+        }
+        None => {
+            // Default weight is 1.0
+            CompiledItem::new(item.content.clone(), 1.0)
+        }
+    };
 
     // Compile sublists
     for sublist in &item.sublists {

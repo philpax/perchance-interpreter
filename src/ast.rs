@@ -13,9 +13,15 @@ pub struct List {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub enum ItemWeight {
+    Static(f64),
+    Dynamic(Box<Expression>),
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub struct Item {
     pub content: Vec<ContentPart>,
-    pub weight: Option<f64>,
+    pub weight: Option<ItemWeight>,
     pub sublists: Vec<List>,
 }
 
@@ -38,7 +44,7 @@ pub struct InlineList {
 #[derive(Debug, Clone, PartialEq)]
 pub struct InlineChoice {
     pub content: Vec<ContentPart>,
-    pub weight: Option<f64>,
+    pub weight: Option<ItemWeight>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -48,6 +54,9 @@ pub enum Expression {
 
     // Property access: [animal.name]
     Property(Box<Expression>, Identifier),
+
+    // Property access with fallback: [animal.name || "default"]
+    PropertyWithFallback(Box<Expression>, Identifier, Box<Expression>),
 
     // Dynamic access: [animal[x]]
     Dynamic(Box<Expression>, Box<Expression>),
@@ -147,8 +156,18 @@ impl Item {
         }
     }
 
-    pub fn with_weight(mut self, weight: f64) -> Self {
+    pub fn with_weight(mut self, weight: ItemWeight) -> Self {
         self.weight = Some(weight);
+        self
+    }
+
+    pub fn with_static_weight(mut self, weight: f64) -> Self {
+        self.weight = Some(ItemWeight::Static(weight));
+        self
+    }
+
+    pub fn with_dynamic_weight(mut self, expr: Expression) -> Self {
+        self.weight = Some(ItemWeight::Dynamic(Box::new(expr)));
         self
     }
 
@@ -171,8 +190,13 @@ impl InlineChoice {
         }
     }
 
-    pub fn with_weight(mut self, weight: f64) -> Self {
+    pub fn with_weight(mut self, weight: ItemWeight) -> Self {
         self.weight = Some(weight);
+        self
+    }
+
+    pub fn with_static_weight(mut self, weight: f64) -> Self {
+        self.weight = Some(ItemWeight::Static(weight));
         self
     }
 }
