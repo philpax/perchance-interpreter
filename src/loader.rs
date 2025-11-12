@@ -4,6 +4,7 @@
 /// with implementations for both filesystem-based and in-memory loading.
 use async_trait::async_trait;
 use std::collections::HashMap;
+#[cfg(feature = "tokio-runtime")]
 use std::path::PathBuf;
 use std::sync::{Arc, RwLock};
 
@@ -47,10 +48,14 @@ pub trait GeneratorLoader: Send + Sync {
 ///
 /// Loads generators from a specified directory. Generator names are treated
 /// as filenames (with optional `.perchance` extension).
+///
+/// Only available with the `tokio-runtime` feature (not on WASM).
+#[cfg(feature = "tokio-runtime")]
 pub struct FolderLoader {
     base_path: PathBuf,
 }
 
+#[cfg(feature = "tokio-runtime")]
 impl FolderLoader {
     /// Create a new FolderLoader with the given base directory
     ///
@@ -69,6 +74,7 @@ impl FolderLoader {
     }
 }
 
+#[cfg(feature = "tokio-runtime")]
 #[async_trait]
 impl GeneratorLoader for FolderLoader {
     async fn load(&self, name: &str) -> Result<String, LoadError> {

@@ -6,9 +6,14 @@ edition = "2021"
 [dependencies]
 rand = "0.8"
 async-trait = "0.1"
-tokio = { version = "1", features = ["rt", "fs", "rt-multi-thread", "macros"] }
-futures = "0.3"
 async-recursion = "1.0"
+
+# Optional tokio support for file-based loader (not available on WASM)
+tokio = { version = "1", features = ["rt", "macros", "fs", "rt-multi-thread"], optional = true }
+
+[features]
+default = ["tokio-runtime"]
+tokio-runtime = ["tokio"]
 
 [dev-dependencies]
 tokio = { version = "1", features = ["rt", "fs", "macros", "rt-multi-thread"] }
@@ -17,3 +22,4 @@ tokio-test = "0.4"
 [[bin]]
 name = "perchance"
 path = "src/bin/main.rs"
+required-features = ["tokio-runtime"]
