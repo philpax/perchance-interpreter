@@ -9,6 +9,18 @@ fn test_simple_list_selection() {
 }
 
 #[test]
+fn test_simple_list_selection_with_multiline() {
+    let template = r#"animal
+    pig
+    cow
+    zebra
+sentence
+    That [animal] is very sneaky."#;
+    let output = evaluate_with_seed(template, 100).unwrap();
+    assert!(output == "dog" || output == "cat" || output == "bird");
+}
+
+#[test]
 fn test_deterministic_same_seed() {
     let template = "animal\n\tdog\n\tcat\n\tbird\n\noutput\n\t[animal]\n";
     let result1 = evaluate_with_seed(template, 12345).unwrap();
