@@ -22,49 +22,16 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  build-wasm:
-    name: Build WASM Module
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: wasm32-unknown-unknown
-
-      - name: Cache Rust dependencies
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-            perchance-wasm/target/
-          key: ${{ runner.os }}-cargo-wasm-${{ hashFiles('**/Cargo.lock', 'Cargo.toml', 'perchance-wasm/Cargo.toml') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-wasm-
-
-      - name: Install wasm-pack
-        run: |
-          if ! command -v wasm-pack &> /dev/null; then
-            curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
-          fi
-
-      - name: Build WASM module
-        run: |
-          wasm-pack build perchance-wasm \
-            --target web \
-            --out-dir ../frontend/src/wasm
-
   build-frontend:
     name: Build Frontend
-    needs: build-wasm
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
@@ -84,18 +51,6 @@ jobs:
           key: ${{ runner.os }}-cargo-wasm-${{ hashFiles('**/Cargo.lock', 'Cargo.toml', 'perchance-wasm/Cargo.toml') }}
           restore-keys: |
             ${{ runner.os }}-cargo-wasm-
-
-      - name: Install wasm-pack
-        run: |
-          if ! command -v wasm-pack &> /dev/null; then
-            curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
-          fi
-
-      - name: Build WASM module
-        run: |
-          wasm-pack build perchance-wasm \
-            --target web \
-            --out-dir ../frontend/src/wasm
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -104,17 +59,14 @@ jobs:
           cache: 'npm'
           cache-dependency-path: frontend/package-lock.json
 
-      - name: Install dependencies
-        working-directory: frontend
-        run: npm ci
+      - name: Install wasm-pack
+        run: |
+          if ! command -v wasm-pack &> /dev/null; then
+            curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+          fi
 
-      - name: Type check
-        working-directory: frontend
-        run: npm run build -- --mode development
-
-      - name: Build production
-        working-directory: frontend
-        run: npm run build
+      - name: Build frontend with build script
+        run: python build-frontend.py --build
 
   lint:
     name: Lint Frontend

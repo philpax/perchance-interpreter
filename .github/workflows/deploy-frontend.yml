@@ -26,6 +26,11 @@ jobs:
         with:
           path: source
 
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -45,19 +50,6 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-wasm-
 
-      - name: Install wasm-pack
-        run: |
-          if ! command -v wasm-pack &> /dev/null; then
-            curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
-          fi
-
-      - name: Build WASM module
-        working-directory: source
-        run: |
-          wasm-pack build perchance-wasm \
-            --target web \
-            --out-dir ../frontend/src/wasm
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -65,13 +57,15 @@ jobs:
           cache: 'npm'
           cache-dependency-path: source/frontend/package-lock.json
 
-      - name: Install dependencies
-        working-directory: source/frontend
-        run: npm ci
+      - name: Install wasm-pack
+        run: |
+          if ! command -v wasm-pack &> /dev/null; then
+            curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+          fi
 
-      - name: Build production frontend
-        working-directory: source/frontend
-        run: npm run build
+      - name: Build frontend with build script
+        working-directory: source
+        run: python build-frontend.py --build
 
       - name: Checkout GitHub Pages repository
         uses: actions/checkout@v4
