@@ -1,12 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import init, { evaluate_perchance, evaluate_multiple } from './wasm/perchance_wasm';
 
-interface EvalResult {
-  success: boolean;
-  output: string;
-  error: string | null;
-}
-
 const DEFAULT_TEMPLATE = `animal
 \tdog
 \tcat^2
@@ -39,25 +33,16 @@ function App() {
   }, []);
 
   // Evaluate template
-  const evaluate = useCallback((code: string, evalSeed?: number) => {
+  const evaluate = useCallback(async (code: string, evalSeed?: number) => {
     if (!wasmReady) return;
 
     try {
       const seedValue = BigInt(evalSeed ?? (parseInt(seed) || 42));
-      const result = evaluate_perchance(
-        code,
-        seedValue
-      ) as EvalResult;
-
-      if (result.success) {
-        setOutput(result.output);
-        setError(null);
-      } else {
-        setOutput('');
-        setError(result.error);
-      }
+      const result = await evaluate_perchance(code, seedValue);
+      setOutput(result);
+      setError(null);
     } catch (e) {
-      setError(`Error: ${e}`);
+      setError(String(e));
       setOutput('');
     }
   }, [wasmReady, seed]);
@@ -73,30 +58,17 @@ function App() {
   }, [template, autoEval, wasmReady, evaluate]);
 
   // Generate multiple samples
-  const generateSamples = () => {
+  const generateSamples = async () => {
     if (!wasmReady) return;
 
     try {
       const count = parseInt(sampleCount) || 5;
-      const results = evaluate_multiple(
-        template,
-        count,
-        undefined // Use random seed
-      ) as EvalResult[];
-
-      const outputs = results
-        .filter(r => r.success)
-        .map(r => r.output);
-
-      if (outputs.length > 0) {
-        setSamples(outputs);
-        setShowSamples(true);
-        setError(null);
-      } else if (results.length > 0 && !results[0].success) {
-        setError(results[0].error);
-      }
+      const results = await evaluate_multiple(template, count, undefined);
+      setSamples(results as string[]);
+      setShowSamples(true);
+      setError(null);
     } catch (e) {
-      setError(`Error: ${e}`);
+      setError(String(e));
     }
   };
 

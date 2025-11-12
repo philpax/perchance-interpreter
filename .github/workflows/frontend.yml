@@ -59,13 +59,6 @@ jobs:
             --target web \
             --out-dir ../frontend/src/wasm
 
-      - name: Upload WASM artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: wasm-module
-          path: frontend/src/wasm/
-          retention-days: 1
-
   build-frontend:
     name: Build Frontend
     needs: build-wasm
@@ -73,18 +66,43 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Cache Rust dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+            perchance-wasm/target/
+          key: ${{ runner.os }}-cargo-wasm-${{ hashFiles('**/Cargo.lock', 'Cargo.toml', 'perchance-wasm/Cargo.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-wasm-
+
+      - name: Install wasm-pack
+        run: |
+          if ! command -v wasm-pack &> /dev/null; then
+            curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+          fi
+
+      - name: Build WASM module
+        run: |
+          wasm-pack build perchance-wasm \
+            --target web \
+            --out-dir ../frontend/src/wasm
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
           cache-dependency-path: frontend/package-lock.json
-
-      - name: Download WASM artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: wasm-module
-          path: frontend/src/wasm/
 
       - name: Install dependencies
         working-directory: frontend
@@ -97,13 +115,6 @@ jobs:
       - name: Build production
         working-directory: frontend
         run: npm run build
-
-      - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: frontend-dist
-          path: frontend/dist/
-          retention-days: 7
 
   lint:
     name: Lint Frontend
@@ -125,7 +136,6 @@ jobs:
       - name: Run ESLint
         working-directory: frontend
         run: npx eslint . --max-warnings 0
-        continue-on-error: true
 
   test-build-script:
     name: Test Build Script
