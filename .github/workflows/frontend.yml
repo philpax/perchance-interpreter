@@ -169,8 +169,9 @@ jobs:
       - name: Install wasm-pack (Windows)
         if: runner.os == 'Windows'
         run: |
-          curl -LO https://github.com/rustwasm/wasm-pack/releases/download/v0.13.0/wasm-pack-v0.13.0-x86_64-pc-windows-msvc.tar.gz
-          tar -xzf wasm-pack-v0.13.0-x86_64-pc-windows-msvc.tar.gz
+          $url = "https://github.com/rustwasm/wasm-pack/releases/download/v0.13.0/wasm-pack-v0.13.0-x86_64-pc-windows-msvc.tar.gz"
+          Invoke-WebRequest -Uri $url -OutFile wasm-pack.tar.gz
+          tar -xzf wasm-pack.tar.gz
           Move-Item -Path wasm-pack-v0.13.0-x86_64-pc-windows-msvc\wasm-pack.exe -Destination $env:USERPROFILE\.cargo\bin\
         shell: powershell
 
