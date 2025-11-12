@@ -318,12 +318,72 @@ fn test_whitespace_preservation_in_text() {
 }
 
 #[test]
+fn test_tab_indentation() {
+    let template = "animal\n\tdog\n\tcat\n\noutput\n\t[animal]\n";
+    let result = evaluate_with_seed(template, 42);
+    assert!(result.is_ok());
+    let output = result.unwrap();
+    assert!(output == "dog" || output == "cat");
+}
+
+#[test]
 fn test_two_space_indentation() {
     let template = "animal\n  dog\n  cat\n\noutput\n  [animal]\n";
     let result = evaluate_with_seed(template, 42);
     assert!(result.is_ok());
     let output = result.unwrap();
     assert!(output == "dog" || output == "cat");
+}
+
+#[test]
+fn test_mixed_tab_and_space_indentation() {
+    // Test that different lists can use different indentation styles
+    let template = "animal\n\tdog\n\tcat\n\ncolor\n  red\n  blue\n\noutput\n\t[animal] [color]\n";
+    let result = evaluate_with_seed(template, 42);
+    assert!(result.is_ok());
+    let output = result.unwrap();
+    assert!(output.contains("dog") || output.contains("cat"));
+    assert!(output.contains("red") || output.contains("blue"));
+}
+
+#[test]
+fn test_hierarchical_with_tabs() {
+    let template = "creature\n\tmammal\n\t\tdog\n\t\tcat\n\tbird\n\t\tsparrow\n\t\teagle\n\noutput\n\t[creature]\n";
+    let result = evaluate_with_seed(template, 42);
+    assert!(result.is_ok());
+    let output = result.unwrap();
+    assert!(
+        output == "dog" || output == "cat" || output == "sparrow" || output == "eagle"
+    );
+}
+
+#[test]
+fn test_hierarchical_with_spaces() {
+    let template = "creature\n  mammal\n    dog\n    cat\n  bird\n    sparrow\n    eagle\n\noutput\n  [creature]\n";
+    let result = evaluate_with_seed(template, 42);
+    assert!(result.is_ok());
+    let output = result.unwrap();
+    assert!(
+        output == "dog" || output == "cat" || output == "sparrow" || output == "eagle"
+    );
+}
+
+#[test]
+fn test_properties_with_tabs() {
+    let template = "character\n\twizard\n\t\tname\n\t\t\tGandalf\n\t\t\tMerlin\n\noutput\n\t[character.wizard.name]\n";
+    let result = evaluate_with_seed(template, 42);
+    assert!(result.is_ok());
+    let output = result.unwrap();
+    assert!(output == "Gandalf" || output == "Merlin");
+}
+
+#[test]
+fn test_properties_with_spaces() {
+    let template = "character\n  wizard\n    name\n      Gandalf\n      Merlin\n\noutput\n  [character.wizard.name]\n";
+    let result = evaluate_with_seed(template, 42);
+    assert!(result.is_ok());
+    let output = result.unwrap();
+    assert!(output == "Gandalf" || output == "Merlin");
 }
 
 #[test]
