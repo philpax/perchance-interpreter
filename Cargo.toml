@@ -1,0 +1,11 @@
+[package]
+name = "perchance-interpreter"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+rand = "0.8"
+
+[[bin]]
+name = "perchance"
+path = "src/bin/main.rs"
