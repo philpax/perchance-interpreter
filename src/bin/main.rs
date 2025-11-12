@@ -1,7 +1,7 @@
 /// CLI tool for Perchance interpreter
 use perchance_interpreter::{compile_template, evaluate, evaluate_with_seed};
-use rand::SeedableRng;
 use rand::rngs::StdRng;
+use rand::SeedableRng;
 use std::env;
 use std::fs;
 use std::io::{self, Read};
@@ -40,12 +40,10 @@ fn main() {
     let template = if args[1] == "-" {
         // Read from stdin
         let mut buffer = String::new();
-        io::stdin()
-            .read_to_string(&mut buffer)
-            .unwrap_or_else(|e| {
-                eprintln!("Error reading from stdin: {}", e);
-                process::exit(1);
-            });
+        io::stdin().read_to_string(&mut buffer).unwrap_or_else(|e| {
+            eprintln!("Error reading from stdin: {}", e);
+            process::exit(1);
+        });
         buffer
     } else {
         // Read from file

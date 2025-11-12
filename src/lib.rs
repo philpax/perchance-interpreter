@@ -12,18 +12,17 @@
 /// let result = evaluate_with_seed(template, 42).unwrap();
 /// println!("{}", result);
 /// ```
-
 pub mod ast;
 pub mod compiler;
 pub mod evaluator;
 pub mod parser;
 
-use rand::SeedableRng;
 use rand::rngs::StdRng;
+use rand::SeedableRng;
 
 /// Re-export main types for convenience
 pub use ast::Program;
-pub use compiler::{CompiledProgram, CompileError};
+pub use compiler::{CompileError, CompiledProgram};
 pub use evaluator::EvalError;
 pub use parser::ParseError;
 
@@ -76,10 +75,7 @@ pub fn compile(program: &Program) -> Result<CompiledProgram, CompileError> {
 }
 
 /// Evaluate a compiled program with a provided RNG
-pub fn evaluate<R: rand::Rng>(
-    program: &CompiledProgram,
-    rng: &mut R,
-) -> Result<String, EvalError> {
+pub fn evaluate<R: rand::Rng>(program: &CompiledProgram, rng: &mut R) -> Result<String, EvalError> {
     evaluator::evaluate(program, rng)
 }
 
@@ -170,7 +166,7 @@ mod tests {
         assert!(result.is_ok());
 
         let num: i32 = result.unwrap().parse().unwrap();
-        assert!(num >= 1 && num <= 10);
+        assert!((1..=10).contains(&num));
     }
 
     #[test]

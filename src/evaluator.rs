@@ -40,10 +40,10 @@ struct ConsumableListState {
 #[derive(Debug, Clone)]
 enum Value {
     Text(String),
-    List(String), // Reference to a list by name
+    List(String),               // Reference to a list by name
     ListInstance(CompiledList), // An actual list instance (for sublists)
-    Array(Vec<String>), // Multiple items (for selectMany/selectUnique before joinItems)
-    ConsumableList(String), // Reference to a consumable list by unique ID
+    Array(Vec<String>),         // Multiple items (for selectMany/selectUnique before joinItems)
+    ConsumableList(String),     // Reference to a consumable list by unique ID
 }
 
 pub struct Evaluator<'a, R: Rng> {
@@ -84,7 +84,10 @@ impl<'a, R: Rng> Evaluator<'a, R> {
 
         // Select an item based on weights (if there are items)
         let item = if !list.items.is_empty() {
-            Some(self.select_weighted_item(&list.items, list.total_weight)?.clone())
+            Some(
+                self.select_weighted_item(&list.items, list.total_weight)?
+                    .clone(),
+            )
         } else {
             None
         };
@@ -176,7 +179,7 @@ impl<'a, R: Rng> Evaluator<'a, R> {
                                 if self.starts_with_vowel_sound(&next_word) {
                                     result.push_str("an");
                                 } else {
-                                    result.push_str("a");
+                                    result.push('a');
                                 }
                                 continue;
                             }
@@ -210,7 +213,7 @@ impl<'a, R: Rng> Evaluator<'a, R> {
                     if self.starts_with_vowel_sound(&next_word) {
                         result.push_str("an");
                     } else {
-                        result.push_str("a");
+                        result.push('a');
                     }
                 }
                 ContentPart::Pluralize => {
@@ -255,11 +258,7 @@ impl<'a, R: Rng> Evaluator<'a, R> {
         }
 
         // Calculate total weight
-        let total_weight: f64 = inline
-            .choices
-            .iter()
-            .map(|c| c.weight.unwrap_or(1.0))
-            .sum();
+        let total_weight: f64 = inline.choices.iter().map(|c| c.weight.unwrap_or(1.0)).sum();
 
         // Select a choice
         let random_value = self.rng.gen::<f64>() * total_weight;
@@ -281,7 +280,10 @@ impl<'a, R: Rng> Evaluator<'a, R> {
         // Look for any number in the text (last one wins)
         let mut last_num = None;
         for word in text.split_whitespace() {
-            if let Ok(num) = word.trim_matches(|c: char| !c.is_ascii_digit() && c != '-').parse::<i64>() {
+            if let Ok(num) = word
+                .trim_matches(|c: char| !c.is_ascii_digit() && c != '-')
+                .parse::<i64>()
+            {
                 last_num = Some(num);
             }
         }
@@ -289,7 +291,11 @@ impl<'a, R: Rng> Evaluator<'a, R> {
     }
 
     // Helper function to peek at the next word in content
-    fn peek_next_word(&mut self, content: &[ContentPart], start_idx: usize) -> Result<String, EvalError> {
+    fn peek_next_word(
+        &mut self,
+        content: &[ContentPart],
+        start_idx: usize,
+    ) -> Result<String, EvalError> {
         for part in &content[start_idx..] {
             match part {
                 ContentPart::Text(text) => {
@@ -344,7 +350,7 @@ impl<'a, R: Rng> Evaluator<'a, R> {
                 // Check for "this" keyword
                 if ident.name == "this" {
                     return Err(EvalError::TypeError(
-                        "Cannot use 'this' without property access (use this.property)".to_string()
+                        "Cannot use 'this' without property access (use this.property)".to_string(),
                     ));
                 }
 
@@ -377,7 +383,7 @@ impl<'a, R: Rng> Evaluator<'a, R> {
                             }
                         } else {
                             return Err(EvalError::TypeError(
-                                "'this' keyword can only be used within $output".to_string()
+                                "'this' keyword can only be used within $output".to_string(),
                             ));
                         }
                     }
@@ -468,24 +474,14 @@ impl<'a, R: Rng> Evaluator<'a, R> {
                 let result = match op {
                     BinaryOperator::Equal => left_val == right_val,
                     BinaryOperator::NotEqual => left_val != right_val,
-                    BinaryOperator::LessThan => {
-                        self.compare_values(&left_val, &right_val)? < 0
-                    }
-                    BinaryOperator::GreaterThan => {
-                        self.compare_values(&left_val, &right_val)? > 0
-                    }
-                    BinaryOperator::LessEqual => {
-                        self.compare_values(&left_val, &right_val)? <= 0
-                    }
+                    BinaryOperator::LessThan => self.compare_values(&left_val, &right_val)? < 0,
+                    BinaryOperator::GreaterThan => self.compare_values(&left_val, &right_val)? > 0,
+                    BinaryOperator::LessEqual => self.compare_values(&left_val, &right_val)? <= 0,
                     BinaryOperator::GreaterEqual => {
                         self.compare_values(&left_val, &right_val)? >= 0
                     }
-                    BinaryOperator::And => {
-                        self.is_truthy(&left_val) && self.is_truthy(&right_val)
-                    }
-                    BinaryOperator::Or => {
-                        self.is_truthy(&left_val) || self.is_truthy(&right_val)
-                    }
+                    BinaryOperator::And => self.is_truthy(&left_val) && self.is_truthy(&right_val),
+                    BinaryOperator::Or => self.is_truthy(&left_val) || self.is_truthy(&right_val),
                 };
 
                 Ok(if result { "true" } else { "false" }.to_string())
@@ -520,7 +516,7 @@ impl<'a, R: Rng> Evaluator<'a, R> {
                 // Handle "this" keyword
                 if ident.name == "this" {
                     return Err(EvalError::TypeError(
-                        "Cannot use 'this' without property access (use this.property)".to_string()
+                        "Cannot use 'this' without property access (use this.property)".to_string(),
                     ));
                 }
 
@@ -553,7 +549,7 @@ impl<'a, R: Rng> Evaluator<'a, R> {
                             }
                         } else {
                             return Err(EvalError::TypeError(
-                                "'this' keyword can only be used within $output".to_string()
+                                "'this' keyword can only be used within $output".to_string(),
                             ));
                         }
                     }
@@ -626,10 +622,7 @@ impl<'a, R: Rng> Evaluator<'a, R> {
 
                 // Get the item
                 let item = source_list.items.get(item_idx).ok_or_else(|| {
-                    EvalError::EmptyList(format!(
-                        "Invalid index {} in consumable list",
-                        item_idx
-                    ))
+                    EvalError::EmptyList(format!("Invalid index {} in consumable list", item_idx))
                 })?;
 
                 // Remove the selected index from remaining_indices
@@ -718,7 +711,11 @@ impl<'a, R: Rng> Evaluator<'a, R> {
         self.value_to_string(value_result)
     }
 
-    fn call_method_value(&mut self, value: &Value, method: &MethodCall) -> Result<Value, EvalError> {
+    fn call_method_value(
+        &mut self,
+        value: &Value,
+        method: &MethodCall,
+    ) -> Result<Value, EvalError> {
         match method.name.as_str() {
             "selectOne" => {
                 // Select one item from the list and return it as a Value
@@ -729,7 +726,9 @@ impl<'a, R: Rng> Evaluator<'a, R> {
                             .get_list(name)
                             .ok_or_else(|| EvalError::UndefinedList(name.clone()))?;
 
-                        let item = self.select_weighted_item(&list.items, list.total_weight)?.clone();
+                        let item = self
+                            .select_weighted_item(&list.items, list.total_weight)?
+                            .clone();
 
                         // If item has sublists, pick one randomly and return it
                         if !item.sublists.is_empty() {
@@ -745,7 +744,9 @@ impl<'a, R: Rng> Evaluator<'a, R> {
                         Ok(Value::Text(result))
                     }
                     Value::ListInstance(list) => {
-                        let item = self.select_weighted_item(&list.items, list.total_weight)?.clone();
+                        let item = self
+                            .select_weighted_item(&list.items, list.total_weight)?
+                            .clone();
 
                         if !item.sublists.is_empty() {
                             let sublist_names: Vec<_> = item.sublists.keys().cloned().collect();
@@ -876,7 +877,9 @@ impl<'a, R: Rng> Evaluator<'a, R> {
 
                         let mut results = Vec::new();
                         for _ in 0..n {
-                            let item = self.select_weighted_item(&list.items, list.total_weight)?.clone();
+                            let item = self
+                                .select_weighted_item(&list.items, list.total_weight)?
+                                .clone();
                             if !item.sublists.is_empty() {
                                 let sublist_names: Vec<_> = item.sublists.keys().cloned().collect();
                                 let idx = self.rng.gen_range(0..sublist_names.len());
@@ -893,7 +896,9 @@ impl<'a, R: Rng> Evaluator<'a, R> {
                     Value::ListInstance(list) => {
                         let mut results = Vec::new();
                         for _ in 0..n {
-                            let item = self.select_weighted_item(&list.items, list.total_weight)?.clone();
+                            let item = self
+                                .select_weighted_item(&list.items, list.total_weight)?
+                                .clone();
                             if !item.sublists.is_empty() {
                                 let sublist_names: Vec<_> = item.sublists.keys().cloned().collect();
                                 let idx = self.rng.gen_range(0..sublist_names.len());
@@ -954,7 +959,8 @@ impl<'a, R: Rng> Evaluator<'a, R> {
                         if n > list.items.len() {
                             return Err(EvalError::InvalidMethodCall(format!(
                                 "Cannot select {} unique items from list with {} items",
-                                n, list.items.len()
+                                n,
+                                list.items.len()
                             )));
                         }
 
@@ -983,7 +989,8 @@ impl<'a, R: Rng> Evaluator<'a, R> {
                         if n > list.items.len() {
                             return Err(EvalError::InvalidMethodCall(format!(
                                 "Cannot select {} unique items from list with {} items",
-                                n, list.items.len()
+                                n,
+                                list.items.len()
                             )));
                         }
 
@@ -1014,7 +1021,8 @@ impl<'a, R: Rng> Evaluator<'a, R> {
                         if n > items.len() {
                             return Err(EvalError::InvalidMethodCall(format!(
                                 "Cannot select {} unique items from array with {} items",
-                                n, items.len()
+                                n,
+                                items.len()
                             )));
                         }
 
@@ -1084,9 +1092,7 @@ impl<'a, R: Rng> Evaluator<'a, R> {
                 };
 
                 match value {
-                    Value::Array(items) => {
-                        Ok(Value::Text(items.join(&separator)))
-                    }
+                    Value::Array(items) => Ok(Value::Text(items.join(&separator))),
                     Value::Text(s) => Ok(Value::Text(s.clone())),
                     _ => {
                         // Try converting to string first
@@ -1131,11 +1137,9 @@ impl<'a, R: Rng> Evaluator<'a, R> {
                             "consumableList can only be called on named lists".to_string(),
                         ))
                     }
-                    _ => {
-                        Err(EvalError::InvalidMethodCall(
-                            "consumableList can only be called on lists".to_string(),
-                        ))
-                    }
+                    _ => Err(EvalError::InvalidMethodCall(
+                        "consumableList can only be called on lists".to_string(),
+                    )),
                 }
             }
 
@@ -1178,10 +1182,18 @@ fn to_plural(s: &str) -> String {
 
     // Common irregular plurals
     let irregulars = [
-        ("child", "children"), ("person", "people"), ("man", "men"),
-        ("woman", "women"), ("tooth", "teeth"), ("foot", "feet"),
-        ("mouse", "mice"), ("goose", "geese"), ("ox", "oxen"),
-        ("sheep", "sheep"), ("deer", "deer"), ("fish", "fish"),
+        ("child", "children"),
+        ("person", "people"),
+        ("man", "men"),
+        ("woman", "women"),
+        ("tooth", "teeth"),
+        ("foot", "feet"),
+        ("mouse", "mice"),
+        ("goose", "geese"),
+        ("ox", "oxen"),
+        ("sheep", "sheep"),
+        ("deer", "deer"),
+        ("fish", "fish"),
     ];
 
     for (singular, plural) in &irregulars {
@@ -1191,8 +1203,13 @@ fn to_plural(s: &str) -> String {
     }
 
     // Regular plural rules
-    if lower.ends_with("s") || lower.ends_with("ss") || lower.ends_with("sh")
-        || lower.ends_with("ch") || lower.ends_with("x") || lower.ends_with("z") {
+    if lower.ends_with("s")
+        || lower.ends_with("ss")
+        || lower.ends_with("sh")
+        || lower.ends_with("ch")
+        || lower.ends_with("x")
+        || lower.ends_with("z")
+    {
         return format!("{}es", s_trimmed);
     } else if lower.ends_with("y") && s_trimmed.len() > 1 {
         let second_last = s_trimmed.chars().nth(s_trimmed.len() - 2).unwrap();
@@ -1224,30 +1241,100 @@ fn to_past_tense(s: &str) -> String {
 
     // Common irregular verbs
     let irregulars = [
-        ("be", "was"), ("have", "had"), ("do", "did"), ("say", "said"),
-        ("go", "went"), ("get", "got"), ("make", "made"), ("know", "knew"),
-        ("think", "thought"), ("take", "took"), ("see", "saw"), ("come", "came"),
-        ("want", "wanted"), ("give", "gave"), ("use", "used"), ("find", "found"),
-        ("tell", "told"), ("ask", "asked"), ("work", "worked"), ("feel", "felt"),
-        ("leave", "left"), ("put", "put"), ("mean", "meant"), ("keep", "kept"),
-        ("let", "let"), ("begin", "began"), ("seem", "seemed"), ("help", "helped"),
-        ("show", "showed"), ("hear", "heard"), ("play", "played"), ("run", "ran"),
-        ("move", "moved"), ("live", "lived"), ("believe", "believed"), ("bring", "brought"),
-        ("write", "wrote"), ("sit", "sat"), ("stand", "stood"), ("lose", "lost"),
-        ("pay", "paid"), ("meet", "met"), ("include", "included"), ("continue", "continued"),
-        ("set", "set"), ("learn", "learned"), ("change", "changed"), ("lead", "led"),
-        ("understand", "understood"), ("watch", "watched"), ("follow", "followed"),
-        ("stop", "stopped"), ("create", "created"), ("speak", "spoke"), ("read", "read"),
-        ("spend", "spent"), ("grow", "grew"), ("open", "opened"), ("walk", "walked"),
-        ("win", "won"), ("teach", "taught"), ("offer", "offered"), ("remember", "remembered"),
-        ("consider", "considered"), ("appear", "appeared"), ("buy", "bought"), ("serve", "served"),
-        ("die", "died"), ("send", "sent"), ("build", "built"), ("stay", "stayed"),
-        ("fall", "fell"), ("cut", "cut"), ("reach", "reached"), ("kill", "killed"),
-        ("raise", "raised"), ("pass", "passed"), ("sell", "sold"), ("decide", "decided"),
-        ("return", "returned"), ("explain", "explained"), ("hope", "hoped"), ("develop", "developed"),
-        ("carry", "carried"), ("break", "broke"), ("receive", "received"), ("agree", "agreed"),
-        ("support", "supported"), ("hit", "hit"), ("produce", "produced"), ("eat", "ate"),
-        ("cover", "covered"), ("catch", "caught"), ("draw", "drew"),
+        ("be", "was"),
+        ("have", "had"),
+        ("do", "did"),
+        ("say", "said"),
+        ("go", "went"),
+        ("get", "got"),
+        ("make", "made"),
+        ("know", "knew"),
+        ("think", "thought"),
+        ("take", "took"),
+        ("see", "saw"),
+        ("come", "came"),
+        ("want", "wanted"),
+        ("give", "gave"),
+        ("use", "used"),
+        ("find", "found"),
+        ("tell", "told"),
+        ("ask", "asked"),
+        ("work", "worked"),
+        ("feel", "felt"),
+        ("leave", "left"),
+        ("put", "put"),
+        ("mean", "meant"),
+        ("keep", "kept"),
+        ("let", "let"),
+        ("begin", "began"),
+        ("seem", "seemed"),
+        ("help", "helped"),
+        ("show", "showed"),
+        ("hear", "heard"),
+        ("play", "played"),
+        ("run", "ran"),
+        ("move", "moved"),
+        ("live", "lived"),
+        ("believe", "believed"),
+        ("bring", "brought"),
+        ("write", "wrote"),
+        ("sit", "sat"),
+        ("stand", "stood"),
+        ("lose", "lost"),
+        ("pay", "paid"),
+        ("meet", "met"),
+        ("include", "included"),
+        ("continue", "continued"),
+        ("set", "set"),
+        ("learn", "learned"),
+        ("change", "changed"),
+        ("lead", "led"),
+        ("understand", "understood"),
+        ("watch", "watched"),
+        ("follow", "followed"),
+        ("stop", "stopped"),
+        ("create", "created"),
+        ("speak", "spoke"),
+        ("read", "read"),
+        ("spend", "spent"),
+        ("grow", "grew"),
+        ("open", "opened"),
+        ("walk", "walked"),
+        ("win", "won"),
+        ("teach", "taught"),
+        ("offer", "offered"),
+        ("remember", "remembered"),
+        ("consider", "considered"),
+        ("appear", "appeared"),
+        ("buy", "bought"),
+        ("serve", "served"),
+        ("die", "died"),
+        ("send", "sent"),
+        ("build", "built"),
+        ("stay", "stayed"),
+        ("fall", "fell"),
+        ("cut", "cut"),
+        ("reach", "reached"),
+        ("kill", "killed"),
+        ("raise", "raised"),
+        ("pass", "passed"),
+        ("sell", "sold"),
+        ("decide", "decided"),
+        ("return", "returned"),
+        ("explain", "explained"),
+        ("hope", "hoped"),
+        ("develop", "developed"),
+        ("carry", "carried"),
+        ("break", "broke"),
+        ("receive", "received"),
+        ("agree", "agreed"),
+        ("support", "supported"),
+        ("hit", "hit"),
+        ("produce", "produced"),
+        ("eat", "ate"),
+        ("cover", "covered"),
+        ("catch", "caught"),
+        ("draw", "drew"),
     ];
 
     for (present, past) in &irregulars {
@@ -1305,33 +1392,86 @@ fn to_present_tense(s: &str) -> String {
 
     // Common irregular present tense (third person singular)
     let irregulars = [
-        ("be", "is"), ("have", "has"), ("do", "does"),
-        ("go", "goes"), ("was", "is"), ("were", "are"),
-        ("had", "has"), ("did", "does"), ("went", "goes"),
-        ("got", "gets"), ("made", "makes"), ("knew", "knows"),
-        ("thought", "thinks"), ("took", "takes"), ("saw", "sees"),
-        ("came", "comes"), ("gave", "gives"), ("found", "finds"),
-        ("told", "tells"), ("asked", "asks"), ("felt", "feels"),
-        ("left", "leaves"), ("put", "puts"), ("meant", "means"),
-        ("kept", "keeps"), ("let", "lets"), ("began", "begins"),
-        ("seemed", "seems"), ("showed", "shows"), ("heard", "hears"),
-        ("ran", "runs"), ("moved", "moves"), ("lived", "lives"),
-        ("brought", "brings"), ("wrote", "writes"), ("sat", "sits"),
-        ("stood", "stands"), ("lost", "loses"), ("paid", "pays"),
-        ("met", "meets"), ("set", "sets"), ("led", "leads"),
-        ("understood", "understands"), ("followed", "follows"),
-        ("stopped", "stops"), ("spoke", "speaks"), ("read", "reads"),
-        ("spent", "spends"), ("grew", "grows"), ("walked", "walks"),
-        ("won", "wins"), ("taught", "teaches"), ("remembered", "remembers"),
-        ("appeared", "appears"), ("bought", "buys"), ("served", "serves"),
-        ("died", "dies"), ("sent", "sends"), ("built", "builds"),
-        ("stayed", "stays"), ("fell", "falls"), ("cut", "cuts"),
-        ("reached", "reaches"), ("killed", "kills"), ("raised", "raises"),
-        ("passed", "passes"), ("sold", "sells"), ("decided", "decides"),
-        ("returned", "returns"), ("explained", "explains"), ("hoped", "hopes"),
-        ("carried", "carries"), ("broke", "breaks"), ("received", "receives"),
-        ("agreed", "agrees"), ("hit", "hits"), ("produced", "produces"),
-        ("ate", "eats"), ("caught", "catches"), ("drew", "draws"),
+        ("be", "is"),
+        ("have", "has"),
+        ("do", "does"),
+        ("go", "goes"),
+        ("was", "is"),
+        ("were", "are"),
+        ("had", "has"),
+        ("did", "does"),
+        ("went", "goes"),
+        ("got", "gets"),
+        ("made", "makes"),
+        ("knew", "knows"),
+        ("thought", "thinks"),
+        ("took", "takes"),
+        ("saw", "sees"),
+        ("came", "comes"),
+        ("gave", "gives"),
+        ("found", "finds"),
+        ("told", "tells"),
+        ("asked", "asks"),
+        ("felt", "feels"),
+        ("left", "leaves"),
+        ("put", "puts"),
+        ("meant", "means"),
+        ("kept", "keeps"),
+        ("let", "lets"),
+        ("began", "begins"),
+        ("seemed", "seems"),
+        ("showed", "shows"),
+        ("heard", "hears"),
+        ("ran", "runs"),
+        ("moved", "moves"),
+        ("lived", "lives"),
+        ("brought", "brings"),
+        ("wrote", "writes"),
+        ("sat", "sits"),
+        ("stood", "stands"),
+        ("lost", "loses"),
+        ("paid", "pays"),
+        ("met", "meets"),
+        ("set", "sets"),
+        ("led", "leads"),
+        ("understood", "understands"),
+        ("followed", "follows"),
+        ("stopped", "stops"),
+        ("spoke", "speaks"),
+        ("read", "reads"),
+        ("spent", "spends"),
+        ("grew", "grows"),
+        ("walked", "walks"),
+        ("won", "wins"),
+        ("taught", "teaches"),
+        ("remembered", "remembers"),
+        ("appeared", "appears"),
+        ("bought", "buys"),
+        ("served", "serves"),
+        ("died", "dies"),
+        ("sent", "sends"),
+        ("built", "builds"),
+        ("stayed", "stays"),
+        ("fell", "falls"),
+        ("cut", "cuts"),
+        ("reached", "reaches"),
+        ("killed", "kills"),
+        ("raised", "raises"),
+        ("passed", "passes"),
+        ("sold", "sells"),
+        ("decided", "decides"),
+        ("returned", "returns"),
+        ("explained", "explains"),
+        ("hoped", "hopes"),
+        ("carried", "carries"),
+        ("broke", "breaks"),
+        ("received", "receives"),
+        ("agreed", "agrees"),
+        ("hit", "hits"),
+        ("produced", "produces"),
+        ("ate", "eats"),
+        ("caught", "catches"),
+        ("drew", "draws"),
     ];
 
     for (past, present) in &irregulars {
@@ -1351,10 +1491,14 @@ fn to_present_tense(s: &str) -> String {
         if !"aeiou".contains(second_last.to_ascii_lowercase()) {
             return format!("{}ies", &s_trimmed[..s_trimmed.len() - 1]);
         }
-    } else if lower.ends_with("s") || lower.ends_with("ss") || lower.ends_with("sh")
-        || lower.ends_with("ch") || lower.ends_with("x") || lower.ends_with("z") {
-        return format!("{}es", s_trimmed);
-    } else if lower.ends_with("o") {
+    } else if lower.ends_with("s")
+        || lower.ends_with("ss")
+        || lower.ends_with("sh")
+        || lower.ends_with("ch")
+        || lower.ends_with("x")
+        || lower.ends_with("z")
+        || lower.ends_with("o")
+    {
         return format!("{}es", s_trimmed);
     }
 
@@ -1370,15 +1514,27 @@ fn to_negative_form(s: &str) -> String {
 
     let lower = s_trimmed.to_lowercase();
 
-    // Special cases for common verbs
-    if lower == "is" || lower == "are" || lower == "am" || lower == "was" || lower == "were" {
-        return format!("{} not", s_trimmed);
-    } else if lower == "have" || lower == "has" || lower == "had" {
-        return format!("{} not", s_trimmed);
-    } else if lower == "do" || lower == "does" || lower == "did" {
-        return format!("{} not", s_trimmed);
-    } else if lower == "will" || lower == "would" || lower == "should" || lower == "could"
-        || lower == "can" || lower == "may" || lower == "might" || lower == "must" {
+    // Special cases for common verbs - all add "not" after the verb
+    if lower == "is"
+        || lower == "are"
+        || lower == "am"
+        || lower == "was"
+        || lower == "were"
+        || lower == "have"
+        || lower == "has"
+        || lower == "had"
+        || lower == "do"
+        || lower == "does"
+        || lower == "did"
+        || lower == "will"
+        || lower == "would"
+        || lower == "should"
+        || lower == "could"
+        || lower == "can"
+        || lower == "may"
+        || lower == "might"
+        || lower == "must"
+    {
         return format!("{} not", s_trimmed);
     }
 
@@ -1397,10 +1553,18 @@ fn to_singular(s: &str) -> String {
 
     // Common irregular plurals (reversed from to_plural)
     let irregulars = [
-        ("children", "child"), ("people", "person"), ("men", "man"),
-        ("women", "woman"), ("teeth", "tooth"), ("feet", "foot"),
-        ("mice", "mouse"), ("geese", "goose"), ("oxen", "ox"),
-        ("sheep", "sheep"), ("deer", "deer"), ("fish", "fish"),
+        ("children", "child"),
+        ("people", "person"),
+        ("men", "man"),
+        ("women", "woman"),
+        ("teeth", "tooth"),
+        ("feet", "foot"),
+        ("mice", "mouse"),
+        ("geese", "goose"),
+        ("oxen", "ox"),
+        ("sheep", "sheep"),
+        ("deer", "deer"),
+        ("fish", "fish"),
     ];
 
     for (plural, singular) in &irregulars {
@@ -1418,16 +1582,19 @@ fn to_singular(s: &str) -> String {
     } else if lower.ends_with("oes") && s_trimmed.len() > 3 {
         return format!("{}o", &s_trimmed[..s_trimmed.len() - 2]);
     } else if lower.ends_with("ses") && s_trimmed.len() > 3 {
-        return format!("{}", &s_trimmed[..s_trimmed.len() - 2]);
-    } else if lower.ends_with("xes") || lower.ends_with("zes")
-        || lower.ends_with("ches") || lower.ends_with("shes") {
+        return s_trimmed[..s_trimmed.len() - 2].to_string();
+    } else if lower.ends_with("xes")
+        || lower.ends_with("zes")
+        || lower.ends_with("ches")
+        || lower.ends_with("shes")
+    {
         if s_trimmed.len() > 2 {
-            return format!("{}", &s_trimmed[..s_trimmed.len() - 2]);
+            return s_trimmed[..s_trimmed.len() - 2].to_string();
         }
     } else if lower.ends_with("s") && !lower.ends_with("ss") {
         // Simple plural - just remove 's'
         if s_trimmed.len() > 1 {
-            return format!("{}", &s_trimmed[..s_trimmed.len() - 1]);
+            return s_trimmed[..s_trimmed.len() - 1].to_string();
         }
     }
 
@@ -1435,10 +1602,7 @@ fn to_singular(s: &str) -> String {
     s_trimmed.to_string()
 }
 
-pub fn evaluate<R: Rng>(
-    program: &CompiledProgram,
-    rng: &mut R,
-) -> Result<String, EvalError> {
+pub fn evaluate<R: Rng>(program: &CompiledProgram, rng: &mut R) -> Result<String, EvalError> {
     let mut evaluator = Evaluator::new(program, rng);
     evaluator.evaluate()
 }
@@ -1448,8 +1612,8 @@ mod tests {
     use super::*;
     use crate::compiler::compile;
     use crate::parser::parse;
-    use rand::SeedableRng;
     use rand::rngs::StdRng;
+    use rand::SeedableRng;
 
     #[test]
     fn test_simple_evaluation() {
@@ -1511,6 +1675,6 @@ mod tests {
         assert!(result.is_ok());
         let output = result.unwrap();
         let num: i32 = output.parse().unwrap();
-        assert!(num >= 1 && num <= 6);
+        assert!((1..=6).contains(&num));
     }
 }

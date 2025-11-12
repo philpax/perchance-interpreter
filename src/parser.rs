@@ -228,7 +228,7 @@ impl Parser {
             match ch {
                 '\n' | '\r' => break,
                 '/' if self.peek_ahead(1) == Some('/') => break, // Comment
-                '^' => break, // Weight marker
+                '^' => break,                                    // Weight marker
                 '\\' => {
                     // Escape sequence
                     if !text_buffer.is_empty() {
@@ -415,7 +415,11 @@ impl Parser {
         if let Some(operator) = op {
             self.skip_spaces();
             let right = self.parse_single_expression()?;
-            Ok(Expression::BinaryOp(Box::new(left), operator, Box::new(right)))
+            Ok(Expression::BinaryOp(
+                Box::new(left),
+                operator,
+                Box::new(right),
+            ))
         } else {
             Ok(left)
         }
@@ -444,7 +448,10 @@ impl Parser {
         let mut expr = if ident.chars().all(|c| c.is_ascii_digit()) {
             // It's a number literal
             Expression::Literal(ident)
-        } else if ident.starts_with('-') && ident.len() > 1 && ident[1..].chars().all(|c| c.is_ascii_digit()) {
+        } else if ident.starts_with('-')
+            && ident.len() > 1
+            && ident[1..].chars().all(|c| c.is_ascii_digit())
+        {
             // Negative number literal
             Expression::Literal(ident)
         } else {
@@ -558,7 +565,9 @@ impl Parser {
                 self.consume_char('a');
                 self.consume_char('}');
                 // Return a special inline that's handled differently in evaluator
-                return Ok(InlineList::new(vec![InlineChoice::new(vec![ContentPart::Article])]));
+                return Ok(InlineList::new(vec![InlineChoice::new(vec![
+                    ContentPart::Article,
+                ])]));
             }
         }
 
@@ -567,7 +576,9 @@ impl Parser {
             if next_pos < self.input.len() && self.input[next_pos] == '}' {
                 self.consume_char('s');
                 self.consume_char('}');
-                return Ok(InlineList::new(vec![InlineChoice::new(vec![ContentPart::Pluralize])]));
+                return Ok(InlineList::new(vec![InlineChoice::new(vec![
+                    ContentPart::Pluralize,
+                ])]));
             }
         }
 
@@ -855,9 +866,7 @@ impl Parser {
         for _ in 0..level {
             if self.peek_char() == Some('\t') {
                 self.advance();
-            } else if self.peek_char() == Some(' ')
-                && self.peek_ahead(1) == Some(' ')
-            {
+            } else if self.peek_char() == Some(' ') && self.peek_ahead(1) == Some(' ') {
                 self.advance();
                 self.advance();
             }

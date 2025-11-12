@@ -74,7 +74,7 @@ fn test_number_range() {
     for seed in 0..20 {
         let result = evaluate_with_seed(template, seed).unwrap();
         let num: i32 = result.parse().unwrap();
-        assert!(num >= 1 && num <= 6);
+        assert!((1..=6).contains(&num));
     }
 }
 
@@ -83,7 +83,7 @@ fn test_number_range_negative() {
     let template = "output\n\t{-10-10}\n";
     let result = evaluate_with_seed(template, 42).unwrap();
     let num: i32 = result.parse().unwrap();
-    assert!(num >= -10 && num <= 10);
+    assert!((-10..=10).contains(&num));
 }
 
 #[test]
@@ -93,7 +93,7 @@ fn test_letter_range() {
         let result = evaluate_with_seed(template, seed).unwrap();
         assert_eq!(result.len(), 1);
         let ch = result.chars().next().unwrap();
-        assert!(ch >= 'a' && ch <= 'z');
+        assert!(ch.is_ascii_lowercase());
     }
 }
 
@@ -103,7 +103,7 @@ fn test_letter_range_uppercase() {
     let result = evaluate_with_seed(template, 42).unwrap();
     assert_eq!(result.len(), 1);
     let ch = result.chars().next().unwrap();
-    assert!(ch >= 'A' && ch <= 'Z');
+    assert!(ch.is_ascii_uppercase());
 }
 
 #[test]
@@ -146,9 +146,7 @@ fn test_hierarchical_lists() {
     let result = evaluate_with_seed(template, 42);
     assert!(result.is_ok());
     let output = result.unwrap();
-    assert!(
-        output == "dog" || output == "cat" || output == "fish" || output == "whale"
-    );
+    assert!(output == "dog" || output == "cat" || output == "fish" || output == "whale");
 }
 
 #[test]
@@ -279,7 +277,8 @@ fn test_nested_inline_lists() {
 
 #[test]
 fn test_mixed_content() {
-    let template = "animal\n\tdog\n\tcat\n\noutput\n\tI saw a {big|small} [animal] with {1-10} legs!\n";
+    let template =
+        "animal\n\tdog\n\tcat\n\noutput\n\tI saw a {big|small} [animal] with {1-10} legs!\n";
     let result = evaluate_with_seed(template, 42);
     assert!(result.is_ok());
     let output = result.unwrap();
@@ -328,7 +327,7 @@ fn test_two_space_indentation() {
 }
 
 #[test]
-fn test_property_with_selectOne() {
+fn test_property_with_select_one() {
     let template = "character\n\twizard\n\t\tname\n\t\t\tGandalf\n\t\tpower\n\t\t\thigh\n\noutput\n\t[c = character.selectOne, c.name]\n";
     let result = evaluate_with_seed(template, 42);
     assert!(result.is_ok());
@@ -347,7 +346,8 @@ fn test_number_range_in_text() {
 
 #[test]
 fn test_multiple_list_references() {
-    let template = "name\n\tAlice\n\tBob\n\ncity\n\tParis\n\tTokyo\n\noutput\n\t[name] lives in [city].\n";
+    let template =
+        "name\n\tAlice\n\tBob\n\ncity\n\tParis\n\tTokyo\n\noutput\n\t[name] lives in [city].\n";
     let result = evaluate_with_seed(template, 42);
     assert!(result.is_ok());
     let output = result.unwrap();
@@ -507,7 +507,8 @@ fn test_possessive_form_ends_with_s() {
 
 #[test]
 fn test_grammar_methods_combined() {
-    let template = "noun\n\tdog\n\nverb\n\twalk\n\noutput\n\tThe [noun.pluralForm] [verb.pastTense].\n";
+    let template =
+        "noun\n\tdog\n\nverb\n\twalk\n\noutput\n\tThe [noun.pluralForm] [verb.pastTense].\n";
     let result = evaluate_with_seed(template, 42);
     assert!(result.is_ok());
     assert_eq!(result.unwrap(), "The dogs walked.");
@@ -728,7 +729,8 @@ fn test_singular_form_irregular() {
 
 #[test]
 fn test_join_items_with_comma() {
-    let template = "fruit\n\tapple\n\tbanana\n\torange\n\noutput\n\t[fruit.selectMany(3).joinItems(\", \")]\n";
+    let template =
+        "fruit\n\tapple\n\tbanana\n\torange\n\noutput\n\t[fruit.selectMany(3).joinItems(\", \")]\n";
     let result = evaluate_with_seed(template, 42);
     assert!(result.is_ok());
     let output = result.unwrap();
@@ -740,7 +742,8 @@ fn test_join_items_with_comma() {
 
 #[test]
 fn test_join_items_with_custom_separator() {
-    let template = "word\n\tfoo\n\tbar\n\tbaz\n\noutput\n\t[word.selectMany(2).joinItems(\" | \")]\n";
+    let template =
+        "word\n\tfoo\n\tbar\n\tbaz\n\noutput\n\t[word.selectMany(2).joinItems(\" | \")]\n";
     let result = evaluate_with_seed(template, 42);
     assert!(result.is_ok());
     let output = result.unwrap();
@@ -750,7 +753,8 @@ fn test_join_items_with_custom_separator() {
 
 #[test]
 fn test_join_items_select_unique() {
-    let template = "color\n\tred\n\tblue\n\tgreen\n\noutput\n\t[color.selectUnique(2).joinItems(\" and \")]\n";
+    let template =
+        "color\n\tred\n\tblue\n\tgreen\n\noutput\n\t[color.selectUnique(2).joinItems(\" and \")]\n";
     let result = evaluate_with_seed(template, 42);
     assert!(result.is_ok());
     let output = result.unwrap();
@@ -823,7 +827,12 @@ fn test_consumable_list_no_duplicates() {
     let mut sorted = parts.clone();
     sorted.sort();
     sorted.dedup();
-    assert_eq!(sorted.len(), 3, "Expected all items to be unique, got: {}", output);
+    assert_eq!(
+        sorted.len(),
+        3,
+        "Expected all items to be unique, got: {}",
+        output
+    );
 }
 
 #[test]

@@ -26,8 +26,8 @@ pub enum ContentPart {
     Inline(InlineList),
     Escape(char),
     // Special inline functions
-    Article,    // {a} - outputs "a" or "an" based on next word
-    Pluralize,  // {s} - outputs "s" for plural or "" for singular based on previous number
+    Article,   // {a} - outputs "a" or "an" based on next word
+    Pluralize, // {s} - outputs "s" for plural or "" for singular based on previous number
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -98,6 +98,12 @@ pub struct MethodCall {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Identifier {
     pub name: String,
+}
+
+impl Default for Program {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl Program {

@@ -43,6 +43,12 @@ impl std::fmt::Display for CompileError {
 
 impl std::error::Error for CompileError {}
 
+impl Default for CompiledProgram {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl CompiledProgram {
     pub fn new() -> Self {
         CompiledProgram {
