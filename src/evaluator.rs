@@ -1,8 +1,10 @@
 /// Evaluator executes compiled programs with RNG support
 use crate::ast::*;
 use crate::compiler::*;
+use crate::loader::{GeneratorLoader, LoadError};
 use rand::Rng;
 use std::collections::HashMap;
+use std::sync::Arc;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum EvalError {
@@ -12,6 +14,7 @@ pub enum EvalError {
     InvalidMethodCall(String),
     EmptyList(String),
     TypeError(String),
+    ImportError(String),
 }
 
 impl std::fmt::Display for EvalError {
@@ -25,6 +28,7 @@ impl std::fmt::Display for EvalError {
             EvalError::InvalidMethodCall(msg) => write!(f, "Invalid method call: {}", msg),
             EvalError::EmptyList(name) => write!(f, "Cannot select from empty list: {}", name),
             EvalError::TypeError(msg) => write!(f, "Type error: {}", msg),
+            EvalError::ImportError(msg) => write!(f, "Import error: {}", msg),
         }
     }
 }
@@ -40,11 +44,12 @@ struct ConsumableListState {
 #[derive(Debug, Clone)]
 enum Value {
     Text(String),
-    List(String),               // Reference to a list by name
-    ListInstance(CompiledList), // An actual list instance (for sublists)
-    ItemInstance(CompiledItem), // An item with its properties (sublists) intact
-    Array(Vec<String>),         // Multiple items (for selectMany/selectUnique before joinItems)
-    ConsumableList(String),     // Reference to a consumable list by unique ID
+    List(String),                   // Reference to a list by name
+    ListInstance(CompiledList),     // An actual list instance (for sublists)
+    ItemInstance(CompiledItem),     // An item with its properties (sublists) intact
+    Array(Vec<String>),             // Multiple items (for selectMany/selectUnique before joinItems)
+    ConsumableList(String),         // Reference to a consumable list by unique ID
+    ImportedGenerator(String),      // Reference to an imported generator by name
 }
 
 pub struct Evaluator<'a, R: Rng> {
@@ -55,6 +60,8 @@ pub struct Evaluator<'a, R: Rng> {
     current_item: Option<CompiledItem>, // Track current item for `this` keyword
     consumable_lists: HashMap<String, ConsumableListState>, // Track consumable lists
     consumable_list_counter: usize, // Counter for generating unique IDs
+    loader: Option<Arc<dyn GeneratorLoader>>, // Generator loader for imports
+    import_cache: HashMap<String, CompiledProgram>, // Cache for imported generators
 }
 
 impl<'a, R: Rng> Evaluator<'a, R> {
@@ -67,7 +74,46 @@ impl<'a, R: Rng> Evaluator<'a, R> {
             current_item: None,
             consumable_lists: HashMap::new(),
             consumable_list_counter: 0,
+            loader: None,
+            import_cache: HashMap::new(),
         }
+    }
+
+    /// Set the generator loader for handling imports
+    pub fn with_loader(mut self, loader: Arc<dyn GeneratorLoader>) -> Self {
+        self.loader = Some(loader);
+        self
+    }
+
+    /// Load and compile an imported generator
+    fn load_import(&mut self, name: &str) -> Result<&CompiledProgram, EvalError> {
+        // Check cache first
+        if self.import_cache.contains_key(name) {
+            return Ok(self.import_cache.get(name).unwrap());
+        }
+
+        // Check if loader is available
+        let loader = self
+            .loader
+            .as_ref()
+            .ok_or_else(|| EvalError::ImportError("No loader available for imports".to_string()))?;
+
+        // Load the generator source (blocking on async operation)
+        // Use futures::executor::block_on which works in any context
+        let source = futures::executor::block_on(loader.load(name))
+            .map_err(|e| EvalError::ImportError(format!("Failed to load generator '{}': {}", name, e)))?;
+
+        // Parse and compile the generator
+        let program = crate::parser::parse(&source)
+            .map_err(|e| EvalError::ImportError(format!("Failed to parse generator '{}': {}", name, e)))?;
+
+        let compiled = crate::compiler::compile(&program)
+            .map_err(|e| EvalError::ImportError(format!("Failed to compile generator '{}': {}", name, e)))?;
+
+        // Cache it
+        self.import_cache.insert(name.to_string(), compiled);
+
+        Ok(self.import_cache.get(name).unwrap())
     }
 
     pub fn evaluate(&mut self) -> Result<String, EvalError> {
@@ -570,6 +616,25 @@ impl<'a, R: Rng> Evaluator<'a, R> {
 
                 Ok(if result { "true" } else { "false" }.to_string())
             }
+
+            Expression::Import(generator_name) => {
+                // Load the imported generator
+                let imported_program = self.load_import(generator_name)?.clone();
+
+                // Create a new evaluator for the imported program with its own context
+                let mut imported_evaluator = Evaluator::new(&imported_program, self.rng);
+
+                // Copy the loader reference so nested imports work
+                if let Some(ref loader) = self.loader {
+                    imported_evaluator.loader = Some(Arc::clone(loader));
+                }
+
+                // Share the import cache
+                imported_evaluator.import_cache = self.import_cache.clone();
+
+                // Evaluate the imported generator
+                imported_evaluator.evaluate()
+            }
         }
     }
 
@@ -670,6 +735,13 @@ impl<'a, R: Rng> Evaluator<'a, R> {
                 self.call_method_value(&base_value, method)
             }
 
+            Expression::Import(generator_name) => {
+                // Load the imported generator to ensure it exists and is cached
+                let _ = self.load_import(generator_name)?;
+                // Return a reference to the imported generator
+                Ok(Value::ImportedGenerator(generator_name.clone()))
+            }
+
             _ => {
                 let result = self.evaluate_expression(expr)?;
                 Ok(Value::Text(result))
@@ -759,6 +831,24 @@ impl<'a, R: Rng> Evaluator<'a, R> {
                     self.evaluate_content(&item.content)
                 }
             }
+            Value::ImportedGenerator(generator_name) => {
+                // Evaluate the imported generator
+                let imported_program = self.load_import(&generator_name)?.clone();
+
+                // Create a new evaluator for the imported program with its own context
+                let mut imported_evaluator = Evaluator::new(&imported_program, self.rng);
+
+                // Copy the loader reference so nested imports work
+                if let Some(ref loader) = self.loader {
+                    imported_evaluator.loader = Some(Arc::clone(loader));
+                }
+
+                // Share the import cache
+                imported_evaluator.import_cache = self.import_cache.clone();
+
+                // Evaluate the imported generator
+                imported_evaluator.evaluate()
+            }
         }
     }
 
@@ -846,6 +936,20 @@ impl<'a, R: Rng> Evaluator<'a, R> {
                     prop_name
                 )))
             }
+            Value::ImportedGenerator(generator_name) => {
+                // Access a property (top-level list) from the imported generator
+                let imported_program = self.load_import(generator_name)?;
+
+                // Look up the list by name in the imported generator
+                if let Some(list) = imported_program.get_list(prop_name) {
+                    Ok(Value::ListInstance(list.clone()))
+                } else {
+                    Err(EvalError::UndefinedProperty(
+                        generator_name.clone(),
+                        prop_name.to_string(),
+                    ))
+                }
+            }
         }
     }
 
@@ -931,6 +1035,11 @@ impl<'a, R: Rng> Evaluator<'a, R> {
                     }
                     Value::ConsumableList(_) => {
                         // For consumable lists, convert to string (which consumes an item)
+                        let result = self.value_to_string(value.clone())?;
+                        Ok(Value::Text(result))
+                    }
+                    Value::ImportedGenerator(_) => {
+                        // Convert imported generator to string (evaluates it)
                         let result = self.value_to_string(value.clone())?;
                         Ok(Value::Text(result))
                     }
@@ -1033,6 +1142,12 @@ impl<'a, R: Rng> Evaluator<'a, R> {
                             "selectAll cannot be called on consumable lists".to_string(),
                         ))
                     }
+                    Value::ImportedGenerator(_) => {
+                        // selectAll is not meaningful for imported generators
+                        Err(EvalError::InvalidMethodCall(
+                            "selectAll cannot be called on imported generators".to_string(),
+                        ))
+                    }
                 }
             }
 
@@ -1122,6 +1237,12 @@ impl<'a, R: Rng> Evaluator<'a, R> {
                         // selectMany with repetition doesn't make sense for consumable lists
                         Err(EvalError::InvalidMethodCall(
                             "selectMany cannot be called on consumable lists (use selectUnique instead)".to_string(),
+                        ))
+                    }
+                    Value::ImportedGenerator(_) => {
+                        // selectMany is not meaningful for imported generators
+                        Err(EvalError::InvalidMethodCall(
+                            "selectMany cannot be called on imported generators".to_string(),
                         ))
                     }
                 }
@@ -1249,6 +1370,12 @@ impl<'a, R: Rng> Evaluator<'a, R> {
                             results.push(result);
                         }
                         Ok(Value::Array(results))
+                    }
+                    Value::ImportedGenerator(_) => {
+                        // selectUnique is not meaningful for imported generators
+                        Err(EvalError::InvalidMethodCall(
+                            "selectUnique cannot be called on imported generators".to_string(),
+                        ))
                     }
                 }
             }

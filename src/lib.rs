@@ -15,6 +15,7 @@
 pub mod ast;
 pub mod compiler;
 pub mod evaluator;
+pub mod loader;
 pub mod parser;
 
 use rand::rngs::StdRng;
