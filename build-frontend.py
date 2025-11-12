@@ -6,6 +6,7 @@ Builds the WASM module and sets up the frontend for development or production.
 
 import argparse
 import os
+import platform
 import subprocess
 import sys
 from pathlib import Path
@@ -16,7 +17,15 @@ def run_command(cmd, cwd=None, description=None):
     if description:
         print(f"\n{description}...")
 
-    print(f"$ {' '.join(cmd)}")
+    # On Windows, use shell=True to resolve .cmd and .bat files
+    use_shell = platform.system() == 'Windows'
+
+    # For display purposes, join the command
+    if use_shell and isinstance(cmd, list):
+        cmd_str = ' '.join(cmd)
+        print(f"$ {cmd_str}")
+    else:
+        print(f"$ {' '.join(cmd)}")
 
     try:
         result = subprocess.run(
@@ -24,15 +33,17 @@ def run_command(cmd, cwd=None, description=None):
             cwd=cwd,
             check=True,
             capture_output=False,
-            text=True
+            text=True,
+            shell=use_shell
         )
         return result
     except subprocess.CalledProcessError as e:
         print(f"Error: Command failed with exit code {e.returncode}", file=sys.stderr)
         sys.exit(1)
     except FileNotFoundError:
-        print(f"Error: Command not found: {cmd[0]}", file=sys.stderr)
-        print(f"Make sure {cmd[0]} is installed and in your PATH", file=sys.stderr)
+        cmd_name = cmd[0] if isinstance(cmd, list) else cmd.split()[0]
+        print(f"Error: Command not found: {cmd_name}", file=sys.stderr)
+        print(f"Make sure {cmd_name} is installed and in your PATH", file=sys.stderr)
         sys.exit(1)
 
 
@@ -43,13 +54,17 @@ def check_prerequisites():
         'npm': 'npm --version',
     }
 
+    # On Windows, use shell=True to resolve .cmd and .bat files
+    use_shell = platform.system() == 'Windows'
+
     missing = []
     for tool, check_cmd in tools.items():
         try:
             subprocess.run(
                 check_cmd.split(),
                 capture_output=True,
-                check=True
+                check=True,
+                shell=use_shell
             )
         except (subprocess.CalledProcessError, FileNotFoundError):
             missing.append(tool)
@@ -123,11 +138,15 @@ def dev_server(frontend_dir):
 
     print("\nPress Ctrl+C to stop the server\n")
 
+    # On Windows, use shell=True to resolve .cmd and .bat files
+    use_shell = platform.system() == 'Windows'
+
     try:
         subprocess.run(
             ["npm", "run", "dev"],
             cwd=frontend_dir,
-            check=True
+            check=True,
+            shell=use_shell
         )
     except KeyboardInterrupt:
         print("\n\nDevelopment server stopped.")
