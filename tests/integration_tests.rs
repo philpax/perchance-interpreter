@@ -1125,7 +1125,7 @@ fn test_multiline_consumable_list_topic() {
 	mathematics
 
 sentence
-  She mostly writes about [t = topic.consumableList] and [a = t.selectOne]. Her last post was about [a].
+  She mostly writes about [t = topic.consumableList, t] and [a = t.selectOne, a]. Her last post was about [a].
 
 output
   [sentence]"#;
@@ -1143,7 +1143,19 @@ output
             || output.contains("mathematics")
     );
     // The second and third topic mentions should be the same
-    // This is tricky to verify without parsing, but we can at least check format
+    // One topic should appear exactly twice (the one from [a = t.selectOne, a] and [a])
+    let topics = vec!["trans rights", "animal rights", "science", "mathematics"];
+    let topic_counts: Vec<_> = topics
+        .iter()
+        .map(|topic| output.matches(topic).count())
+        .collect();
+
+    // Should have exactly one topic appearing twice (from [a = t.selectOne, a] and [a])
+    // and one topic appearing once (from [t = topic.consumableList])
+    assert_eq!(topic_counts.iter().filter(|&&count| count == 2).count(), 1);
+    assert_eq!(topic_counts.iter().filter(|&&count| count == 1).count(), 1);
+    assert_eq!(topic_counts.iter().filter(|&&count| count == 0).count(), 2);
+
     assert!(output.contains(" and "));
     assert!(output.contains("Her last post was about "));
 }
