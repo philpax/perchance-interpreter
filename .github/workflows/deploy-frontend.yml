@@ -1,0 +1,107 @@
+name: Deploy Frontend
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'frontend/**'
+      - 'perchance-wasm/**'
+      - 'src/**'
+      - '.github/workflows/deploy-frontend.yml'
+      - 'build-frontend.py'
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build-and-deploy:
+    name: Build and Deploy Frontend
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout source repository
+        uses: actions/checkout@v4
+        with:
+          path: source
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Cache Rust dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            source/target/
+            source/perchance-wasm/target/
+          key: ${{ runner.os }}-cargo-wasm-${{ hashFiles('source/**/Cargo.lock', 'source/Cargo.toml', 'source/perchance-wasm/Cargo.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-wasm-
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: source/frontend/package-lock.json
+
+      - name: Install wasm-pack
+        run: |
+          if ! command -v wasm-pack &> /dev/null; then
+            curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+          fi
+
+      - name: Build frontend with build script
+        working-directory: source
+        run: python build-frontend.py --build
+
+      - name: Checkout GitHub Pages repository
+        uses: actions/checkout@v4
+        with:
+          repository: philpax/philpax.github.io
+          path: pages
+          token: ${{ secrets.PAGES_DEPLOY_TOKEN }}
+
+      - name: Deploy to GitHub Pages
+        working-directory: pages
+        run: |
+          # Create target directory if it doesn't exist
+          mkdir -p static/experimental/perchance
+
+          # Remove old files
+          rm -rf static/experimental/perchance/*
+
+          # Copy new build
+          cp -r ../source/frontend/dist/* static/experimental/perchance/
+
+          # Configure git
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Commit and push
+          git add static/experimental/perchance
+          if git diff --staged --quiet; then
+            echo "No changes to deploy"
+          else
+            git commit -m "Deploy perchance-interpreter frontend
+
+            Automated deployment from philpax/perchance-interpreter@${{ github.sha }}"
+            git push
+          fi
+
+      - name: Deployment complete
+        run: |
+          echo "✓ Frontend deployed successfully!"
+          echo "🌐 Available at: https://philpax.github.io/static/experimental/perchance/"

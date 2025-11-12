@@ -2,6 +2,7 @@
 
 [![CI](https://github.com/philpax/perchance-interpreter/workflows/CI/badge.svg)](https://github.com/philpax/perchance-interpreter/actions/workflows/ci.yml)
 [![Frontend CI](https://github.com/philpax/perchance-interpreter/workflows/Frontend%20CI/badge.svg)](https://github.com/philpax/perchance-interpreter/actions/workflows/frontend.yml)
+[![Deploy Frontend](https://github.com/philpax/perchance-interpreter/workflows/Deploy%20Frontend/badge.svg)](https://github.com/philpax/perchance-interpreter/actions/workflows/deploy-frontend.yml)
 
 A Rust implementation of the Perchance template language with deterministic random generation.
 
@@ -101,6 +102,20 @@ python build-frontend.py --build
 3. Open http://localhost:5173 in your browser
 
 For more details, see [frontend/README.md](frontend/README.md).
+
+### Automated Deployment
+
+The frontend is automatically deployed to [https://philpax.github.io/static/experimental/perchance/](https://philpax.github.io/static/experimental/perchance/) whenever changes are pushed to the main branch that affect:
+- Frontend code (`frontend/**`)
+- WASM module (`perchance-wasm/**`, `src/**`)
+- Build configuration (`build-frontend.py`, `.github/workflows/deploy-frontend.yml`)
+
+You can also manually trigger a deployment by running the "Deploy Frontend" workflow from the Actions tab.
+
+**Setup Requirements:**
+To enable automated deployment, you need to configure a GitHub secret:
+1. Create a Personal Access Token (classic) with `repo` permissions at https://github.com/settings/tokens
+2. Add it as a repository secret named `PAGES_DEPLOY_TOKEN` in the repository settings
 
 ## Usage
 
