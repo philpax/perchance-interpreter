@@ -97,7 +97,7 @@ def build_wasm(project_root):
         description="Building WASM module with wasm-pack"
     )
 
-    print("✓ WASM module built successfully")
+    print("[OK] WASM module built successfully")
 
 
 def install_dependencies(frontend_dir):
@@ -112,7 +112,7 @@ def install_dependencies(frontend_dir):
         description="Installing npm packages"
     )
 
-    print("✓ Dependencies installed successfully")
+    print("[OK] Dependencies installed successfully")
 
 
 def build_frontend(frontend_dir):
@@ -127,7 +127,7 @@ def build_frontend(frontend_dir):
         description="Building production bundle"
     )
 
-    print("✓ Frontend built successfully")
+    print("[OK] Frontend built successfully")
 
 
 def dev_server(frontend_dir):
