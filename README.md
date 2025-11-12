@@ -57,6 +57,34 @@ This interpreter implements core Perchance functionality:
 cargo build --release
 ```
 
+## Web Frontend
+
+This project includes a beautiful web-based frontend built with React, TypeScript, and WebAssembly. The frontend provides:
+
+- **Live Preview**: Real-time evaluation as you type
+- **Interactive Editor**: Syntax-highlighted editor with auto-completion
+- **Multiple Samples**: Generate many outputs from the same template
+- **Error Display**: Clear, helpful error messages
+- **Modern UI**: Responsive design with Tailwind CSS
+
+### Running the Frontend
+
+1. Build the WASM module:
+   ```bash
+   wasm-pack build perchance-wasm --target web --out-dir ../frontend/src/wasm
+   ```
+
+2. Start the development server:
+   ```bash
+   cd frontend
+   npm install
+   npm run dev
+   ```
+
+3. Open http://localhost:5173 in your browser
+
+For more details, see [frontend/README.md](frontend/README.md).
+
 ## Usage
 
 ### As a Library
