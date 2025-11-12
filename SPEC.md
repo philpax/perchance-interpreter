@@ -114,7 +114,7 @@ Access patterns:
 - `[animal.mammal]` - Directly selects from the mammal sublist
 - `[animal.bird]` - Directly selects from the bird sublist
 
-### 7. Properties
+### 7. Properties and Single-Item Lists
 
 Lists can have properties using the equals sign:
 
@@ -132,6 +132,27 @@ race
 ```
 
 Access properties with dot notation: `[race.dwarf.height]`
+
+**The Equals Sign Behavior:**
+
+There are two ways to create a "single-item list":
+
+```
+# Method 1: Using equals sign
+veg1 = {celery|spinach}
+
+# Method 2: Multi-line with one item
+veg2
+	{celery|spinach}
+```
+
+**Important difference:**
+- `veg1` is a **direct reference** to `{celery|spinach}`, not a list
+- `veg2` is a **list** containing one item: `{celery|spinach}`
+- `[v = veg1.selectOne]` stores either "celery" or "spinach" (the inline choice is evaluated)
+- `[v = veg2.selectOne]` stores the unevaluated text `{celery|spinach}`, which will be random each time `[v]` is referenced
+
+For most cases, this distinction doesn't matter because Perchance evaluates both forms when outputting. But it matters when using `selectOne` with variable assignment.
 
 ### 8. Variable Assignment
 
@@ -240,6 +261,106 @@ output
 
 "You have 1 apple." or "You have 3 apples."
 
+### 14. The `$output` Keyword
+
+Lists can define a custom output using the `$output` keyword. When a list with `$output` is referenced, it always returns the `$output` value instead of randomly selecting an item:
+
+```
+greeting
+	hello
+	hi
+	$output = Welcome to our service
+
+output
+	[greeting]
+```
+
+This always outputs "Welcome to our service" regardless of other items in the list.
+
+The `$output` value can contain references:
+
+```
+name
+	Alice
+	Bob
+
+greeting
+	$output = Hello, [name]!
+
+output
+	[greeting]
+```
+
+### 15. Consumable Lists
+
+A **consumable list** is a stateful copy of a list where items are removed after selection. This ensures unique selections without repetition:
+
+```
+card
+	ace
+	king
+	queen
+	jack
+
+output
+	[deck = card.consumableList][deck], [deck], [deck], [deck]
+```
+
+Output: "king, ace, jack, queen" (each card appears exactly once, in random order)
+
+**Important behaviors:**
+- Each `consumableList` call creates an independent copy
+- Attempting to select more items than available results in an error
+- The first evaluation of `[cl = list.consumableList]` both creates the consumable list AND outputs the first item
+- To create a consumable list without outputting an item, use: `[cl = list.consumableList, ""]`
+
+Consumable lists work with methods:
+```
+[item.consumableList.selectUnique(3).joinItems(", ")]
+```
+
+### 16. Binary Operators and Conditionals
+
+**Comparison operators** (return true/false):
+- `==` - Equal to
+- `!=` - Not equal to
+- `<` - Less than
+- `>` - Greater than
+- `<=` - Less than or equal to
+- `>=` - Greater than or equal to
+
+**Logical operators**:
+- `&&` - Logical AND (both conditions must be true)
+- `||` - Logical OR (at least one condition must be true)
+
+**Ternary operator** for conditional output:
+```
+output
+	[n = {1-6}, n < 4 ? "low" : "high"]
+	[score > 90 ? "A" : score > 80 ? "B" : "C"]
+```
+
+**Note**: The `||` operator in expressions is different from the property fallback syntax `[a.property || "default"]`, which is NOT implemented.
+
+### 17. HTML Tag Pass-Through
+
+HTML tags are passed through as-is in the output. This allows for basic formatting when the output is rendered in a browser:
+
+```
+output
+	<b>Bold text</b> and <i>italic text</i>
+	Line one<br>Line two
+```
+
+Supported HTML tags (passed through without modification):
+- `<b>...</b>` - Bold
+- `<i>...</i>` - Italic
+- `<u>...</u>` - Underline
+- `<s>...</s>` - Strikethrough
+- `<br>` - Line break
+
+**Note**: This interpreter does not render HTML. Tags are simply preserved in the text output. Rendering would be handled by a separate display layer.
+
 ## Built-in Methods
 
 Methods are called with dot notation: `[listname.methodName]`
@@ -249,7 +370,9 @@ Methods are called with dot notation: `[listname.methodName]`
 - **selectOne** - Explicitly selects one item from a list
 - **selectAll** - Returns all items as an array
 - **selectMany(n)** - Selects n items with repetition allowed
+  - ❌ `selectMany(min, max)` for random count NOT implemented
 - **selectUnique(n)** - Selects n unique items without repetition
+  - ❌ `selectUnique(min, max)` for random count NOT implemented
 
 ### Text Transformation Methods
 
@@ -260,11 +383,13 @@ Methods are called with dot notation: `[listname.methodName]`
 
 ### Grammar Methods
 
-- **pluralForm** - Converts to plural
-- **singularForm** - Converts to singular
-- **pastTense** - Converts verb to past tense
-- **presentTense** - Converts verb to present tense
-- **futureTense** - Converts verb to future tense
+- **pluralForm** - Converts to plural (cat → cats, child → children, city → cities)
+- **singularForm** - Converts to singular (cities → city, children → child)
+- **pastTense** - Converts verb to past tense (walk → walked, go → went)
+- **presentTense** - Converts verb to present tense (walked → walks, went → goes)
+- **futureTense** - Converts verb to future tense (walk → will walk, go → will go)
+- **possessiveForm** - Adds possessive (John → John's, James → James')
+- **negativeForm** - Creates negative form (examine → does not examine, is → is not)
 
 ### List Information Methods
 
@@ -275,9 +400,10 @@ Methods are called with dot notation: `[listname.methodName]`
 
 ### Other Methods
 
-- **evaluateItem** - Explicitly evaluates the item
-- **joinItems(separator)** - Joins array items with separator
-- **replaceText(find, replace)** - Replaces text
+- **evaluateItem** - ❌ NOT IMPLEMENTED - Would explicitly evaluate inline content before storage
+- **joinItems(separator)** - Joins array items with separator (default: space)
+- **consumableList** - Creates a stateful list where items are removed after selection
+- **replaceText(find, replace)** - ❌ NOT IMPLEMENTED - Would replace text
 
 ## Evaluation Semantics
 
@@ -349,6 +475,43 @@ Variables assigned in square brackets are available for the remainder of that ev
 
 Both `[x]` references will use the same animal.
 
+## Important Notes and Common Pitfalls
+
+### Evaluation vs. Storage
+
+When you write `[x = animal.selectOne]`, you are:
+1. Selecting one item from the animal list
+2. Storing that item in variable `x`
+3. **Also outputting that item at the same time**
+
+To assign without outputting, use a comma with empty string:
+```
+[x = animal.selectOne, ""]Now using x: [x]
+```
+
+### Inline Content in Variables
+
+If you store an item that contains inline choices like `{red|blue}`:
+- The inline choice is **not** automatically evaluated
+- Each time you reference the variable, a new random choice is made
+- To evaluate before storage, you would use `evaluateItem` (NOT IMPLEMENTED)
+
+Example:
+```
+flower
+	{red|pink} rose
+
+output
+	[f = flower.selectOne][f] and [f]
+```
+This might output "red rose and pink rose" (different each time).
+
+### Consumable Lists Side Effects
+
+Creating a consumable list with `[cl = list.consumableList]` has a side effect:
+- It creates the consumable list AND outputs the first item
+- To create without output: `[cl = list.consumableList, ""]`
+
 ## Determinism Requirement
 
 For this implementation:
@@ -362,16 +525,17 @@ The following features from the full Perchance system are **not** implemented in
 
 - JavaScript code execution
 - Plugin system
-- `$output` keyword for custom exports
-- `consumableList` and list state management
-- Dynamic properties and property functions
-- Import/export between generators
-- HTML/CSS rendering
+- Import/export between generators (`{import:name}` syntax)
+- HTML/CSS rendering (HTML tags are passed through as-is)
 - User input handling
-- Conditional logic (if/else)
-- Loops and repetition constructs
-- Mathematical operations beyond number generation
+- Long-form if/else statements (ternary operator `?:` is supported)
+- Loops and repetition constructs (use `selectMany` instead)
+- Mathematical operations (+, -, *, /, etc.)
 - String concatenation with `+` operator
+- **Dynamic odds** with `^[condition]` syntax (e.g., `item ^[variable == "value"]`)
+- **`evaluateItem` method** - For explicitly evaluating items before storage
+- **`||` operator for property fallback** - The syntax `[a.property || "default"]` for missing properties
+- **Variable-count selection** - `selectMany(min, max)` and `selectUnique(min, max)` for random counts
 
 ## Grammar Summary
 

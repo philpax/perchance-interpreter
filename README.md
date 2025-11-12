@@ -38,10 +38,18 @@ This interpreter implements core Perchance functionality:
 ### ❌ Not Implemented (Out of Scope)
 - JavaScript code execution
 - Plugin system
-- `this` keyword for accessing sibling properties (partially implemented, needs property assignment syntax)
-- HTML/CSS rendering
+- `this` keyword for accessing sibling properties
+- HTML/CSS rendering (HTML tags are passed through as-is)
 - Import/export between generators with `{import:name}` syntax (requires multi-file architecture)
-- Long-form if/else statements (ternary is supported)
+- Long-form if/else statements (ternary `?:` is supported)
+- Mathematical operations (+, -, *, /, etc.)
+- String concatenation with `+` operator
+- **Dynamic odds** with `^[condition]` syntax (e.g., `item ^[variable == "value"]`)
+- **`evaluateItem` method** for explicitly evaluating items before storage
+- **`||` operator for property fallback** (e.g., `[a.property || "default"]` for missing properties)
+- **Variable-count selection** - `selectMany(min, max)` and `selectUnique(min, max)` for random counts
+
+**Note**: Binary `||` operator IS supported in conditional expressions (e.g., `[a || b ? "yes" : "no"]`)
 
 ## Installation
 
@@ -250,9 +258,14 @@ None! All core features are working correctly.
 
 ## Test Results
 
-Current test status: **89 out of 89 integration tests passing (100%)** ✨
+Current test status: **106 out of 109 integration tests passing (97%)** ✨
 
-All categories working:
+**3 failing tests** (expected - features not yet implemented):
+- `test_multiline_dynamic_odds_with_equality` - Dynamic odds `^[condition]` syntax
+- `test_multiline_evaluate_item_with_ranges` - `evaluateItem` method
+- `test_multiline_or_operator_fallback` - Property fallback `||` operator
+
+All implemented categories working:
 - ✅ Basic list selection and determinism
 - ✅ Weighted selection
 - ✅ Inline lists with weights

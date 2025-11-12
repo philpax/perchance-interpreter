@@ -1105,6 +1105,26 @@ animal
 }
 
 #[test]
+fn test_html_tag_passthrough() {
+    // HTML tags should be passed through as-is
+    let template = "output\n\t<b>Bold</b> and <i>italic</i> text<br>New line\n";
+    let result = evaluate_with_seed(template, 42);
+    assert!(result.is_ok());
+    let output = result.unwrap();
+    assert_eq!(output, "<b>Bold</b> and <i>italic</i> text<br>New line");
+}
+
+#[test]
+fn test_html_tags_with_references() {
+    let template = "word\n\thello\n\noutput\n\t<b>[word]</b> <i>world</i>\n";
+    let result = evaluate_with_seed(template, 42);
+    assert!(result.is_ok());
+    let output = result.unwrap();
+    assert_eq!(output, "<b>hello</b> <i>world</i>");
+}
+
+
+#[test]
 fn test_multiline_evaluate_item_with_ranges() {
     let template = r#"output
   [f = fruit.selectOne.evaluateItem]?! [f] is way too many!
