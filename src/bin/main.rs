@@ -23,7 +23,8 @@ fn print_usage() {
     eprintln!("  cat template.perchance | perchance -   # Read from stdin");
 }
 
-fn main() {
+#[tokio::main]
+async fn main() {
     let args: Vec<String> = env::args().collect();
 
     if args.len() < 2 {
@@ -59,7 +60,7 @@ fn main() {
             eprintln!("Error parsing seed '{}': {}", args[2], e);
             process::exit(1);
         });
-        evaluate_with_seed(&template, seed)
+        evaluate_with_seed(&template, seed).await
     } else {
         // No seed provided, use random seed
         let compiled = compile_template(&template).unwrap_or_else(|e| {
@@ -68,7 +69,7 @@ fn main() {
         });
 
         let mut rng = StdRng::from_entropy();
-        evaluate(&compiled, &mut rng).map_err(|e| e.into())
+        evaluate(&compiled, &mut rng).await.map_err(|e| e.into())
     };
 
     match result {

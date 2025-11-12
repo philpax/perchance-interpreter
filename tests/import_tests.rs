@@ -1,6 +1,6 @@
 /// Tests for import/export functionality
 use perchance_interpreter::loader::InMemoryLoader;
-use perchance_interpreter::{compile, evaluate, parse};
+use perchance_interpreter::{compile, parse};
 use rand::rngs::StdRng;
 use rand::SeedableRng;
 use std::sync::Arc;
@@ -9,10 +9,7 @@ use std::sync::Arc;
 async fn test_basic_import_inline() {
     // Create a loader with a simple generator
     let loader = InMemoryLoader::new();
-    loader.add(
-        "nouns",
-        "noun\n\tdog\n\tcat\n\tbird\n\noutput\n\t[noun]\n",
-    );
+    loader.add("nouns", "noun\n\tdog\n\tcat\n\tbird\n\noutput\n\t[noun]\n");
 
     // Create a generator that imports the nouns
     let template = "output\n\tI saw a {import:nouns}.\n";
@@ -23,7 +20,7 @@ async fn test_basic_import_inline() {
     let mut evaluator = perchance_interpreter::evaluator::Evaluator::new(&compiled, &mut rng)
         .with_loader(Arc::new(loader));
 
-    let result = evaluator.evaluate().unwrap();
+    let result = evaluator.evaluate().await.unwrap();
     assert!(
         result == "I saw a dog." || result == "I saw a cat." || result == "I saw a bird.",
         "Got: {}",
@@ -49,7 +46,7 @@ async fn test_import_with_assignment() {
     let mut evaluator = perchance_interpreter::evaluator::Evaluator::new(&compiled, &mut rng)
         .with_loader(Arc::new(loader));
 
-    let result = evaluator.evaluate().unwrap();
+    let result = evaluator.evaluate().await.unwrap();
     assert!(
         result == "dog" || result == "cat" || result == "bird",
         "Got: {}",
@@ -75,7 +72,7 @@ async fn test_import_with_property_access() {
     let mut evaluator = perchance_interpreter::evaluator::Evaluator::new(&compiled, &mut rng)
         .with_loader(Arc::new(loader));
 
-    let result = evaluator.evaluate().unwrap();
+    let result = evaluator.evaluate().await.unwrap();
     // Should access individual lists
     assert!(result.contains(" is "), "Got: {}", result);
 }
@@ -98,10 +95,12 @@ async fn test_import_with_output_property() {
     let mut evaluator = perchance_interpreter::evaluator::Evaluator::new(&compiled, &mut rng)
         .with_loader(Arc::new(loader));
 
-    let result = evaluator.evaluate().unwrap();
+    let result = evaluator.evaluate().await.unwrap();
     assert!(
-        result == "hello world!" || result == "hello friend!" ||
-        result == "hi world!" || result == "hi friend!",
+        result == "hello world!"
+            || result == "hello friend!"
+            || result == "hi world!"
+            || result == "hi friend!",
         "Got: {}",
         result
     );
@@ -122,9 +121,11 @@ async fn test_import_default_export() {
     let mut evaluator = perchance_interpreter::evaluator::Evaluator::new(&compiled, &mut rng)
         .with_loader(Arc::new(loader));
 
-    let result = evaluator.evaluate().unwrap();
+    let result = evaluator.evaluate().await.unwrap();
     assert!(
-        result == "The color is red." || result == "The color is blue." || result == "The color is green.",
+        result == "The color is red."
+            || result == "The color is blue."
+            || result == "The color is green.",
         "Got: {}",
         result
     );
@@ -146,7 +147,7 @@ async fn test_multiple_imports() {
     let mut evaluator = perchance_interpreter::evaluator::Evaluator::new(&compiled, &mut rng)
         .with_loader(Arc::new(loader));
 
-    let result = evaluator.evaluate().unwrap();
+    let result = evaluator.evaluate().await.unwrap();
     // Should have both a color and an animal
     assert!(result.contains(" "), "Got: {}", result);
 }
@@ -165,7 +166,7 @@ async fn test_import_not_found() {
     let mut evaluator = perchance_interpreter::evaluator::Evaluator::new(&compiled, &mut rng)
         .with_loader(Arc::new(loader));
 
-    let result = evaluator.evaluate();
+    let result = evaluator.evaluate().await;
     assert!(result.is_err());
     assert!(result.unwrap_err().to_string().contains("Import error"));
 }
@@ -181,7 +182,7 @@ async fn test_import_without_loader() {
     let mut evaluator = perchance_interpreter::evaluator::Evaluator::new(&compiled, &mut rng);
     // Note: not calling with_loader()
 
-    let result = evaluator.evaluate();
+    let result = evaluator.evaluate().await;
     assert!(result.is_err());
     assert!(result
         .unwrap_err()
@@ -204,7 +205,7 @@ async fn test_import_caching() {
     let mut evaluator = perchance_interpreter::evaluator::Evaluator::new(&compiled, &mut rng)
         .with_loader(Arc::new(loader));
 
-    let result = evaluator.evaluate().unwrap();
+    let result = evaluator.evaluate().await.unwrap();
     assert_eq!(result, "hello hello");
 }
 
@@ -236,7 +237,7 @@ async fn test_import_with_weights() {
         let mut evaluator = perchance_interpreter::evaluator::Evaluator::new(&compiled, &mut rng)
             .with_loader(Arc::new(loader_clone));
 
-        let result = evaluator.evaluate().unwrap();
+        let result = evaluator.evaluate().await.unwrap();
         if result == "common" {
             common_count += 1;
         } else if result == "rare" {
@@ -270,7 +271,7 @@ async fn test_import_with_sublists() {
     let mut evaluator = perchance_interpreter::evaluator::Evaluator::new(&compiled, &mut rng)
         .with_loader(Arc::new(loader));
 
-    let result = evaluator.evaluate().unwrap();
+    let result = evaluator.evaluate().await.unwrap();
     assert!(
         result == "brown" || result == "black" || result == "white" || result == "orange",
         "Got: {}",
@@ -304,7 +305,7 @@ async fn test_complex_import_scenario() {
     let mut evaluator = perchance_interpreter::evaluator::Evaluator::new(&compiled, &mut rng)
         .with_loader(Arc::new(loader));
 
-    let result = evaluator.evaluate().unwrap();
+    let result = evaluator.evaluate().await.unwrap();
     assert!(result.starts_with("I saw a "), "Got: {}", result);
     assert!(result.ends_with('.'), "Got: {}", result);
 }

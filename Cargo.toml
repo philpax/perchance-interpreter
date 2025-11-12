@@ -6,11 +6,13 @@ edition = "2021"
 [dependencies]
 rand = "0.8"
 async-trait = "0.1"
-tokio = { version = "1", features = ["rt", "fs", "rt-multi-thread"] }
+tokio = { version = "1", features = ["rt", "fs", "rt-multi-thread", "macros"] }
 futures = "0.3"
+async-recursion = "1.0"
 
 [dev-dependencies]
 tokio = { version = "1", features = ["rt", "fs", "macros", "rt-multi-thread"] }
+tokio-test = "0.4"
 
 [[bin]]
 name = "perchance"

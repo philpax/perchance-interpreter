@@ -1,7 +1,8 @@
 /// Evaluator executes compiled programs with RNG support
 use crate::ast::*;
 use crate::compiler::*;
-use crate::loader::{GeneratorLoader, LoadError};
+use crate::loader::GeneratorLoader;
+use async_recursion::async_recursion;
 use rand::Rng;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -44,12 +45,12 @@ struct ConsumableListState {
 #[derive(Debug, Clone)]
 enum Value {
     Text(String),
-    List(String),                   // Reference to a list by name
-    ListInstance(CompiledList),     // An actual list instance (for sublists)
-    ItemInstance(CompiledItem),     // An item with its properties (sublists) intact
-    Array(Vec<String>),             // Multiple items (for selectMany/selectUnique before joinItems)
-    ConsumableList(String),         // Reference to a consumable list by unique ID
-    ImportedGenerator(String),      // Reference to an imported generator by name
+    List(String),               // Reference to a list by name
+    ListInstance(CompiledList), // An actual list instance (for sublists)
+    ItemInstance(CompiledItem), // An item with its properties (sublists) intact
+    Array(Vec<String>),         // Multiple items (for selectMany/selectUnique before joinItems)
+    ConsumableList(String),     // Reference to a consumable list by unique ID
+    ImportedGenerator(String),  // Reference to an imported generator by name
 }
 
 pub struct Evaluator<'a, R: Rng> {
@@ -64,7 +65,7 @@ pub struct Evaluator<'a, R: Rng> {
     import_cache: HashMap<String, CompiledProgram>, // Cache for imported generators
 }
 
-impl<'a, R: Rng> Evaluator<'a, R> {
+impl<'a, R: Rng + Send> Evaluator<'a, R> {
     pub fn new(program: &'a CompiledProgram, rng: &'a mut R) -> Self {
         Evaluator {
             program,
@@ -86,7 +87,7 @@ impl<'a, R: Rng> Evaluator<'a, R> {
     }
 
     /// Load and compile an imported generator
-    fn load_import(&mut self, name: &str) -> Result<&CompiledProgram, EvalError> {
+    async fn load_import(&mut self, name: &str) -> Result<&CompiledProgram, EvalError> {
         // Check cache first
         if self.import_cache.contains_key(name) {
             return Ok(self.import_cache.get(name).unwrap());
@@ -98,17 +99,19 @@ impl<'a, R: Rng> Evaluator<'a, R> {
             .as_ref()
             .ok_or_else(|| EvalError::ImportError("No loader available for imports".to_string()))?;
 
-        // Load the generator source (blocking on async operation)
-        // Use futures::executor::block_on which works in any context
-        let source = futures::executor::block_on(loader.load(name))
-            .map_err(|e| EvalError::ImportError(format!("Failed to load generator '{}': {}", name, e)))?;
+        // Load the generator source
+        let source = loader.load(name).await.map_err(|e| {
+            EvalError::ImportError(format!("Failed to load generator '{}': {}", name, e))
+        })?;
 
         // Parse and compile the generator
-        let program = crate::parser::parse(&source)
-            .map_err(|e| EvalError::ImportError(format!("Failed to parse generator '{}': {}", name, e)))?;
+        let program = crate::parser::parse(&source).map_err(|e| {
+            EvalError::ImportError(format!("Failed to parse generator '{}': {}", name, e))
+        })?;
 
-        let compiled = crate::compiler::compile(&program)
-            .map_err(|e| EvalError::ImportError(format!("Failed to compile generator '{}': {}", name, e)))?;
+        let compiled = crate::compiler::compile(&program).map_err(|e| {
+            EvalError::ImportError(format!("Failed to compile generator '{}': {}", name, e))
+        })?;
 
         // Cache it
         self.import_cache.insert(name.to_string(), compiled);
@@ -116,15 +119,15 @@ impl<'a, R: Rng> Evaluator<'a, R> {
         Ok(self.import_cache.get(name).unwrap())
     }
 
-    pub fn evaluate(&mut self) -> Result<String, EvalError> {
+    pub async fn evaluate(&mut self) -> Result<String, EvalError> {
         // Evaluate the "output" list, or default to the last list if not defined
         match self.program.get_list("output") {
-            Some(output_list) => self.evaluate_list(output_list),
+            Some(output_list) => self.evaluate_list(output_list).await,
             None => {
                 // Default to the last list if no "output" list is defined
                 if let Some(last_list_name) = self.program.list_order.last() {
                     if let Some(last_list) = self.program.get_list(last_list_name) {
-                        self.evaluate_list(last_list)
+                        self.evaluate_list(last_list).await
                     } else {
                         Err(EvalError::UndefinedList("output".to_string()))
                     }
@@ -135,7 +138,8 @@ impl<'a, R: Rng> Evaluator<'a, R> {
         }
     }
 
-    fn evaluate_list(&mut self, list: &CompiledList) -> Result<String, EvalError> {
+    #[async_recursion]
+    async fn evaluate_list(&mut self, list: &CompiledList) -> Result<String, EvalError> {
         if list.items.is_empty() && list.output.is_none() {
             return Err(EvalError::EmptyList(list.name.clone()));
         }
@@ -143,7 +147,8 @@ impl<'a, R: Rng> Evaluator<'a, R> {
         // Select an item based on weights (if there are items)
         let item = if !list.items.is_empty() {
             Some(
-                self.select_weighted_item(&list.items, list.total_weight)?
+                self.select_weighted_item(&list.items, list.total_weight)
+                    .await?
                     .clone(),
             )
         } else {
@@ -158,7 +163,7 @@ impl<'a, R: Rng> Evaluator<'a, R> {
                 self.current_item = Some(selected_item.clone());
             }
 
-            let result = self.evaluate_content(output_content);
+            let result = self.evaluate_content(output_content).await;
 
             // Restore previous context
             self.current_item = old_item;
@@ -176,14 +181,15 @@ impl<'a, R: Rng> Evaluator<'a, R> {
             let idx = self.rng.gen_range(0..sublist_names.len());
             let sublist_name = &sublist_names[idx];
             let sublist = item.sublists.get(sublist_name).unwrap();
-            return self.evaluate_list(sublist);
+            return self.evaluate_list(sublist).await;
         }
 
         // Evaluate the item's content
-        self.evaluate_content(&item.content)
+        self.evaluate_content(&item.content).await
     }
 
-    fn select_weighted_item<'b>(
+    #[async_recursion]
+    async fn select_weighted_item<'b>(
         &mut self,
         items: &'b [CompiledItem],
         _total_weight: f64,
@@ -199,7 +205,7 @@ impl<'a, R: Rng> Evaluator<'a, R> {
         for item in items {
             let weight = if let Some(ref expr) = item.dynamic_weight {
                 // Evaluate the dynamic weight expression
-                let result = self.evaluate_expression(expr)?;
+                let result = self.evaluate_expression(expr).await?;
                 // Convert to number: "true" -> 1.0, "false" -> 0.0, or parse as number
                 let weight = if result == "true" {
                     1.0
@@ -236,7 +242,8 @@ impl<'a, R: Rng> Evaluator<'a, R> {
         Ok(&items[items.len() - 1])
     }
 
-    fn evaluate_content(&mut self, content: &[ContentPart]) -> Result<String, EvalError> {
+    #[async_recursion]
+    async fn evaluate_content(&mut self, content: &[ContentPart]) -> Result<String, EvalError> {
         let mut result = String::new();
 
         for (i, part) in content.iter().enumerate() {
@@ -250,7 +257,7 @@ impl<'a, R: Rng> Evaluator<'a, R> {
                 }
                 ContentPart::Escape(ch) => result.push(*ch),
                 ContentPart::Reference(expr) => {
-                    let value = self.evaluate_expression(expr)?;
+                    let value = self.evaluate_expression(expr).await?;
                     // Track numbers for {s} pluralization
                     if let Ok(num) = value.parse::<i64>() {
                         self.last_number = Some(num);
@@ -263,7 +270,7 @@ impl<'a, R: Rng> Evaluator<'a, R> {
                         match &inline.choices[0].content[0] {
                             ContentPart::Article => {
                                 // {a} - choose "a" or "an" based on next word
-                                let next_word = self.peek_next_word(content, i + 1)?;
+                                let next_word = self.peek_next_word(content, i + 1).await?;
                                 if self.starts_with_vowel_sound(&next_word) {
                                     result.push_str("an");
                                 } else {
@@ -288,7 +295,7 @@ impl<'a, R: Rng> Evaluator<'a, R> {
                     }
 
                     // Regular inline evaluation
-                    let value = self.evaluate_inline(inline)?;
+                    let value = self.evaluate_inline(inline).await?;
                     // Track numbers for {s} pluralization
                     if let Ok(num) = value.parse::<i64>() {
                         self.last_number = Some(num);
@@ -297,7 +304,7 @@ impl<'a, R: Rng> Evaluator<'a, R> {
                 }
                 ContentPart::Article => {
                     // {a} - choose "a" or "an" based on next word
-                    let next_word = self.peek_next_word(content, i + 1)?;
+                    let next_word = self.peek_next_word(content, i + 1).await?;
                     if self.starts_with_vowel_sound(&next_word) {
                         result.push_str("an");
                     } else {
@@ -321,7 +328,8 @@ impl<'a, R: Rng> Evaluator<'a, R> {
         Ok(result)
     }
 
-    fn evaluate_inline(&mut self, inline: &InlineList) -> Result<String, EvalError> {
+    #[async_recursion]
+    async fn evaluate_inline(&mut self, inline: &InlineList) -> Result<String, EvalError> {
         if inline.choices.is_empty() {
             return Ok(String::new());
         }
@@ -354,7 +362,7 @@ impl<'a, R: Rng> Evaluator<'a, R> {
                 Some(ItemWeight::Static(w)) => *w,
                 Some(ItemWeight::Dynamic(expr)) => {
                     // Evaluate the dynamic weight expression
-                    let result = self.evaluate_expression(expr)?;
+                    let result = self.evaluate_expression(expr).await?;
                     // Convert to number: "true" -> 1.0, "false" -> 0.0, or parse as number
                     let weight = if result == "true" {
                         1.0
@@ -384,12 +392,13 @@ impl<'a, R: Rng> Evaluator<'a, R> {
         for (i, weight) in actual_weights.iter().enumerate() {
             cumulative += weight;
             if random_value < cumulative {
-                return self.evaluate_content(&inline.choices[i].content);
+                return self.evaluate_content(&inline.choices[i].content).await;
             }
         }
 
         // Fallback
         self.evaluate_content(&inline.choices[inline.choices.len() - 1].content)
+            .await
     }
 
     // Helper function to extract a number from text
@@ -408,7 +417,8 @@ impl<'a, R: Rng> Evaluator<'a, R> {
     }
 
     // Helper function to peek at the next word in content
-    fn peek_next_word(
+    #[async_recursion]
+    async fn peek_next_word(
         &mut self,
         content: &[ContentPart],
         start_idx: usize,
@@ -425,7 +435,7 @@ impl<'a, R: Rng> Evaluator<'a, R> {
                 }
                 ContentPart::Reference(expr) => {
                     // Evaluate the reference to get the word
-                    let value = self.evaluate_expression(expr)?;
+                    let value = self.evaluate_expression(expr).await?;
                     if let Some(word) = value.split_whitespace().next() {
                         if !word.is_empty() {
                             return Ok(word.to_string());
@@ -434,7 +444,7 @@ impl<'a, R: Rng> Evaluator<'a, R> {
                 }
                 ContentPart::Inline(inline) => {
                     // Evaluate the inline to get the word
-                    let value = self.evaluate_inline(inline)?;
+                    let value = self.evaluate_inline(inline).await?;
                     if let Some(word) = value.split_whitespace().next() {
                         if !word.is_empty() {
                             return Ok(word.to_string());
@@ -461,7 +471,8 @@ impl<'a, R: Rng> Evaluator<'a, R> {
         matches!(first_char, 'a' | 'e' | 'i' | 'o' | 'u')
     }
 
-    fn evaluate_expression(&mut self, expr: &Expression) -> Result<String, EvalError> {
+    #[async_recursion]
+    async fn evaluate_expression(&mut self, expr: &Expression) -> Result<String, EvalError> {
         match expr {
             Expression::Simple(ident) => {
                 // Check for "this" keyword
@@ -473,12 +484,12 @@ impl<'a, R: Rng> Evaluator<'a, R> {
 
                 // Check if it's a variable first
                 if let Some(value) = self.variables.get(&ident.name) {
-                    return self.value_to_string(value.clone());
+                    return self.value_to_string(value.clone()).await;
                 }
 
                 // Otherwise, look up the list and evaluate it
                 match self.program.get_list(&ident.name) {
-                    Some(list) => self.evaluate_list(list),
+                    Some(list) => self.evaluate_list(list).await,
                     None => Err(EvalError::UndefinedList(ident.name.clone())),
                 }
             }
@@ -491,7 +502,7 @@ impl<'a, R: Rng> Evaluator<'a, R> {
                         if let Some(ref item) = self.current_item {
                             if let Some(sublist) = item.sublists.get(&prop.name) {
                                 let sublist_clone = sublist.clone();
-                                return self.evaluate_list(&sublist_clone);
+                                return self.evaluate_list(&sublist_clone).await;
                             } else {
                                 return Err(EvalError::UndefinedProperty(
                                     "this".to_string(),
@@ -506,14 +517,14 @@ impl<'a, R: Rng> Evaluator<'a, R> {
                     }
                 }
 
-                let base_value = self.evaluate_to_value(base)?;
+                let base_value = self.evaluate_to_value(base).await?;
                 // Try as property first, then as a zero-argument method
-                match self.get_property(&base_value, &prop.name) {
+                match self.get_property(&base_value, &prop.name).await {
                     Ok(result) => Ok(result),
                     Err(EvalError::UndefinedProperty(_, _)) => {
                         // Try as a method call with no arguments
                         let method = MethodCall::new(prop.name.clone());
-                        self.call_method(&base_value, &method)
+                        self.call_method(&base_value, &method).await
                     }
                     Err(e) => Err(e),
                 }
@@ -521,30 +532,30 @@ impl<'a, R: Rng> Evaluator<'a, R> {
 
             Expression::PropertyWithFallback(base, prop, fallback) => {
                 // Try to access the property, fall back to the fallback expression if it doesn't exist
-                let base_value = self.evaluate_to_value(base)?;
-                match self.get_property(&base_value, &prop.name) {
+                let base_value = self.evaluate_to_value(base).await?;
+                match self.get_property(&base_value, &prop.name).await {
                     Ok(result) => Ok(result),
                     Err(EvalError::UndefinedProperty(_, _)) | Err(EvalError::TypeError(_)) => {
                         // Property doesn't exist, evaluate fallback
-                        self.evaluate_expression(fallback)
+                        self.evaluate_expression(fallback).await
                     }
                     Err(e) => Err(e),
                 }
             }
 
             Expression::Dynamic(base, index) => {
-                let base_value = self.evaluate_to_value(base)?;
-                let index_str = self.evaluate_expression(index)?;
-                self.get_property(&base_value, &index_str)
+                let base_value = self.evaluate_to_value(base).await?;
+                let index_str = self.evaluate_expression(index).await?;
+                self.get_property(&base_value, &index_str).await
             }
 
             Expression::Method(base, method) => {
-                let base_value = self.evaluate_to_value(base)?;
-                self.call_method(&base_value, method)
+                let base_value = self.evaluate_to_value(base).await?;
+                self.call_method(&base_value, method).await
             }
 
             Expression::Assignment(ident, value) => {
-                let val = self.evaluate_to_value(value)?;
+                let val = self.evaluate_to_value(value).await?;
                 self.variables.insert(ident.name.clone(), val);
                 Ok(String::new())
             }
@@ -552,12 +563,12 @@ impl<'a, R: Rng> Evaluator<'a, R> {
             Expression::Sequence(exprs, output) => {
                 // Evaluate all expressions in sequence
                 for expr in exprs {
-                    self.evaluate_expression(expr)?;
+                    self.evaluate_expression(expr).await?;
                 }
 
                 // Return the output expression if present
                 if let Some(out_expr) = output {
-                    self.evaluate_expression(out_expr)
+                    self.evaluate_expression(out_expr).await
                 } else {
                     Ok(String::new())
                 }
@@ -568,7 +579,7 @@ impl<'a, R: Rng> Evaluator<'a, R> {
                 // We need to parse and evaluate the string content
                 // For now, we'll use a simple approach: re-parse the string as content
                 match crate::parser::Parser::new(s).parse_content_until_newline() {
-                    Ok(content) => self.evaluate_content(&content),
+                    Ok(content) => self.evaluate_content(&content).await,
                     Err(_) => Ok(s.clone()), // Fallback to literal if parsing fails
                 }
             }
@@ -587,19 +598,19 @@ impl<'a, R: Rng> Evaluator<'a, R> {
 
             Expression::Conditional(cond, true_expr, false_expr) => {
                 // Evaluate condition
-                let cond_result = self.evaluate_expression(cond)?;
+                let cond_result = self.evaluate_expression(cond).await?;
 
                 // Check if condition is truthy
                 if self.is_truthy(&cond_result) {
-                    self.evaluate_expression(true_expr)
+                    self.evaluate_expression(true_expr).await
                 } else {
-                    self.evaluate_expression(false_expr)
+                    self.evaluate_expression(false_expr).await
                 }
             }
 
             Expression::BinaryOp(left, op, right) => {
-                let left_val = self.evaluate_expression(left)?;
-                let right_val = self.evaluate_expression(right)?;
+                let left_val = self.evaluate_expression(left).await?;
+                let right_val = self.evaluate_expression(right).await?;
 
                 let result = match op {
                     BinaryOperator::Equal => left_val == right_val,
@@ -619,7 +630,7 @@ impl<'a, R: Rng> Evaluator<'a, R> {
 
             Expression::Import(generator_name) => {
                 // Load the imported generator
-                let imported_program = self.load_import(generator_name)?.clone();
+                let imported_program = self.load_import(generator_name).await?.clone();
 
                 // Create a new evaluator for the imported program with its own context
                 let mut imported_evaluator = Evaluator::new(&imported_program, self.rng);
@@ -633,7 +644,7 @@ impl<'a, R: Rng> Evaluator<'a, R> {
                 imported_evaluator.import_cache = self.import_cache.clone();
 
                 // Evaluate the imported generator
-                imported_evaluator.evaluate()
+                imported_evaluator.evaluate().await
             }
         }
     }
@@ -659,7 +670,8 @@ impl<'a, R: Rng> Evaluator<'a, R> {
         }
     }
 
-    fn evaluate_to_value(&mut self, expr: &Expression) -> Result<Value, EvalError> {
+    #[async_recursion]
+    async fn evaluate_to_value(&mut self, expr: &Expression) -> Result<Value, EvalError> {
         match expr {
             Expression::Simple(ident) => {
                 // Handle "this" keyword
@@ -704,14 +716,14 @@ impl<'a, R: Rng> Evaluator<'a, R> {
                     }
                 }
 
-                let base_value = self.evaluate_to_value(base)?;
+                let base_value = self.evaluate_to_value(base).await?;
                 // Try as property first, then as a zero-argument method
-                match self.get_property_value(&base_value, &prop.name) {
+                match self.get_property_value(&base_value, &prop.name).await {
                     Ok(value) => Ok(value),
                     Err(EvalError::UndefinedProperty(_, _)) | Err(EvalError::TypeError(_)) => {
                         // Try as a method call with no arguments
                         let method = MethodCall::new(prop.name.clone());
-                        self.call_method_value(&base_value, &method)
+                        self.call_method_value(&base_value, &method).await
                     }
                     Err(e) => Err(e),
                 }
@@ -719,37 +731,38 @@ impl<'a, R: Rng> Evaluator<'a, R> {
 
             Expression::PropertyWithFallback(base, prop, fallback) => {
                 // Try to access the property, fall back to the fallback expression if it doesn't exist
-                let base_value = self.evaluate_to_value(base)?;
-                match self.get_property_value(&base_value, &prop.name) {
+                let base_value = self.evaluate_to_value(base).await?;
+                match self.get_property_value(&base_value, &prop.name).await {
                     Ok(value) => Ok(value),
                     Err(EvalError::UndefinedProperty(_, _)) | Err(EvalError::TypeError(_)) => {
                         // Property doesn't exist, evaluate fallback
-                        self.evaluate_to_value(fallback)
+                        self.evaluate_to_value(fallback).await
                     }
                     Err(e) => Err(e),
                 }
             }
 
             Expression::Method(base, method) => {
-                let base_value = self.evaluate_to_value(base)?;
-                self.call_method_value(&base_value, method)
+                let base_value = self.evaluate_to_value(base).await?;
+                self.call_method_value(&base_value, method).await
             }
 
             Expression::Import(generator_name) => {
                 // Load the imported generator to ensure it exists and is cached
-                let _ = self.load_import(generator_name)?;
+                let _ = self.load_import(generator_name).await?;
                 // Return a reference to the imported generator
                 Ok(Value::ImportedGenerator(generator_name.clone()))
             }
 
             _ => {
-                let result = self.evaluate_expression(expr)?;
+                let result = self.evaluate_expression(expr).await?;
                 Ok(Value::Text(result))
             }
         }
     }
 
-    fn value_to_string(&mut self, value: Value) -> Result<String, EvalError> {
+    #[async_recursion]
+    async fn value_to_string(&mut self, value: Value) -> Result<String, EvalError> {
         match value {
             Value::Text(s) => Ok(s),
             Value::List(name) => {
@@ -757,9 +770,9 @@ impl<'a, R: Rng> Evaluator<'a, R> {
                     .program
                     .get_list(&name)
                     .ok_or_else(|| EvalError::UndefinedList(name.clone()))?;
-                self.evaluate_list(list)
+                self.evaluate_list(list).await
             }
-            Value::ListInstance(list) => self.evaluate_list(&list),
+            Value::ListInstance(list) => self.evaluate_list(&list).await,
             Value::ItemInstance(item) => {
                 // Evaluate the item's content
                 // If it has sublists, pick one randomly
@@ -768,9 +781,9 @@ impl<'a, R: Rng> Evaluator<'a, R> {
                     let idx = self.rng.gen_range(0..sublist_names.len());
                     let sublist_name = &sublist_names[idx];
                     let sublist = item.sublists.get(sublist_name).unwrap();
-                    self.evaluate_list(sublist)
+                    self.evaluate_list(sublist).await
                 } else {
-                    self.evaluate_content(&item.content)
+                    self.evaluate_content(&item.content).await
                 }
             }
             Value::Array(items) => Ok(items.join(" ")), // Default: space-separated
@@ -826,14 +839,14 @@ impl<'a, R: Rng> Evaluator<'a, R> {
                     let sidx = self.rng.gen_range(0..sublist_names.len());
                     let sublist_name = &sublist_names[sidx];
                     let sublist = item.sublists.get(sublist_name).unwrap();
-                    self.evaluate_list(sublist)
+                    self.evaluate_list(sublist).await
                 } else {
-                    self.evaluate_content(&item.content)
+                    self.evaluate_content(&item.content).await
                 }
             }
             Value::ImportedGenerator(generator_name) => {
                 // Evaluate the imported generator
-                let imported_program = self.load_import(&generator_name)?.clone();
+                let imported_program = self.load_import(&generator_name).await?.clone();
 
                 // Create a new evaluator for the imported program with its own context
                 let mut imported_evaluator = Evaluator::new(&imported_program, self.rng);
@@ -847,12 +860,42 @@ impl<'a, R: Rng> Evaluator<'a, R> {
                 imported_evaluator.import_cache = self.import_cache.clone();
 
                 // Evaluate the imported generator
-                imported_evaluator.evaluate()
+                imported_evaluator.evaluate().await
             }
         }
     }
 
-    fn get_property_value(&mut self, value: &Value, prop_name: &str) -> Result<Value, EvalError> {
+    /// Evaluate a list to a Value (useful for checking if it evaluates to an ImportedGenerator)
+    async fn evaluate_list_to_value(&mut self, list: &CompiledList) -> Result<Value, EvalError> {
+        // Check if list has $output property
+        if let Some(output_content) = &list.output {
+            // Check if the output is a simple import expression
+            if output_content.len() == 1 {
+                if let ContentPart::Inline(inline) = &output_content[0] {
+                    if inline.choices.len() == 1 && inline.choices[0].content.len() == 1 {
+                        if let ContentPart::Reference(Expression::Import(name)) =
+                            &inline.choices[0].content[0]
+                        {
+                            // Load the import to ensure it's cached
+                            let _ = self.load_import(name).await?;
+                            return Ok(Value::ImportedGenerator(name.clone()));
+                        }
+                    }
+                }
+            }
+        }
+
+        // Default: evaluate as text and return as Text value
+        let result = self.evaluate_list(list).await?;
+        Ok(Value::Text(result))
+    }
+
+    #[async_recursion]
+    async fn get_property_value(
+        &mut self,
+        value: &Value,
+        prop_name: &str,
+    ) -> Result<Value, EvalError> {
         match value {
             Value::List(list_name) => {
                 // Look up the list
@@ -865,6 +908,17 @@ impl<'a, R: Rng> Evaluator<'a, R> {
                 for item in &list.items {
                     if let Some(sublist) = item.sublists.get(prop_name) {
                         return Ok(Value::ListInstance(sublist.clone()));
+                    }
+                }
+
+                // If no items have the property, check if the list has a $output
+                // that evaluates to an imported generator
+                if list.items.is_empty() && list.output.is_some() {
+                    // Try to evaluate the list to see if it produces an ImportedGenerator
+                    let result_value = self.evaluate_list_to_value(list).await?;
+                    if matches!(result_value, Value::ImportedGenerator(_)) {
+                        // Delegate property access to the imported generator
+                        return self.get_property_value(&result_value, prop_name).await;
                     }
                 }
 
@@ -914,7 +968,7 @@ impl<'a, R: Rng> Evaluator<'a, R> {
                 // Check if this is a grammar method that can be applied to text
                 if self.is_grammar_method(prop_name) {
                     let method = MethodCall::new(prop_name.to_string());
-                    return self.call_method_value(value, &method);
+                    return self.call_method_value(value, &method).await;
                 }
                 Err(EvalError::TypeError(format!(
                     "Cannot access property '{}' on text value",
@@ -929,7 +983,7 @@ impl<'a, R: Rng> Evaluator<'a, R> {
                 // Check if this is a method that can be applied to consumable lists
                 if self.is_grammar_method(prop_name) || prop_name == "selectOne" {
                     let method = MethodCall::new(prop_name.to_string());
-                    return self.call_method_value(value, &method);
+                    return self.call_method_value(value, &method).await;
                 }
                 Err(EvalError::TypeError(format!(
                     "Cannot access property '{}' on consumable list",
@@ -938,7 +992,7 @@ impl<'a, R: Rng> Evaluator<'a, R> {
             }
             Value::ImportedGenerator(generator_name) => {
                 // Access a property (top-level list) from the imported generator
-                let imported_program = self.load_import(generator_name)?;
+                let imported_program = self.load_import(generator_name).await?;
 
                 // Look up the list by name in the imported generator
                 if let Some(list) = imported_program.get_list(prop_name) {
@@ -970,17 +1024,24 @@ impl<'a, R: Rng> Evaluator<'a, R> {
         )
     }
 
-    fn get_property(&mut self, value: &Value, prop_name: &str) -> Result<String, EvalError> {
-        let prop_value = self.get_property_value(value, prop_name)?;
-        self.value_to_string(prop_value)
+    #[async_recursion]
+    async fn get_property(&mut self, value: &Value, prop_name: &str) -> Result<String, EvalError> {
+        let prop_value = self.get_property_value(value, prop_name).await?;
+        self.value_to_string(prop_value).await
     }
 
-    fn call_method(&mut self, value: &Value, method: &MethodCall) -> Result<String, EvalError> {
-        let value_result = self.call_method_value(value, method)?;
-        self.value_to_string(value_result)
+    #[async_recursion]
+    async fn call_method(
+        &mut self,
+        value: &Value,
+        method: &MethodCall,
+    ) -> Result<String, EvalError> {
+        let value_result = self.call_method_value(value, method).await?;
+        self.value_to_string(value_result).await
     }
 
-    fn call_method_value(
+    #[async_recursion]
+    async fn call_method_value(
         &mut self,
         value: &Value,
         method: &MethodCall,
@@ -996,7 +1057,8 @@ impl<'a, R: Rng> Evaluator<'a, R> {
                             .ok_or_else(|| EvalError::UndefinedList(name.clone()))?;
 
                         let item = self
-                            .select_weighted_item(&list.items, list.total_weight)?
+                            .select_weighted_item(&list.items, list.total_weight)
+                            .await?
                             .clone();
 
                         // If item has sublists (properties), return the item instance
@@ -1006,12 +1068,13 @@ impl<'a, R: Rng> Evaluator<'a, R> {
                         }
 
                         // No sublists, evaluate content directly
-                        let result = self.evaluate_content(&item.content)?;
+                        let result = self.evaluate_content(&item.content).await?;
                         Ok(Value::Text(result))
                     }
                     Value::ListInstance(list) => {
                         let item = self
-                            .select_weighted_item(&list.items, list.total_weight)?
+                            .select_weighted_item(&list.items, list.total_weight)
+                            .await?
                             .clone();
 
                         // If item has sublists (properties), return the item instance
@@ -1019,7 +1082,7 @@ impl<'a, R: Rng> Evaluator<'a, R> {
                             return Ok(Value::ItemInstance(item));
                         }
 
-                        let result = self.evaluate_content(&item.content)?;
+                        let result = self.evaluate_content(&item.content).await?;
                         Ok(Value::Text(result))
                     }
                     Value::ItemInstance(item) => Ok(Value::ItemInstance(item.clone())),
@@ -1035,12 +1098,12 @@ impl<'a, R: Rng> Evaluator<'a, R> {
                     }
                     Value::ConsumableList(_) => {
                         // For consumable lists, convert to string (which consumes an item)
-                        let result = self.value_to_string(value.clone())?;
+                        let result = self.value_to_string(value.clone()).await?;
                         Ok(Value::Text(result))
                     }
                     Value::ImportedGenerator(_) => {
                         // Convert imported generator to string (evaluates it)
-                        let result = self.value_to_string(value.clone())?;
+                        let result = self.value_to_string(value.clone()).await?;
                         Ok(Value::Text(result))
                     }
                 }
@@ -1051,7 +1114,7 @@ impl<'a, R: Rng> Evaluator<'a, R> {
                 match value {
                     Value::ItemInstance(item) => {
                         // Evaluate the item's content immediately
-                        let result = self.evaluate_content(&item.content)?;
+                        let result = self.evaluate_content(&item.content).await?;
                         Ok(Value::Text(result))
                     }
                     Value::Text(s) => {
@@ -1060,29 +1123,29 @@ impl<'a, R: Rng> Evaluator<'a, R> {
                     }
                     _ => {
                         // For other values, convert to string
-                        let result = self.value_to_string(value.clone())?;
+                        let result = self.value_to_string(value.clone()).await?;
                         Ok(Value::Text(result))
                     }
                 }
             }
 
             "upperCase" => {
-                let s = self.value_to_string(value.clone())?;
+                let s = self.value_to_string(value.clone()).await?;
                 Ok(Value::Text(s.to_uppercase()))
             }
 
             "lowerCase" => {
-                let s = self.value_to_string(value.clone())?;
+                let s = self.value_to_string(value.clone()).await?;
                 Ok(Value::Text(s.to_lowercase()))
             }
 
             "titleCase" => {
-                let s = self.value_to_string(value.clone())?;
+                let s = self.value_to_string(value.clone()).await?;
                 Ok(Value::Text(to_title_case(&s)))
             }
 
             "sentenceCase" => {
-                let s = self.value_to_string(value.clone())?;
+                let s = self.value_to_string(value.clone()).await?;
                 Ok(Value::Text(to_sentence_case(&s)))
             }
 
@@ -1101,11 +1164,11 @@ impl<'a, R: Rng> Evaluator<'a, R> {
                                 let sublist_names: Vec<_> = item.sublists.keys().cloned().collect();
                                 for sublist_name in sublist_names {
                                     if let Some(sublist) = item.sublists.get(&sublist_name) {
-                                        results.push(self.evaluate_list(sublist)?);
+                                        results.push(self.evaluate_list(sublist).await?);
                                     }
                                 }
                             } else {
-                                results.push(self.evaluate_content(&item.content)?);
+                                results.push(self.evaluate_content(&item.content).await?);
                             }
                         }
                         Ok(Value::Text(results.join(" ")))
@@ -1117,18 +1180,18 @@ impl<'a, R: Rng> Evaluator<'a, R> {
                                 let sublist_names: Vec<_> = item.sublists.keys().cloned().collect();
                                 for sublist_name in sublist_names {
                                     if let Some(sublist) = item.sublists.get(&sublist_name) {
-                                        results.push(self.evaluate_list(sublist)?);
+                                        results.push(self.evaluate_list(sublist).await?);
                                     }
                                 }
                             } else {
-                                results.push(self.evaluate_content(&item.content)?);
+                                results.push(self.evaluate_content(&item.content).await?);
                             }
                         }
                         Ok(Value::Text(results.join(" ")))
                     }
                     Value::ItemInstance(item) => {
                         // For an item instance, just evaluate its content
-                        let result = self.evaluate_content(&item.content)?;
+                        let result = self.evaluate_content(&item.content).await?;
                         Ok(Value::Text(result))
                     }
                     Value::Text(s) => Ok(Value::Text(s.clone())),
@@ -1159,7 +1222,7 @@ impl<'a, R: Rng> Evaluator<'a, R> {
                     ));
                 } else {
                     // Evaluate the argument to get the number
-                    let arg_str = self.evaluate_expression(&method.args[0])?;
+                    let arg_str = self.evaluate_expression(&method.args[0]).await?;
                     arg_str.parse::<usize>().map_err(|_| {
                         EvalError::InvalidMethodCall(format!(
                             "selectMany argument must be a number, got: {}",
@@ -1178,17 +1241,18 @@ impl<'a, R: Rng> Evaluator<'a, R> {
                         let mut results = Vec::new();
                         for _ in 0..n {
                             let item = self
-                                .select_weighted_item(&list.items, list.total_weight)?
+                                .select_weighted_item(&list.items, list.total_weight)
+                                .await?
                                 .clone();
                             if !item.sublists.is_empty() {
                                 let sublist_names: Vec<_> = item.sublists.keys().cloned().collect();
                                 let idx = self.rng.gen_range(0..sublist_names.len());
                                 let sublist_name = &sublist_names[idx];
                                 if let Some(sublist) = item.sublists.get(sublist_name) {
-                                    results.push(self.evaluate_list(sublist)?);
+                                    results.push(self.evaluate_list(sublist).await?);
                                 }
                             } else {
-                                results.push(self.evaluate_content(&item.content)?);
+                                results.push(self.evaluate_content(&item.content).await?);
                             }
                         }
                         Ok(Value::Array(results))
@@ -1197,17 +1261,18 @@ impl<'a, R: Rng> Evaluator<'a, R> {
                         let mut results = Vec::new();
                         for _ in 0..n {
                             let item = self
-                                .select_weighted_item(&list.items, list.total_weight)?
+                                .select_weighted_item(&list.items, list.total_weight)
+                                .await?
                                 .clone();
                             if !item.sublists.is_empty() {
                                 let sublist_names: Vec<_> = item.sublists.keys().cloned().collect();
                                 let idx = self.rng.gen_range(0..sublist_names.len());
                                 let sublist_name = &sublist_names[idx];
                                 if let Some(sublist) = item.sublists.get(sublist_name) {
-                                    results.push(self.evaluate_list(sublist)?);
+                                    results.push(self.evaluate_list(sublist).await?);
                                 }
                             } else {
-                                results.push(self.evaluate_content(&item.content)?);
+                                results.push(self.evaluate_content(&item.content).await?);
                             }
                         }
                         Ok(Value::Array(results))
@@ -1216,7 +1281,7 @@ impl<'a, R: Rng> Evaluator<'a, R> {
                         // Repeat the same item n times (convert to string)
                         let mut results = Vec::new();
                         for _ in 0..n {
-                            let result = self.evaluate_content(&item.content)?;
+                            let result = self.evaluate_content(&item.content).await?;
                             results.push(result);
                         }
                         Ok(Value::Array(results))
@@ -1255,7 +1320,7 @@ impl<'a, R: Rng> Evaluator<'a, R> {
                         "selectUnique requires an argument".to_string(),
                     ));
                 } else {
-                    let arg_str = self.evaluate_expression(&method.args[0])?;
+                    let arg_str = self.evaluate_expression(&method.args[0]).await?;
                     arg_str.parse::<usize>().map_err(|_| {
                         EvalError::InvalidMethodCall(format!(
                             "selectUnique argument must be a number, got: {}",
@@ -1292,10 +1357,10 @@ impl<'a, R: Rng> Evaluator<'a, R> {
                                 let sidx = self.rng.gen_range(0..sublist_names.len());
                                 let sublist_name = &sublist_names[sidx];
                                 if let Some(sublist) = item.sublists.get(sublist_name) {
-                                    results.push(self.evaluate_list(sublist)?);
+                                    results.push(self.evaluate_list(sublist).await?);
                                 }
                             } else {
-                                results.push(self.evaluate_content(&item.content)?);
+                                results.push(self.evaluate_content(&item.content).await?);
                             }
                         }
                         Ok(Value::Array(results))
@@ -1322,10 +1387,10 @@ impl<'a, R: Rng> Evaluator<'a, R> {
                                 let sidx = self.rng.gen_range(0..sublist_names.len());
                                 let sublist_name = &sublist_names[sidx];
                                 if let Some(sublist) = item.sublists.get(sublist_name) {
-                                    results.push(self.evaluate_list(sublist)?);
+                                    results.push(self.evaluate_list(sublist).await?);
                                 }
                             } else {
-                                results.push(self.evaluate_content(&item.content)?);
+                                results.push(self.evaluate_content(&item.content).await?);
                             }
                         }
                         Ok(Value::Array(results))
@@ -1338,7 +1403,7 @@ impl<'a, R: Rng> Evaluator<'a, R> {
                                     .to_string(),
                             ));
                         }
-                        let result = self.evaluate_content(&item.content)?;
+                        let result = self.evaluate_content(&item.content).await?;
                         Ok(Value::Array(vec![result]))
                     }
                     Value::Text(s) => Ok(Value::Text(s.clone())),
@@ -1366,7 +1431,7 @@ impl<'a, R: Rng> Evaluator<'a, R> {
                         // For consumable lists, consume n items
                         let mut results = Vec::new();
                         for _ in 0..n {
-                            let result = self.value_to_string(value.clone())?;
+                            let result = self.value_to_string(value.clone()).await?;
                             results.push(result);
                         }
                         Ok(Value::Array(results))
@@ -1381,37 +1446,37 @@ impl<'a, R: Rng> Evaluator<'a, R> {
             }
 
             "pluralForm" => {
-                let s = self.value_to_string(value.clone())?;
+                let s = self.value_to_string(value.clone()).await?;
                 Ok(Value::Text(to_plural(&s)))
             }
 
             "pastTense" => {
-                let s = self.value_to_string(value.clone())?;
+                let s = self.value_to_string(value.clone()).await?;
                 Ok(Value::Text(to_past_tense(&s)))
             }
 
             "possessiveForm" => {
-                let s = self.value_to_string(value.clone())?;
+                let s = self.value_to_string(value.clone()).await?;
                 Ok(Value::Text(to_possessive(&s)))
             }
 
             "futureTense" => {
-                let s = self.value_to_string(value.clone())?;
+                let s = self.value_to_string(value.clone()).await?;
                 Ok(Value::Text(to_future_tense(&s)))
             }
 
             "presentTense" => {
-                let s = self.value_to_string(value.clone())?;
+                let s = self.value_to_string(value.clone()).await?;
                 Ok(Value::Text(to_present_tense(&s)))
             }
 
             "negativeForm" => {
-                let s = self.value_to_string(value.clone())?;
+                let s = self.value_to_string(value.clone()).await?;
                 Ok(Value::Text(to_negative_form(&s)))
             }
 
             "singularForm" => {
-                let s = self.value_to_string(value.clone())?;
+                let s = self.value_to_string(value.clone()).await?;
                 Ok(Value::Text(to_singular(&s)))
             }
 
@@ -1420,7 +1485,7 @@ impl<'a, R: Rng> Evaluator<'a, R> {
                 let separator = if method.args.is_empty() {
                     " ".to_string() // Default separator
                 } else {
-                    self.evaluate_expression(&method.args[0])?
+                    self.evaluate_expression(&method.args[0]).await?
                 };
 
                 match value {
@@ -1428,7 +1493,7 @@ impl<'a, R: Rng> Evaluator<'a, R> {
                     Value::Text(s) => Ok(Value::Text(s.clone())),
                     _ => {
                         // Try converting to string first
-                        let s = self.value_to_string(value.clone())?;
+                        let s = self.value_to_string(value.clone()).await?;
                         Ok(Value::Text(s))
                     }
                 }
@@ -1934,9 +1999,12 @@ fn to_singular(s: &str) -> String {
     s_trimmed.to_string()
 }
 
-pub fn evaluate<R: Rng>(program: &CompiledProgram, rng: &mut R) -> Result<String, EvalError> {
+pub async fn evaluate<R: Rng + Send>(
+    program: &CompiledProgram,
+    rng: &mut R,
+) -> Result<String, EvalError> {
     let mut evaluator = Evaluator::new(program, rng);
-    evaluator.evaluate()
+    evaluator.evaluate().await
 }
 
 #[cfg(test)]
@@ -1947,60 +2015,60 @@ mod tests {
     use rand::rngs::StdRng;
     use rand::SeedableRng;
 
-    #[test]
-    fn test_simple_evaluation() {
+    #[tokio::test]
+    async fn test_simple_evaluation() {
         let input = "output\n\thello world\n";
         let program = parse(input).unwrap();
         let compiled = compile(&program).unwrap();
         let mut rng = StdRng::seed_from_u64(42);
-        let result = evaluate(&compiled, &mut rng);
+        let result = evaluate(&compiled, &mut rng).await;
         assert_eq!(result.unwrap(), "hello world");
     }
 
-    #[test]
-    fn test_list_reference() {
+    #[tokio::test]
+    async fn test_list_reference() {
         let input = "animal\n\tdog\n\tcat\n\noutput\n\tI saw a [animal].\n";
         let program = parse(input).unwrap();
         let compiled = compile(&program).unwrap();
         let mut rng = StdRng::seed_from_u64(42);
-        let result = evaluate(&compiled, &mut rng);
+        let result = evaluate(&compiled, &mut rng).await;
         let output = result.unwrap();
         assert!(output == "I saw a dog." || output == "I saw a cat.");
     }
 
-    #[test]
-    fn test_deterministic() {
+    #[tokio::test]
+    async fn test_deterministic() {
         let input = "animal\n\tdog\n\tcat\n\noutput\n\t[animal]\n";
         let program = parse(input).unwrap();
         let compiled = compile(&program).unwrap();
 
         let mut rng1 = StdRng::seed_from_u64(12345);
-        let result1 = evaluate(&compiled, &mut rng1).unwrap();
+        let result1 = evaluate(&compiled, &mut rng1).await.unwrap();
 
         let mut rng2 = StdRng::seed_from_u64(12345);
-        let result2 = evaluate(&compiled, &mut rng2).unwrap();
+        let result2 = evaluate(&compiled, &mut rng2).await.unwrap();
 
         assert_eq!(result1, result2);
     }
 
-    #[test]
-    fn test_inline_list() {
+    #[tokio::test]
+    async fn test_inline_list() {
         let input = "output\n\t{big|small}\n";
         let program = parse(input).unwrap();
         let compiled = compile(&program).unwrap();
         let mut rng = StdRng::seed_from_u64(42);
-        let result = evaluate(&compiled, &mut rng);
+        let result = evaluate(&compiled, &mut rng).await;
         let output = result.unwrap();
         assert!(output == "big" || output == "small");
     }
 
-    #[test]
-    fn test_number_range() {
+    #[tokio::test]
+    async fn test_number_range() {
         let input = "output\n\t{1-6}\n";
         let program = parse(input).unwrap();
         let compiled = compile(&program).unwrap();
         let mut rng = StdRng::seed_from_u64(42);
-        let result = evaluate(&compiled, &mut rng);
+        let result = evaluate(&compiled, &mut rng).await;
         let output = result.unwrap();
         let num: i32 = output.parse().unwrap();
         assert!((1..=6).contains(&num));

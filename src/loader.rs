@@ -73,7 +73,7 @@ impl FolderLoader {
 impl GeneratorLoader for FolderLoader {
     async fn load(&self, name: &str) -> Result<String, LoadError> {
         // Sanitize the name to prevent path traversal attacks
-        let sanitized = name.replace("..", "").replace('/', "").replace('\\', "");
+        let sanitized = name.replace("..", "").replace(['/', '\\'], "");
 
         if sanitized.is_empty() {
             return Err(LoadError::InvalidPath(name.to_string()));

@@ -6,11 +6,13 @@
 /// # Example
 ///
 /// ```
+/// # tokio_test::block_on(async {
 /// use perchance_interpreter::evaluate_with_seed;
 ///
 /// let template = "animal\n\tdog\n\tcat\n\noutput\n\tI saw a [animal].\n";
-/// let result = evaluate_with_seed(template, 42).unwrap();
+/// let result = evaluate_with_seed(template, 42).await.unwrap();
 /// println!("{}", result);
+/// # });
 /// ```
 pub mod ast;
 pub mod compiler;
@@ -76,8 +78,11 @@ pub fn compile(program: &Program) -> Result<CompiledProgram, CompileError> {
 }
 
 /// Evaluate a compiled program with a provided RNG
-pub fn evaluate<R: rand::Rng>(program: &CompiledProgram, rng: &mut R) -> Result<String, EvalError> {
-    evaluator::evaluate(program, rng)
+pub async fn evaluate<R: rand::Rng + Send>(
+    program: &CompiledProgram,
+    rng: &mut R,
+) -> Result<String, EvalError> {
+    evaluator::evaluate(program, rng).await
 }
 
 /// Convenience function: evaluate a template with a seed value
@@ -96,14 +101,16 @@ pub fn evaluate<R: rand::Rng>(program: &CompiledProgram, rng: &mut R) -> Result<
 /// use perchance_interpreter::evaluate_with_seed;
 ///
 /// let template = "output\n\tHello {world|universe}!\n";
-/// let result = evaluate_with_seed(template, 12345).unwrap();
+/// # tokio_test::block_on(async {
+/// let result = evaluate_with_seed(template, 12345).await.unwrap();
 /// println!("{}", result);
+/// # });
 /// ```
-pub fn evaluate_with_seed(template: &str, seed: u64) -> Result<String, InterpreterError> {
+pub async fn evaluate_with_seed(template: &str, seed: u64) -> Result<String, InterpreterError> {
     let program = parse(template)?;
     let compiled = compile(&program)?;
     let mut rng = StdRng::seed_from_u64(seed);
-    let result = evaluate(&compiled, &mut rng)?;
+    let result = evaluate(&compiled, &mut rng).await?;
     Ok(result)
 }
 
@@ -115,6 +122,7 @@ pub fn evaluate_with_seed(template: &str, seed: u64) -> Result<String, Interpret
 /// # Example
 ///
 /// ```
+/// # tokio_test::block_on(async {
 /// use perchance_interpreter::{compile_template, evaluate};
 /// use rand::SeedableRng;
 /// use rand::rngs::StdRng;
@@ -124,10 +132,11 @@ pub fn evaluate_with_seed(template: &str, seed: u64) -> Result<String, Interpret
 ///
 /// // Evaluate multiple times with different seeds
 /// let mut rng1 = StdRng::seed_from_u64(1);
-/// let result1 = evaluate(&compiled, &mut rng1).unwrap();
+/// let result1 = evaluate(&compiled, &mut rng1).await.unwrap();
 ///
 /// let mut rng2 = StdRng::seed_from_u64(2);
-/// let result2 = evaluate(&compiled, &mut rng2).unwrap();
+/// let result2 = evaluate(&compiled, &mut rng2).await.unwrap();
+/// # });
 /// ```
 pub fn compile_template(template: &str) -> Result<CompiledProgram, InterpreterError> {
     let program = parse(template)?;
@@ -139,40 +148,40 @@ pub fn compile_template(template: &str) -> Result<CompiledProgram, InterpreterEr
 mod tests {
     use super::*;
 
-    #[test]
-    fn test_evaluate_with_seed() {
+    #[tokio::test]
+    async fn test_evaluate_with_seed() {
         let template = "output\n\tHello world!\n";
-        let result = evaluate_with_seed(template, 42);
+        let result = evaluate_with_seed(template, 42).await;
         assert_eq!(result.unwrap(), "Hello world!");
     }
 
-    #[test]
-    fn test_deterministic_output() {
+    #[tokio::test]
+    async fn test_deterministic_output() {
         let template = "animal\n\tdog\n\tcat\n\tbird\n\noutput\n\t[animal]\n";
 
-        let result1 = evaluate_with_seed(template, 12345).unwrap();
-        let result2 = evaluate_with_seed(template, 12345).unwrap();
+        let result1 = evaluate_with_seed(template, 12345).await.unwrap();
+        let result2 = evaluate_with_seed(template, 12345).await.unwrap();
 
         assert_eq!(result1, result2);
     }
 
-    #[test]
-    fn test_compile_and_evaluate() {
+    #[tokio::test]
+    async fn test_compile_and_evaluate() {
         let template = "output\n\t{1-10}\n";
         let compiled = compile_template(template).unwrap();
 
         let mut rng = StdRng::seed_from_u64(999);
-        let result = evaluate(&compiled, &mut rng);
+        let result = evaluate(&compiled, &mut rng).await;
 
         let num: i32 = result.unwrap().parse().unwrap();
         assert!((1..=10).contains(&num));
     }
 
-    #[test]
-    fn test_complex_template() {
+    #[tokio::test]
+    async fn test_complex_template() {
         let template = "animal\n\tdog\n\tcat^2\n\tbird^0.5\n\ncolor\n\tred\n\tblue\n\tgreen\n\noutput\n\tI saw a {beautiful|pretty} [color] [animal].\n";
 
-        let result = evaluate_with_seed(template, 42);
+        let result = evaluate_with_seed(template, 42).await;
         let output = result.unwrap();
         assert!(output.starts_with("I saw a"));
     }
