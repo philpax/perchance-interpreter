@@ -5,6 +5,7 @@ use std::collections::HashMap;
 #[derive(Debug, Clone)]
 pub struct CompiledProgram {
     pub lists: HashMap<String, CompiledList>,
+    pub list_order: Vec<String>, // Preserve order of lists for default output
 }
 
 #[derive(Debug, Clone)]
@@ -53,10 +54,12 @@ impl CompiledProgram {
     pub fn new() -> Self {
         CompiledProgram {
             lists: HashMap::new(),
+            list_order: Vec::new(),
         }
     }
 
     pub fn add_list(&mut self, name: String, list: CompiledList) {
+        self.list_order.push(name.clone());
         self.lists.insert(name, list);
     }
 
