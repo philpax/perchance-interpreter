@@ -686,19 +686,50 @@ impl<'a, R: Rng> Evaluator<'a, R> {
                     prop_name.to_string(),
                 ))
             }
-            Value::Text(_) => Err(EvalError::TypeError(format!(
-                "Cannot access property '{}' on text value",
-                prop_name
-            ))),
+            Value::Text(_) => {
+                // Check if this is a grammar method that can be applied to text
+                if self.is_grammar_method(prop_name) {
+                    let method = MethodCall::new(prop_name.to_string());
+                    return self.call_method_value(value, &method);
+                }
+                Err(EvalError::TypeError(format!(
+                    "Cannot access property '{}' on text value",
+                    prop_name
+                )))
+            }
             Value::Array(_) => Err(EvalError::TypeError(format!(
                 "Cannot access property '{}' on array value",
                 prop_name
             ))),
-            Value::ConsumableList(_) => Err(EvalError::TypeError(format!(
-                "Cannot access property '{}' on consumable list",
-                prop_name
-            ))),
+            Value::ConsumableList(_) => {
+                // Check if this is a method that can be applied to consumable lists
+                if self.is_grammar_method(prop_name) || prop_name == "selectOne" {
+                    let method = MethodCall::new(prop_name.to_string());
+                    return self.call_method_value(value, &method);
+                }
+                Err(EvalError::TypeError(format!(
+                    "Cannot access property '{}' on consumable list",
+                    prop_name
+                )))
+            }
         }
+    }
+
+    fn is_grammar_method(&self, name: &str) -> bool {
+        matches!(
+            name,
+            "pluralForm"
+                | "singularForm"
+                | "upperCase"
+                | "lowerCase"
+                | "titleCase"
+                | "sentenceCase"
+                | "pastTense"
+                | "presentTense"
+                | "futureTense"
+                | "negativeForm"
+                | "possessiveForm"
+        )
     }
 
     fn get_property(&mut self, value: &Value, prop_name: &str) -> Result<String, EvalError> {

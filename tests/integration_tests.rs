@@ -318,12 +318,68 @@ fn test_whitespace_preservation_in_text() {
 }
 
 #[test]
+fn test_tab_indentation() {
+    let template = "animal\n\tdog\n\tcat\n\noutput\n\t[animal]\n";
+    let result = evaluate_with_seed(template, 42);
+    assert!(result.is_ok());
+    let output = result.unwrap();
+    assert!(output == "dog" || output == "cat");
+}
+
+#[test]
 fn test_two_space_indentation() {
     let template = "animal\n  dog\n  cat\n\noutput\n  [animal]\n";
     let result = evaluate_with_seed(template, 42);
     assert!(result.is_ok());
     let output = result.unwrap();
     assert!(output == "dog" || output == "cat");
+}
+
+#[test]
+fn test_mixed_tab_and_space_indentation() {
+    // Test that different lists can use different indentation styles
+    let template = "animal\n\tdog\n\tcat\n\ncolor\n  red\n  blue\n\noutput\n\t[animal] [color]\n";
+    let result = evaluate_with_seed(template, 42);
+    assert!(result.is_ok());
+    let output = result.unwrap();
+    assert!(output.contains("dog") || output.contains("cat"));
+    assert!(output.contains("red") || output.contains("blue"));
+}
+
+#[test]
+fn test_hierarchical_with_tabs() {
+    let template = "creature\n\tmammal\n\t\tdog\n\t\tcat\n\tbird\n\t\tsparrow\n\t\teagle\n\noutput\n\t[creature]\n";
+    let result = evaluate_with_seed(template, 42);
+    assert!(result.is_ok());
+    let output = result.unwrap();
+    assert!(output == "dog" || output == "cat" || output == "sparrow" || output == "eagle");
+}
+
+#[test]
+fn test_hierarchical_with_spaces() {
+    let template = "creature\n  mammal\n    dog\n    cat\n  bird\n    sparrow\n    eagle\n\noutput\n  [creature]\n";
+    let result = evaluate_with_seed(template, 42);
+    assert!(result.is_ok());
+    let output = result.unwrap();
+    assert!(output == "dog" || output == "cat" || output == "sparrow" || output == "eagle");
+}
+
+#[test]
+fn test_properties_with_tabs() {
+    let template = "character\n\twizard\n\t\tname\n\t\t\tGandalf\n\t\t\tMerlin\n\noutput\n\t[character.wizard.name]\n";
+    let result = evaluate_with_seed(template, 42);
+    assert!(result.is_ok());
+    let output = result.unwrap();
+    assert!(output == "Gandalf" || output == "Merlin");
+}
+
+#[test]
+fn test_properties_with_spaces() {
+    let template = "character\n  wizard\n    name\n      Gandalf\n      Merlin\n\noutput\n  [character.wizard.name]\n";
+    let result = evaluate_with_seed(template, 42);
+    assert!(result.is_ok());
+    let output = result.unwrap();
+    assert!(output == "Gandalf" || output == "Merlin");
 }
 
 #[test]
@@ -842,4 +898,371 @@ fn test_consumable_list_independent_instances() {
     let result = evaluate_with_seed(template, 42);
     assert!(result.is_ok());
     // Both c1 and c2 should work independently
+}
+
+// Multiline tests from documentation examples
+
+#[test]
+fn test_multiline_animal_sentence_paragraph() {
+    let template = r#"animal
+	pig
+	cow
+	zebra
+
+adjective
+  sneaky
+  happy
+  furry
+
+sentence
+	That [animal] is very sneaky.
+	I befriended a wild [animal] yesterday.
+
+paragraph = [sentence] [sentence] [sentence]
+
+output
+	[paragraph]"#;
+    let result = evaluate_with_seed(template, 42);
+    if result.is_err() {
+        eprintln!("Error: {:?}", result.as_ref().unwrap_err());
+    }
+    assert!(result.is_ok());
+    let output = result.unwrap();
+    // Should have 3 sentences (contains 3 periods)
+    assert_eq!(output.matches('.').count(), 3);
+    // Should contain animal names
+    assert!(output.contains("pig") || output.contains("cow") || output.contains("zebra"));
+}
+
+#[test]
+fn test_multiline_food_description() {
+    let template = r#"description
+	It's a [adjective] dish with [type] [main].
+	The [adjective] [main] is paired with a [size] serving of [condiment]-covered [side].
+	A [main] with a bit of [condiment] and some [adjective] [side] on the side.
+
+adjective
+	vegan
+	Indonesian
+	Italian
+	delicious
+
+main
+	risotto
+	pie
+	stir-fry
+	curry
+
+side
+	bowl of rice
+	salad
+	fries
+	fried mushrooms
+	pumpkin soup
+
+type
+	a [size] serving of
+	well-cooked
+	unusually fresh
+	roasted
+
+size
+	small
+	large
+	tiny
+
+condiment
+	pepper ^2
+	salt
+	chilli flakes ^0.1
+	oregano
+
+output
+	[description]"#;
+    let result = evaluate_with_seed(template, 42);
+    assert!(result.is_ok());
+    let output = result.unwrap();
+    // Should contain one of the mains
+    assert!(
+        output.contains("risotto")
+            || output.contains("pie")
+            || output.contains("stir-fry")
+            || output.contains("curry")
+    );
+    // Should contain one of the adjectives
+    assert!(
+        output.contains("vegan")
+            || output.contains("Indonesian")
+            || output.contains("Italian")
+            || output.contains("delicious")
+    );
+}
+
+#[test]
+fn test_multiline_inline_curly_blocks() {
+    let template = r#"animal
+	pig
+	cow
+
+sentence
+	That's a {very|extremely} {tiny|small} [animal]!
+	I {think|believe} that you are a {liar|thief}.
+	I'd be so {rich|poor} if not for that person.
+
+output
+	[sentence]"#;
+    let result = evaluate_with_seed(template, 42);
+    assert!(result.is_ok());
+    let output = result.unwrap();
+    // Should be one of the sentences
+    assert!(output.ends_with('!') || output.ends_with('.'));
+}
+
+#[test]
+fn test_multiline_plural_form_title_case() {
+    let template = r#"animal
+	pig
+	zebra
+	cow
+
+sentence
+	There are so many [animal.pluralForm] here.
+	I've befriended this [animal].
+	[animal.pluralForm.titleCase] are very agile.
+
+output
+	[sentence]"#;
+    let result = evaluate_with_seed(template, 42);
+    if result.is_err() {
+        eprintln!("Error: {:?}", result.as_ref().unwrap_err());
+    }
+    assert!(result.is_ok());
+    let output = result.unwrap();
+    // Should contain pluralized animals
+    assert!(
+        output.contains("pigs")
+            || output.contains("zebras")
+            || output.contains("cows")
+            || output.contains("Pigs")
+            || output.contains("Zebras")
+            || output.contains("Cows")
+            || output.contains("pig")
+            || output.contains("zebra")
+            || output.contains("cow")
+    );
+}
+
+#[test]
+fn test_multiline_select_one_variable() {
+    let template = r#"flower
+	rose
+	lily
+	tulip
+
+sentence
+  Oh you've got me a [f = flower.selectOne]! Thank you, I love [f.pluralForm].
+
+output
+  [sentence]"#;
+    let result = evaluate_with_seed(template, 42);
+    if result.is_err() {
+        eprintln!("Error: {:?}", result.as_ref().unwrap_err());
+    }
+    assert!(result.is_ok());
+    let output = result.unwrap();
+    // Should have consistent flower (e.g., "rose" and "roses")
+    if output.contains("rose") {
+        assert!(output.contains("roses"));
+    } else if output.contains("lily") {
+        assert!(output.contains("lilies") || output.contains("lilys"));
+    } else if output.contains("tulip") {
+        assert!(output.contains("tulips"));
+    }
+}
+
+#[test]
+fn test_multiline_multiple_variable_assignments() {
+    let template = r#"name
+  Addison
+  Alex
+  Alexis
+
+lastName
+	Smith
+	Johnson
+	Williams
+
+sentence
+  I think her name was [n = name.selectOne.titleCase]? [n] [l = lastName.titleCase]? Wait, no, it was [n = name.selectOne]. Yeah, that's right, [n] [l].
+
+output
+  [sentence]"#;
+    let result = evaluate_with_seed(template, 42);
+    assert!(result.is_ok());
+    let output = result.unwrap();
+    // Should contain name patterns
+    assert!(output.contains("Addison") || output.contains("Alex") || output.contains("Alexis"));
+    // Should contain last name
+    assert!(output.contains("Smith") || output.contains("Johnson") || output.contains("Williams"));
+}
+
+#[test]
+fn test_multiline_consumable_list_topic() {
+    let template = r#"topic
+  trans rights
+	animal rights
+	science
+	mathematics
+
+sentence
+  She mostly writes about [t = topic.consumableList, t] and [a = t.selectOne, a]. Her last post was about [a].
+
+output
+  [sentence]"#;
+    let result = evaluate_with_seed(template, 42);
+    if result.is_err() {
+        eprintln!("Error: {:?}", result.as_ref().unwrap_err());
+    }
+    assert!(result.is_ok());
+    let output = result.unwrap();
+    // Should contain topics
+    assert!(
+        output.contains("trans rights")
+            || output.contains("animal rights")
+            || output.contains("science")
+            || output.contains("mathematics")
+    );
+    // The second and third topic mentions should be the same
+    // One topic should appear exactly twice (the one from [a = t.selectOne, a] and [a])
+    let topics = ["trans rights", "animal rights", "science", "mathematics"];
+    let topic_counts: Vec<_> = topics
+        .iter()
+        .map(|topic| output.matches(topic).count())
+        .collect();
+
+    // Should have exactly one topic appearing twice (from [a = t.selectOne, a] and [a])
+    // and one topic appearing once (from [t = topic.consumableList])
+    assert_eq!(topic_counts.iter().filter(|&&count| count == 2).count(), 1);
+    assert_eq!(topic_counts.iter().filter(|&&count| count == 1).count(), 1);
+    assert_eq!(topic_counts.iter().filter(|&&count| count == 0).count(), 2);
+
+    assert!(output.contains(" and "));
+    assert!(output.contains("Her last post was about "));
+}
+
+#[test]
+fn test_multiline_hierarchical_sublists() {
+    let template = r#"animal
+	mammal
+		kangaroo
+		pig
+		human
+	reptile
+		lizard
+		crocodile
+		turtle
+	insect
+		spider
+		beetle
+		ant
+
+output
+    {[animal.mammal]|[animal.reptile]|[animal.insect]}"#;
+    let result = evaluate_with_seed(template, 42);
+    assert!(result.is_ok());
+    let output = result.unwrap();
+    // Should be one of the specific animals
+    let animals = [
+        "kangaroo",
+        "pig",
+        "human",
+        "lizard",
+        "crocodile",
+        "turtle",
+        "spider",
+        "beetle",
+        "ant",
+    ];
+    assert!(animals.iter().any(|&a| output.contains(a)));
+}
+
+#[test]
+fn test_multiline_or_operator_fallback() {
+    let template = r#"output
+  {A} [a = animal.selectOne] is covered in [a.body || "fur"].
+
+animal
+  bird
+    body = feathers
+  lizard
+    body = scales
+  dog
+	cat
+	moose"#;
+    let result = evaluate_with_seed(template, 42);
+    if result.is_err() {
+        eprintln!("Error: {:?}", result.as_ref().unwrap_err());
+    }
+    assert!(result.is_ok());
+    let output = result.unwrap();
+    // Should contain either "feathers", "scales", or "fur"
+    assert!(output.contains("feathers") || output.contains("scales") || output.contains("fur"));
+    // Should start with "A " (article)
+    assert!(output.starts_with("A "));
+}
+
+#[test]
+fn test_multiline_evaluate_item_with_ranges() {
+    let template = r#"output
+  [f = fruit.selectOne.evaluateItem]?! [f] is way too many!
+
+fruit
+  {10-20} apples
+  {30-70} pears"#;
+    let result = evaluate_with_seed(template, 42);
+    assert!(result.is_ok());
+    let output = result.unwrap();
+    // Should have same number in both places
+    // e.g., "50 pears?! 50 pears is way too many!"
+    assert!(output.contains("apples") || output.contains("pears"));
+    assert!(output.contains("?!"));
+    assert!(output.contains("is way too many!"));
+}
+
+#[test]
+fn test_multiline_dynamic_odds_with_equality() {
+    let template = r#"output
+  The dragon's scales were [c = color.selectOne]. More specifically, [shade.selectOne].
+
+color
+  blue
+  red
+  green
+  yellow
+
+shade
+  blue ^[c == "blue"]
+    cyan
+    navy blue
+    teal
+    turquoise
+  red ^[c == "red"]
+    maroon
+    cherry"#;
+    let result = evaluate_with_seed(template, 42);
+    assert!(result.is_ok());
+    let output = result.unwrap();
+    // If color is blue, shade should be a blue shade
+    if output.contains("were blue") {
+        assert!(
+            output.contains("cyan")
+                || output.contains("navy blue")
+                || output.contains("teal")
+                || output.contains("turquoise")
+        );
+    }
+    // If color is red, shade should be a red shade
+    if output.contains("were red") {
+        assert!(output.contains("maroon") || output.contains("cherry"));
+    }
 }

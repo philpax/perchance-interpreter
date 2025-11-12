@@ -87,6 +87,24 @@ impl Parser {
             return Err(ParseError::EmptyListName(self.line));
         }
 
+        self.skip_spaces();
+
+        // Check if this is a direct assignment: listname = expression
+        if self.peek_char() == Some('=') {
+            self.consume_char('=');
+            self.skip_spaces();
+
+            // Parse the expression until newline
+            let output_content = self.parse_content_until_newline()?;
+            self.skip_to_newline();
+            self.consume_char('\n');
+
+            // Create a list with just the output property set
+            let mut list = List::new(name);
+            list.set_output(output_content);
+            return Ok(list);
+        }
+
         self.skip_to_newline();
         self.consume_char('\n');
 
