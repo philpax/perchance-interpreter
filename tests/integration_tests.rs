@@ -17,7 +17,12 @@ fn test_simple_list_selection_with_multiline() {
 sentence
     That [animal] is very sneaky."#;
     let output = evaluate_with_seed(template, 100).unwrap();
-    assert!(output == "dog" || output == "cat" || output == "bird");
+    assert!(
+        output.contains("pig") || output.contains("cow") || output.contains("zebra"),
+        "Expected output to contain one of the animals, got: {}",
+        output
+    );
+    assert!(output.contains("sneaky"));
 }
 
 #[test]
@@ -263,11 +268,11 @@ fn test_mixed_content() {
 }
 
 #[test]
-fn test_empty_output_list_error() {
-    let template = "animal\n\tdog\n";
-    let result = evaluate_with_seed(template, 42);
-    assert!(result.is_err());
-    assert!(result.unwrap_err().to_string().contains("output"));
+fn test_default_to_last_list() {
+    // When no "output" list is defined, the last list should be used as output
+    let template = "animal\n\tdog\n\tcat\n";
+    let result = evaluate_with_seed(template, 42).unwrap();
+    assert!(result == "dog" || result == "cat");
 }
 
 #[test]

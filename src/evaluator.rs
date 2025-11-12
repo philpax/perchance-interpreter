@@ -70,10 +70,21 @@ impl<'a, R: Rng> Evaluator<'a, R> {
     }
 
     pub fn evaluate(&mut self) -> Result<String, EvalError> {
-        // Evaluate the "output" list
+        // Evaluate the "output" list, or default to the last list if not defined
         match self.program.get_list("output") {
             Some(output_list) => self.evaluate_list(output_list),
-            None => Err(EvalError::UndefinedList("output".to_string())),
+            None => {
+                // Default to the last list if no "output" list is defined
+                if let Some(last_list_name) = self.program.list_order.last() {
+                    if let Some(last_list) = self.program.get_list(last_list_name) {
+                        self.evaluate_list(last_list)
+                    } else {
+                        Err(EvalError::UndefinedList("output".to_string()))
+                    }
+                } else {
+                    Err(EvalError::UndefinedList("output".to_string()))
+                }
+            }
         }
     }
 
