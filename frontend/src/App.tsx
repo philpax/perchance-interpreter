@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import init, { evaluate_perchance, evaluate_multiple } from './wasm/perchance_wasm';
+import init, { evaluate_multiple } from './wasm/perchance_wasm';
 
 const DEFAULT_TEMPLATE = `animal
 \tdog
@@ -17,13 +17,11 @@ output
 function App() {
   const [wasmReady, setWasmReady] = useState(false);
   const [template, setTemplate] = useState(DEFAULT_TEMPLATE);
-  const [output, setOutput] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
   const [autoEval, setAutoEval] = useState(true);
   const [seed, setSeed] = useState<string>('42');
-  const [sampleCount, setSampleCount] = useState<string>('5');
+  const [sampleCount, setSampleCount] = useState<number>(5);
   const [samples, setSamples] = useState<string[]>([]);
-  const [showSamples, setShowSamples] = useState(false);
 
   // Initialize WASM
   useEffect(() => {
@@ -32,48 +30,51 @@ function App() {
     });
   }, []);
 
-  // Evaluate template
-  const evaluate = useCallback(async (code: string, evalSeed?: number) => {
+  // Randomize seed
+  const randomizeSeed = () => {
+    setSeed(Math.floor(Math.random() * 1000000).toString());
+  };
+
+  // Generate multiple samples
+  const generateSamples = useCallback(async (code: string, count: number, evalSeed: string) => {
     if (!wasmReady) return;
 
     try {
-      const seedValue = BigInt(evalSeed ?? (parseInt(seed) || 42));
-      const result = await evaluate_perchance(code, seedValue);
-      setOutput(result);
+      const seedValue = BigInt(parseInt(evalSeed) || 42);
+      const results = await evaluate_multiple(code, count, seedValue);
+      setSamples(results as string[]);
       setError(null);
     } catch (e) {
       setError(String(e));
-      setOutput('');
+      setSamples([]);
     }
-  }, [wasmReady, seed]);
+  }, [wasmReady]);
 
-  // Auto-evaluate on template change
+  // Auto-evaluate on template/seed/count change
   useEffect(() => {
     if (autoEval && wasmReady) {
       const timer = setTimeout(() => {
-        evaluate(template);
+        generateSamples(template, sampleCount, seed);
       }, 300); // Debounce
       return () => clearTimeout(timer);
     }
-  }, [template, autoEval, wasmReady, evaluate]);
+  }, [template, sampleCount, seed, autoEval, wasmReady, generateSamples]);
 
-  // Generate multiple samples
-  const generateSamples = async () => {
-    if (!wasmReady) return;
+  // Handle slider change (1-10)
+  const handleSliderChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSampleCount(parseInt(e.target.value));
+  };
 
-    try {
-      const count = parseInt(sampleCount) || 5;
-      const results = await evaluate_multiple(template, count, undefined);
-      setSamples(results as string[]);
-      setShowSamples(true);
-      setError(null);
-    } catch (e) {
-      setError(String(e));
+  // Handle text input change (unbounded)
+  const handleTextChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = parseInt(e.target.value);
+    if (!isNaN(value) && value > 0) {
+      setSampleCount(value);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 text-white">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white">
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
         <div className="mb-8 text-center">
@@ -81,7 +82,15 @@ function App() {
             Perchance Interpreter
           </h1>
           <p className="text-gray-400 text-lg">
-            A deterministic random text generator with live preview
+            A deterministic random text generator •{' '}
+            <a
+              href="https://perchance.org/tutorial"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-purple-400 hover:text-purple-300 transition-colors underline"
+            >
+              Tutorial
+            </a>
           </p>
         </div>
 
@@ -129,35 +138,37 @@ function App() {
                         onChange={(e) => setSeed(e.target.value)}
                         className="w-24 px-3 py-1 bg-slate-700 border border-slate-600 rounded text-sm focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 focus:outline-none"
                       />
+                      <button
+                        onClick={randomizeSeed}
+                        className="px-3 py-1 bg-slate-700 hover:bg-slate-600 border border-slate-600 rounded text-sm transition-colors"
+                        title="Randomize seed"
+                      >
+                        🎲
+                      </button>
                     </div>
-
-                    <button
-                      onClick={() => evaluate(template)}
-                      className="px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 rounded-lg font-medium text-sm transition-all shadow-lg hover:shadow-purple-500/50"
-                    >
-                      Run
-                    </button>
                   </div>
 
-                  <div className="flex items-center gap-4 flex-wrap">
+                  <div className="space-y-2">
                     <div className="flex items-center gap-2">
-                      <label className="text-sm text-gray-300">Samples:</label>
+                      <label className="text-sm text-gray-300">Samples: {sampleCount}</label>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <input
+                        type="range"
+                        min="1"
+                        max="10"
+                        value={Math.min(sampleCount, 10)}
+                        onChange={handleSliderChange}
+                        className="flex-1 h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-purple-600"
+                      />
                       <input
                         type="number"
                         value={sampleCount}
-                        onChange={(e) => setSampleCount(e.target.value)}
+                        onChange={handleTextChange}
                         min="1"
-                        max="50"
                         className="w-20 px-3 py-1 bg-slate-700 border border-slate-600 rounded text-sm focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 focus:outline-none"
                       />
                     </div>
-
-                    <button
-                      onClick={generateSamples}
-                      className="px-4 py-2 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 rounded-lg font-medium text-sm transition-all shadow-lg hover:shadow-blue-500/50"
-                    >
-                      Generate Multiple
-                    </button>
                   </div>
                 </div>
               </div>
@@ -166,9 +177,7 @@ function App() {
             {/* Preview Panel */}
             <div className="bg-slate-800/50 backdrop-blur rounded-lg shadow-2xl border border-slate-700/50 overflow-hidden">
               <div className="bg-gradient-to-r from-blue-600 to-cyan-600 px-6 py-3">
-                <h2 className="text-xl font-semibold">
-                  {showSamples ? 'Multiple Samples' : 'Output Preview'}
-                </h2>
+                <h2 className="text-xl font-semibold">Output Samples</h2>
               </div>
               <div className="p-6">
                 {error ? (
@@ -183,20 +192,9 @@ function App() {
                       </div>
                     </div>
                   </div>
-                ) : showSamples ? (
+                ) : samples.length > 0 ? (
                   <div className="space-y-3">
-                    <div className="flex justify-between items-center mb-4">
-                      <p className="text-gray-400 text-sm">
-                        Generated {samples.length} samples
-                      </p>
-                      <button
-                        onClick={() => setShowSamples(false)}
-                        className="text-sm text-gray-400 hover:text-white transition-colors"
-                      >
-                        ← Back to single output
-                      </button>
-                    </div>
-                    <div className="space-y-2 max-h-[500px] overflow-y-auto">
+                    <div className="space-y-2 max-h-[580px] overflow-y-auto">
                       {samples.map((sample, i) => (
                         <div
                           key={i}
@@ -213,26 +211,12 @@ function App() {
                     </div>
                   </div>
                 ) : (
-                  <div className="bg-slate-900/70 rounded-lg p-6 min-h-[500px] border border-slate-700">
-                    {output ? (
-                      <div>
-                        <div className="flex items-center gap-2 mb-3 pb-3 border-b border-slate-700">
-                          <svg className="w-5 h-5 text-green-400" fill="currentColor" viewBox="0 0 20 20">
-                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                          </svg>
-                          <span className="text-green-400 font-semibold text-sm">Success</span>
-                        </div>
-                        <p className="text-gray-100 text-lg leading-relaxed">{output}</p>
-                      </div>
-                    ) : (
-                      <div className="flex flex-col items-center justify-center h-full text-gray-500">
-                        <svg className="w-16 h-16 mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                        </svg>
-                        <p className="text-lg">Output will appear here</p>
-                        <p className="text-sm mt-2">Edit the template or click Run to generate</p>
-                      </div>
-                    )}
+                  <div className="flex flex-col items-center justify-center h-full min-h-[500px] text-gray-500">
+                    <svg className="w-16 h-16 mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    <p className="text-lg">Output will appear here</p>
+                    <p className="text-sm mt-2">Edit the template to generate samples</p>
                   </div>
                 )}
               </div>
