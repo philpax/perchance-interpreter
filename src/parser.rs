@@ -72,6 +72,8 @@ impl Parser {
 
             // Only parse lists at the top level (no indentation)
             if self.get_indentation_level() == 0 {
+                // Reset indentation detection for each top-level list to support mixed indentation
+                self.space_indent_unit = None;
                 let list = self.parse_list(0)?;
                 program.add_list(list);
             } else {
