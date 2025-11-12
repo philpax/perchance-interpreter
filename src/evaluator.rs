@@ -171,9 +171,9 @@ impl<'a, R: Rng> Evaluator<'a, R> {
         }
 
         if actual_total <= 0.0 {
-            return Err(EvalError::EmptyList(
-                "All items have zero or negative weights".to_string(),
-            ));
+            // If all weights are 0, treat all items as having equal weight (1.0)
+            actual_weights = vec![1.0; items.len()];
+            actual_total = items.len() as f64;
         }
 
         let random_value = self.rng.gen::<f64>() * actual_total;
@@ -326,9 +326,9 @@ impl<'a, R: Rng> Evaluator<'a, R> {
         }
 
         if actual_total <= 0.0 {
-            return Err(EvalError::EmptyList(
-                "All inline choices have zero or negative weights".to_string(),
-            ));
+            // If all weights are 0, treat all choices as having equal weight (1.0)
+            actual_weights = vec![1.0; inline.choices.len()];
+            actual_total = inline.choices.len() as f64;
         }
 
         // Select a choice
@@ -800,6 +800,19 @@ impl<'a, R: Rng> Evaluator<'a, R> {
                 // Access a property (sublist) of an item
                 if let Some(sublist) = item.sublists.get(prop_name) {
                     Ok(Value::ListInstance(sublist.clone()))
+                } else if item.sublists.len() == 1 {
+                    // If the item has exactly one sublist, try to access the property from that sublist
+                    let single_sublist = item.sublists.values().next().unwrap();
+                    // Search through items in the single sublist for the property
+                    for subitem in &single_sublist.items {
+                        if let Some(target_sublist) = subitem.sublists.get(prop_name) {
+                            return Ok(Value::ListInstance(target_sublist.clone()));
+                        }
+                    }
+                    Err(EvalError::UndefinedProperty(
+                        "item".to_string(),
+                        prop_name.to_string(),
+                    ))
                 } else {
                     Err(EvalError::UndefinedProperty(
                         "item".to_string(),

@@ -201,9 +201,11 @@ impl Parser {
         // Check if content is just a simple identifier (potential sublist name)
         let simple_name = if content.len() == 1 {
             if let ContentPart::Text(ref s) = content[0] {
+                // Trim whitespace from the identifier
+                let trimmed = s.trim();
                 // Check if it's a valid identifier (letters, numbers, underscore only)
-                if s.chars().all(|c| c.is_alphanumeric() || c == '_') && !s.is_empty() {
-                    Some(s.clone())
+                if trimmed.chars().all(|c| c.is_alphanumeric() || c == '_') && !trimmed.is_empty() {
+                    Some(trimmed.to_string())
                 } else {
                     None
                 }
@@ -215,15 +217,17 @@ impl Parser {
         };
 
         // Parse sublists
-        // If we have a simple name and indented content, treat it as a sublist
+        // If we have a simple name and indented content, treat all indented items as a single sublist
         if let Some(sublist_name) = simple_name {
             // Check if there are indented items
             self.skip_empty_lines();
             if !self.is_eof() && self.get_indentation_level() == expected_indent + 1 {
-                // Parse all the indented items as a single sublist
-                let mut sublist = List::new(sublist_name);
                 let sublist_indent = expected_indent + 1;
 
+                // Create a single sublist with the parent's name
+                let mut sublist = List::new(sublist_name);
+
+                // Parse all indented items as items in this sublist
                 while !self.is_eof() {
                     self.skip_empty_lines();
                     if self.is_eof() {
@@ -243,7 +247,7 @@ impl Parser {
                     }
                 }
 
-                // Clear the content and add the sublist
+                // Clear the content and add the single sublist
                 item.content.clear();
                 item.add_sublist(sublist);
             }
@@ -388,8 +392,16 @@ impl Parser {
                 self.advance();
                 self.advance();
                 self.skip_spaces();
-                let right = self.parse_and_expression()?;
-                left = Expression::BinaryOp(Box::new(left), BinaryOperator::Or, Box::new(right));
+
+                // Check if left is a Property expression - if so, this is property fallback
+                if let Expression::Property(base, prop) = left {
+                    let fallback = self.parse_and_expression()?;
+                    left = Expression::PropertyWithFallback(base, prop, Box::new(fallback));
+                } else {
+                    // Otherwise, it's a logical OR
+                    let right = self.parse_and_expression()?;
+                    left = Expression::BinaryOp(Box::new(left), BinaryOperator::Or, Box::new(right));
+                }
             } else {
                 break;
             }
@@ -521,8 +533,9 @@ impl Parser {
                     self.consume_char(']');
                     expr = Expression::Dynamic(Box::new(expr), Box::new(index_expr));
                 }
-                Some('=') if matches!(expr, Expression::Simple(_)) => {
-                    // Assignment
+                Some('=') if matches!(expr, Expression::Simple(_))
+                    && self.peek_two_chars() != Some(('=', '=')) => {
+                    // Assignment (but not ==)
                     self.consume_char('=');
                     self.skip_spaces();
                     if let Expression::Simple(ident) = expr {
