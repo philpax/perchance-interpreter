@@ -163,7 +163,6 @@ mod tests {
         let input = "animal\n\tdog\n\tcat\n";
         let program = parse(input).unwrap();
         let result = compile(&program);
-        assert!(result.is_ok());
         let compiled = result.unwrap();
         assert_eq!(compiled.lists.len(), 1);
         assert!(compiled.get_list("animal").is_some());
@@ -174,7 +173,6 @@ mod tests {
         let input = "animal\n\tdog^2\n\tcat^0.5\n";
         let program = parse(input).unwrap();
         let result = compile(&program);
-        assert!(result.is_ok());
         let compiled = result.unwrap();
         let animal_list = compiled.get_list("animal").unwrap();
         assert_eq!(animal_list.total_weight, 2.5);

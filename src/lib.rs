@@ -142,7 +142,6 @@ mod tests {
     fn test_evaluate_with_seed() {
         let template = "output\n\tHello world!\n";
         let result = evaluate_with_seed(template, 42);
-        assert!(result.is_ok());
         assert_eq!(result.unwrap(), "Hello world!");
     }
 
@@ -163,7 +162,6 @@ mod tests {
 
         let mut rng = StdRng::seed_from_u64(999);
         let result = evaluate(&compiled, &mut rng);
-        assert!(result.is_ok());
 
         let num: i32 = result.unwrap().parse().unwrap();
         assert!((1..=10).contains(&num));
@@ -174,7 +172,6 @@ mod tests {
         let template = "animal\n\tdog\n\tcat^2\n\tbird^0.5\n\ncolor\n\tred\n\tblue\n\tgreen\n\noutput\n\tI saw a {beautiful|pretty} [color] [animal].\n";
 
         let result = evaluate_with_seed(template, 42);
-        assert!(result.is_ok());
         let output = result.unwrap();
         assert!(output.starts_with("I saw a"));
     }

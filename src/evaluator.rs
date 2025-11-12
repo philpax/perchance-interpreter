@@ -1653,7 +1653,6 @@ mod tests {
         let compiled = compile(&program).unwrap();
         let mut rng = StdRng::seed_from_u64(42);
         let result = evaluate(&compiled, &mut rng);
-        assert!(result.is_ok());
         assert_eq!(result.unwrap(), "hello world");
     }
 
@@ -1664,7 +1663,6 @@ mod tests {
         let compiled = compile(&program).unwrap();
         let mut rng = StdRng::seed_from_u64(42);
         let result = evaluate(&compiled, &mut rng);
-        assert!(result.is_ok());
         let output = result.unwrap();
         assert!(output == "I saw a dog." || output == "I saw a cat.");
     }
@@ -1691,7 +1689,6 @@ mod tests {
         let compiled = compile(&program).unwrap();
         let mut rng = StdRng::seed_from_u64(42);
         let result = evaluate(&compiled, &mut rng);
-        assert!(result.is_ok());
         let output = result.unwrap();
         assert!(output == "big" || output == "small");
     }
@@ -1703,7 +1700,6 @@ mod tests {
         let compiled = compile(&program).unwrap();
         let mut rng = StdRng::seed_from_u64(42);
         let result = evaluate(&compiled, &mut rng);
-        assert!(result.is_ok());
         let output = result.unwrap();
         let num: i32 = output.parse().unwrap();
         assert!((1..=6).contains(&num));

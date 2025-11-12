@@ -1016,7 +1016,6 @@ mod tests {
     fn test_simple_list() {
         let input = "animal\n\tdog\n\tcat\n";
         let result = parse(input);
-        assert!(result.is_ok());
         let program = result.unwrap();
         assert_eq!(program.lists.len(), 1);
         assert_eq!(program.lists[0].name, "animal");
@@ -1027,7 +1026,6 @@ mod tests {
     fn test_with_output() {
         let input = "animal\n\tdog\n\tcat\n\noutput\n\tI saw a [animal].\n";
         let result = parse(input);
-        assert!(result.is_ok());
         let program = result.unwrap();
         assert_eq!(program.lists.len(), 2);
     }
@@ -1035,22 +1033,90 @@ mod tests {
     #[test]
     fn test_inline_list() {
         let input = "output\n\t{big|small} animal\n";
-        let result = parse(input);
-        assert!(result.is_ok());
+        assert_eq!(
+            parse(input).unwrap(),
+            Program {
+                lists: [List {
+                    name: "output".into(),
+                    items: [Item {
+                        content: [
+                            ContentPart::Inline(InlineList {
+                                choices: [
+                                    InlineChoice {
+                                        content: [
+                                            ContentPart::Text("b".into()),
+                                            ContentPart::Text("i".into()),
+                                            ContentPart::Text("g".into())
+                                        ]
+                                        .into(),
+                                        weight: None
+                                    },
+                                    InlineChoice {
+                                        content: [
+                                            ContentPart::Text("s".into()),
+                                            ContentPart::Text("m".into()),
+                                            ContentPart::Text("a".into()),
+                                            ContentPart::Text("l".into()),
+                                            ContentPart::Text("l".into())
+                                        ]
+                                        .into(),
+                                        weight: None
+                                    }
+                                ]
+                                .into()
+                            }),
+                            ContentPart::Text(" animal".into())
+                        ]
+                        .into(),
+                        weight: None,
+                        sublists: [].into()
+                    }]
+                    .into(),
+                    output: None
+                }]
+                .into()
+            }
+        );
     }
 
     #[test]
     fn test_number_range() {
         let input = "output\n\tRolled {1-6}\n";
-        let result = parse(input);
-        assert!(result.is_ok());
+        assert_eq!(
+            parse(input).unwrap(),
+            Program {
+                lists: [List {
+                    name: "output".into(),
+                    items: [Item {
+                        content: [
+                            ContentPart::Text("Rolled ".into()),
+                            ContentPart::Inline(InlineList {
+                                choices: [InlineChoice {
+                                    content: [ContentPart::Reference(Expression::NumberRange(
+                                        1, 6
+                                    ))]
+                                    .into(),
+                                    weight: None
+                                }]
+                                .into()
+                            })
+                        ]
+                        .into(),
+                        weight: None,
+                        sublists: [].into()
+                    }]
+                    .into(),
+                    output: None
+                }]
+                .into()
+            }
+        );
     }
 
     #[test]
     fn test_weights() {
         let input = "animal\n\tdog^2\n\tcat^0.5\n\tbird\n";
         let result = parse(input);
-        assert!(result.is_ok());
         let program = result.unwrap();
         assert_eq!(program.lists[0].items[0].weight, Some(2.0));
         assert_eq!(program.lists[0].items[1].weight, Some(0.5));

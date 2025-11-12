@@ -4,9 +4,7 @@ use perchance_interpreter::evaluate_with_seed;
 #[test]
 fn test_simple_list_selection() {
     let template = "animal\n\tdog\n\tcat\n\tbird\n\noutput\n\t[animal]\n";
-    let result = evaluate_with_seed(template, 100);
-    assert!(result.is_ok());
-    let output = result.unwrap();
+    let output = evaluate_with_seed(template, 100).unwrap();
     assert!(output == "dog" || output == "cat" || output == "bird");
 }
 
@@ -53,18 +51,14 @@ fn test_weighted_selection() {
 #[test]
 fn test_inline_list() {
     let template = "output\n\t{hello|goodbye}\n";
-    let result = evaluate_with_seed(template, 42);
-    assert!(result.is_ok());
-    let output = result.unwrap();
+    let output = evaluate_with_seed(template, 42).unwrap();
     assert!(output == "hello" || output == "goodbye");
 }
 
 #[test]
 fn test_inline_list_with_weights() {
     let template = "output\n\t{common^10|rare^1}\n";
-    let result = evaluate_with_seed(template, 42);
-    assert!(result.is_ok());
-    let output = result.unwrap();
+    let output = evaluate_with_seed(template, 42).unwrap();
     assert!(output == "common" || output == "rare");
 }
 
@@ -132,9 +126,7 @@ fn test_escape_sequences() {
 #[test]
 fn test_comments() {
     let template = "// This is a comment\nanimal\n\tdog // inline comment\n\tcat\n\noutput\n\t[animal] // another comment\n";
-    let result = evaluate_with_seed(template, 42);
-    assert!(result.is_ok());
-    let output = result.unwrap();
+    let output = evaluate_with_seed(template, 42).unwrap();
     // Should not contain "//" or "comment"
     assert!(!output.contains("//"));
     assert!(!output.contains("comment"));
@@ -143,36 +135,28 @@ fn test_comments() {
 #[test]
 fn test_hierarchical_lists() {
     let template = "creature\n\tland\n\t\tdog\n\t\tcat\n\twater\n\t\tfish\n\t\twhale\n\noutput\n\t[creature]\n";
-    let result = evaluate_with_seed(template, 42);
-    assert!(result.is_ok());
-    let output = result.unwrap();
+    let output = evaluate_with_seed(template, 42).unwrap();
     assert!(output == "dog" || output == "cat" || output == "fish" || output == "whale");
 }
 
 #[test]
 fn test_hierarchical_list_direct_access() {
     let template = "creature\n\tland\n\t\tdog\n\t\tcat\n\twater\n\t\tfish\n\t\twhale\n\noutput\n\t[creature.land]\n";
-    let result = evaluate_with_seed(template, 42);
-    assert!(result.is_ok());
-    let output = result.unwrap();
+    let output = evaluate_with_seed(template, 42).unwrap();
     assert!(output == "dog" || output == "cat");
 }
 
 #[test]
 fn test_properties() {
     let template = "character\n\twizard\n\t\tname\n\t\t\tGandalf\n\t\t\tMerlin\n\t\tpower\n\t\t\t{80-100}\n\noutput\n\t[character.wizard.name]\n";
-    let result = evaluate_with_seed(template, 42);
-    assert!(result.is_ok());
-    let output = result.unwrap();
+    let output = evaluate_with_seed(template, 42).unwrap();
     assert!(output == "Gandalf" || output == "Merlin");
 }
 
 #[test]
 fn test_variable_assignment() {
     let template = "animal\n\tdog\n\tcat\n\noutput\n\t[x = animal, x] and [x]\n";
-    let result = evaluate_with_seed(template, 42);
-    assert!(result.is_ok());
-    let output = result.unwrap();
+    let output = evaluate_with_seed(template, 42).unwrap();
     // Should have the same animal twice
     assert!(output == "dog and dog" || output == "cat and cat");
 }
@@ -180,36 +164,28 @@ fn test_variable_assignment() {
 #[test]
 fn test_variable_assignment_with_properties() {
     let template = "character\n\twizard\n\t\tname\n\t\t\tGandalf\n\t\ttype\n\t\t\tMagic User\n\noutput\n\t[c = character.wizard, c.name] is a [c.type]\n";
-    let result = evaluate_with_seed(template, 42);
-    assert!(result.is_ok());
-    let output = result.unwrap();
+    let output = evaluate_with_seed(template, 42).unwrap();
     assert_eq!(output, "Gandalf is a Magic User");
 }
 
 #[test]
 fn test_comma_sequence_with_output() {
     let template = "animal\n\tdog\n\tcat\n\noutput\n\t[x = animal, \"I saw a [x]\"]\n";
-    let result = evaluate_with_seed(template, 42);
-    assert!(result.is_ok());
-    let output = result.unwrap();
+    let output = evaluate_with_seed(template, 42).unwrap();
     assert!(output == "I saw a dog" || output == "I saw a cat");
 }
 
 #[test]
 fn test_comma_sequence_no_output() {
     let template = "animal\n\tdog\n\tcat\n\noutput\n\t[x = animal, \"\"]Result: [x]\n";
-    let result = evaluate_with_seed(template, 42);
-    assert!(result.is_ok());
-    let output = result.unwrap();
+    let output = evaluate_with_seed(template, 42).unwrap();
     assert!(output == "Result: dog" || output == "Result: cat");
 }
 
 #[test]
 fn test_method_select_one() {
     let template = "animal\n\tdog\n\tcat\n\noutput\n\t[animal.selectOne]\n";
-    let result = evaluate_with_seed(template, 42);
-    assert!(result.is_ok());
-    let output = result.unwrap();
+    let output = evaluate_with_seed(template, 42).unwrap();
     assert!(output == "dog" || output == "cat");
 }
 
@@ -217,7 +193,6 @@ fn test_method_select_one() {
 fn test_method_upper_case() {
     let template = "word\n\thello\n\noutput\n\t[word.upperCase]\n";
     let result = evaluate_with_seed(template, 42);
-    assert!(result.is_ok());
     assert_eq!(result.unwrap(), "HELLO");
 }
 
@@ -225,7 +200,6 @@ fn test_method_upper_case() {
 fn test_method_lower_case() {
     let template = "word\n\tHELLO\n\noutput\n\t[word.lowerCase]\n";
     let result = evaluate_with_seed(template, 42);
-    assert!(result.is_ok());
     assert_eq!(result.unwrap(), "hello");
 }
 
@@ -233,7 +207,6 @@ fn test_method_lower_case() {
 fn test_method_title_case() {
     let template = "phrase\n\thello world\n\noutput\n\t[phrase.titleCase]\n";
     let result = evaluate_with_seed(template, 42);
-    assert!(result.is_ok());
     assert_eq!(result.unwrap(), "Hello World");
 }
 
@@ -241,16 +214,13 @@ fn test_method_title_case() {
 fn test_method_sentence_case() {
     let template = "phrase\n\thello world\n\noutput\n\t[phrase.sentenceCase]\n";
     let result = evaluate_with_seed(template, 42);
-    assert!(result.is_ok());
     assert_eq!(result.unwrap(), "Hello world");
 }
 
 #[test]
 fn test_complex_nested_references() {
     let template = "adj\n\tbig\n\tsmall\n\nanimal\n\tdog\n\tcat\n\noutput\n\tA [adj] [animal] saw a [adj] [animal].\n";
-    let result = evaluate_with_seed(template, 42);
-    assert!(result.is_ok());
-    let output = result.unwrap();
+    let output = evaluate_with_seed(template, 42).unwrap();
     // Just verify it contains expected words
     assert!(output.starts_with("A "));
     assert!(output.contains(" saw a "));
@@ -259,9 +229,7 @@ fn test_complex_nested_references() {
 #[test]
 fn test_multiple_inline_lists() {
     let template = "output\n\t{big|small} {red|blue} {cat|dog}\n";
-    let result = evaluate_with_seed(template, 42);
-    assert!(result.is_ok());
-    let output = result.unwrap();
+    let output = evaluate_with_seed(template, 42).unwrap();
     let words: Vec<&str> = output.split_whitespace().collect();
     assert_eq!(words.len(), 3);
 }
@@ -269,9 +237,7 @@ fn test_multiple_inline_lists() {
 #[test]
 fn test_nested_inline_lists() {
     let template = "animal\n\tdog\n\tcat\n\noutput\n\t{[animal]|bird}\n";
-    let result = evaluate_with_seed(template, 42);
-    assert!(result.is_ok());
-    let output = result.unwrap();
+    let output = evaluate_with_seed(template, 42).unwrap();
     assert!(output == "dog" || output == "cat" || output == "bird");
 }
 
@@ -279,9 +245,7 @@ fn test_nested_inline_lists() {
 fn test_mixed_content() {
     let template =
         "animal\n\tdog\n\tcat\n\noutput\n\tI saw a {big|small} [animal] with {1-10} legs!\n";
-    let result = evaluate_with_seed(template, 42);
-    assert!(result.is_ok());
-    let output = result.unwrap();
+    let output = evaluate_with_seed(template, 42).unwrap();
     assert!(output.starts_with("I saw a "));
     assert!(output.contains(" legs!"));
 }
@@ -313,25 +277,20 @@ fn test_empty_list_error() {
 fn test_whitespace_preservation_in_text() {
     let template = "output\n\thello  world\n";
     let result = evaluate_with_seed(template, 42);
-    assert!(result.is_ok());
     assert_eq!(result.unwrap(), "hello  world");
 }
 
 #[test]
 fn test_tab_indentation() {
     let template = "animal\n\tdog\n\tcat\n\noutput\n\t[animal]\n";
-    let result = evaluate_with_seed(template, 42);
-    assert!(result.is_ok());
-    let output = result.unwrap();
+    let output = evaluate_with_seed(template, 42).unwrap();
     assert!(output == "dog" || output == "cat");
 }
 
 #[test]
 fn test_two_space_indentation() {
     let template = "animal\n  dog\n  cat\n\noutput\n  [animal]\n";
-    let result = evaluate_with_seed(template, 42);
-    assert!(result.is_ok());
-    let output = result.unwrap();
+    let output = evaluate_with_seed(template, 42).unwrap();
     assert!(output == "dog" || output == "cat");
 }
 
@@ -339,9 +298,7 @@ fn test_two_space_indentation() {
 fn test_mixed_tab_and_space_indentation() {
     // Test that different lists can use different indentation styles
     let template = "animal\n\tdog\n\tcat\n\ncolor\n  red\n  blue\n\noutput\n\t[animal] [color]\n";
-    let result = evaluate_with_seed(template, 42);
-    assert!(result.is_ok());
-    let output = result.unwrap();
+    let output = evaluate_with_seed(template, 42).unwrap();
     assert!(output.contains("dog") || output.contains("cat"));
     assert!(output.contains("red") || output.contains("blue"));
 }
@@ -349,36 +306,28 @@ fn test_mixed_tab_and_space_indentation() {
 #[test]
 fn test_hierarchical_with_tabs() {
     let template = "creature\n\tmammal\n\t\tdog\n\t\tcat\n\tbird\n\t\tsparrow\n\t\teagle\n\noutput\n\t[creature]\n";
-    let result = evaluate_with_seed(template, 42);
-    assert!(result.is_ok());
-    let output = result.unwrap();
+    let output = evaluate_with_seed(template, 42).unwrap();
     assert!(output == "dog" || output == "cat" || output == "sparrow" || output == "eagle");
 }
 
 #[test]
 fn test_hierarchical_with_spaces() {
     let template = "creature\n  mammal\n    dog\n    cat\n  bird\n    sparrow\n    eagle\n\noutput\n  [creature]\n";
-    let result = evaluate_with_seed(template, 42);
-    assert!(result.is_ok());
-    let output = result.unwrap();
+    let output = evaluate_with_seed(template, 42).unwrap();
     assert!(output == "dog" || output == "cat" || output == "sparrow" || output == "eagle");
 }
 
 #[test]
 fn test_properties_with_tabs() {
     let template = "character\n\twizard\n\t\tname\n\t\t\tGandalf\n\t\t\tMerlin\n\noutput\n\t[character.wizard.name]\n";
-    let result = evaluate_with_seed(template, 42);
-    assert!(result.is_ok());
-    let output = result.unwrap();
+    let output = evaluate_with_seed(template, 42).unwrap();
     assert!(output == "Gandalf" || output == "Merlin");
 }
 
 #[test]
 fn test_properties_with_spaces() {
     let template = "character\n  wizard\n    name\n      Gandalf\n      Merlin\n\noutput\n  [character.wizard.name]\n";
-    let result = evaluate_with_seed(template, 42);
-    assert!(result.is_ok());
-    let output = result.unwrap();
+    let output = evaluate_with_seed(template, 42).unwrap();
     assert!(output == "Gandalf" || output == "Merlin");
 }
 
@@ -386,16 +335,13 @@ fn test_properties_with_spaces() {
 fn test_property_with_select_one() {
     let template = "character\n\twizard\n\t\tname\n\t\t\tGandalf\n\t\tpower\n\t\t\thigh\n\noutput\n\t[c = character.selectOne, c.name]\n";
     let result = evaluate_with_seed(template, 42);
-    assert!(result.is_ok());
     assert_eq!(result.unwrap(), "Gandalf");
 }
 
 #[test]
 fn test_number_range_in_text() {
     let template = "output\n\tRolled a {1-6} on the dice!\n";
-    let result = evaluate_with_seed(template, 42);
-    assert!(result.is_ok());
-    let output = result.unwrap();
+    let output = evaluate_with_seed(template, 42).unwrap();
     assert!(output.starts_with("Rolled a "));
     assert!(output.ends_with(" on the dice!"));
 }
@@ -404,9 +350,7 @@ fn test_number_range_in_text() {
 fn test_multiple_list_references() {
     let template =
         "name\n\tAlice\n\tBob\n\ncity\n\tParis\n\tTokyo\n\noutput\n\t[name] lives in [city].\n";
-    let result = evaluate_with_seed(template, 42);
-    assert!(result.is_ok());
-    let output = result.unwrap();
+    let output = evaluate_with_seed(template, 42).unwrap();
     assert!(output.contains(" lives in "));
     assert!(output.ends_with("."));
 }
@@ -415,7 +359,6 @@ fn test_multiple_list_references() {
 fn test_literal_string_in_sequence() {
     let template = "output\n\t[\"Hello World\"]\n";
     let result = evaluate_with_seed(template, 42);
-    assert!(result.is_ok());
     assert_eq!(result.unwrap(), "Hello World");
 }
 
@@ -423,7 +366,6 @@ fn test_literal_string_in_sequence() {
 fn test_article_consonant() {
     let template = "output\n\tI saw {a} cat.\n";
     let result = evaluate_with_seed(template, 42);
-    assert!(result.is_ok());
     assert_eq!(result.unwrap(), "I saw a cat.");
 }
 
@@ -431,16 +373,13 @@ fn test_article_consonant() {
 fn test_article_vowel() {
     let template = "output\n\tI saw {a} elephant.\n";
     let result = evaluate_with_seed(template, 42);
-    assert!(result.is_ok());
     assert_eq!(result.unwrap(), "I saw an elephant.");
 }
 
 #[test]
 fn test_article_with_reference() {
     let template = "animal\n\tapple\n\tdog\n\noutput\n\tI saw {a} [animal].\n";
-    let result = evaluate_with_seed(template, 42);
-    assert!(result.is_ok());
-    let output = result.unwrap();
+    let output = evaluate_with_seed(template, 42).unwrap();
     // Should be either "I saw an apple." or "I saw a dog."
     assert!(output == "I saw an apple." || output == "I saw a dog.");
 }
@@ -449,7 +388,6 @@ fn test_article_with_reference() {
 fn test_pluralize_singular() {
     let template = "output\n\t1 apple{s}\n";
     let result = evaluate_with_seed(template, 42);
-    assert!(result.is_ok());
     assert_eq!(result.unwrap(), "1 apple");
 }
 
@@ -457,7 +395,6 @@ fn test_pluralize_singular() {
 fn test_pluralize_plural() {
     let template = "output\n\t3 apple{s}\n";
     let result = evaluate_with_seed(template, 42);
-    assert!(result.is_ok());
     assert_eq!(result.unwrap(), "3 apples");
 }
 
@@ -465,16 +402,13 @@ fn test_pluralize_plural() {
 fn test_pluralize_with_zero() {
     let template = "output\n\t0 apple{s}\n";
     let result = evaluate_with_seed(template, 42);
-    assert!(result.is_ok());
     assert_eq!(result.unwrap(), "0 apples");
 }
 
 #[test]
 fn test_pluralize_with_reference() {
     let template = "output\n\t{1-6} apple{s}\n";
-    let result = evaluate_with_seed(template, 42);
-    assert!(result.is_ok());
-    let output = result.unwrap();
+    let output = evaluate_with_seed(template, 42).unwrap();
     // Should match pattern: "N apple(s)" where N is 1-6
     assert!(output.ends_with(" apple") || output.ends_with(" apples"));
 }
@@ -482,9 +416,7 @@ fn test_pluralize_with_reference() {
 #[test]
 fn test_article_and_pluralize_combined() {
     let template = "output\n\tI want {a} {1-3} orange{s}.\n";
-    let result = evaluate_with_seed(template, 42);
-    assert!(result.is_ok());
-    let output = result.unwrap();
+    let output = evaluate_with_seed(template, 42).unwrap();
     // Should have proper article and pluralization
     assert!(output.starts_with("I want a ") || output.starts_with("I want an "));
 }
@@ -493,7 +425,6 @@ fn test_article_and_pluralize_combined() {
 fn test_plural_form_regular() {
     let template = "word\n\tcat\n\noutput\n\t[word.pluralForm]\n";
     let result = evaluate_with_seed(template, 42);
-    assert!(result.is_ok());
     assert_eq!(result.unwrap(), "cats");
 }
 
@@ -501,7 +432,6 @@ fn test_plural_form_regular() {
 fn test_plural_form_irregular() {
     let template = "word\n\tchild\n\noutput\n\t[word.pluralForm]\n";
     let result = evaluate_with_seed(template, 42);
-    assert!(result.is_ok());
     assert_eq!(result.unwrap(), "children");
 }
 
@@ -509,7 +439,6 @@ fn test_plural_form_irregular() {
 fn test_plural_form_es() {
     let template = "word\n\tbox\n\noutput\n\t[word.pluralForm]\n";
     let result = evaluate_with_seed(template, 42);
-    assert!(result.is_ok());
     assert_eq!(result.unwrap(), "boxes");
 }
 
@@ -517,7 +446,6 @@ fn test_plural_form_es() {
 fn test_plural_form_y_to_ies() {
     let template = "word\n\tcity\n\noutput\n\t[word.pluralForm]\n";
     let result = evaluate_with_seed(template, 42);
-    assert!(result.is_ok());
     assert_eq!(result.unwrap(), "cities");
 }
 
@@ -525,7 +453,6 @@ fn test_plural_form_y_to_ies() {
 fn test_past_tense_regular() {
     let template = "verb\n\twalk\n\noutput\n\t[verb.pastTense]\n";
     let result = evaluate_with_seed(template, 42);
-    assert!(result.is_ok());
     assert_eq!(result.unwrap(), "walked");
 }
 
@@ -533,7 +460,6 @@ fn test_past_tense_regular() {
 fn test_past_tense_irregular() {
     let template = "verb\n\tgo\n\noutput\n\t[verb.pastTense]\n";
     let result = evaluate_with_seed(template, 42);
-    assert!(result.is_ok());
     assert_eq!(result.unwrap(), "went");
 }
 
@@ -541,7 +467,6 @@ fn test_past_tense_irregular() {
 fn test_past_tense_ends_with_e() {
     let template = "verb\n\tlove\n\noutput\n\t[verb.pastTense]\n";
     let result = evaluate_with_seed(template, 42);
-    assert!(result.is_ok());
     assert_eq!(result.unwrap(), "loved");
 }
 
@@ -549,7 +474,6 @@ fn test_past_tense_ends_with_e() {
 fn test_possessive_form() {
     let template = "name\n\tJohn\n\noutput\n\t[name.possessiveForm] book\n";
     let result = evaluate_with_seed(template, 42);
-    assert!(result.is_ok());
     assert_eq!(result.unwrap(), "John's book");
 }
 
@@ -557,7 +481,6 @@ fn test_possessive_form() {
 fn test_possessive_form_ends_with_s() {
     let template = "name\n\tJames\n\noutput\n\t[name.possessiveForm] book\n";
     let result = evaluate_with_seed(template, 42);
-    assert!(result.is_ok());
     assert_eq!(result.unwrap(), "James' book");
 }
 
@@ -566,7 +489,6 @@ fn test_grammar_methods_combined() {
     let template =
         "noun\n\tdog\n\nverb\n\twalk\n\noutput\n\tThe [noun.pluralForm] [verb.pastTense].\n";
     let result = evaluate_with_seed(template, 42);
-    assert!(result.is_ok());
     assert_eq!(result.unwrap(), "The dogs walked.");
 }
 
@@ -576,7 +498,6 @@ fn test_grammar_methods_combined() {
 fn test_ternary_operator_true() {
     let template = "output\n\t[5 > 3 ? \"yes\" : \"no\"]\n";
     let result = evaluate_with_seed(template, 42);
-    assert!(result.is_ok());
     assert_eq!(result.unwrap(), "yes");
 }
 
@@ -584,7 +505,6 @@ fn test_ternary_operator_true() {
 fn test_ternary_operator_false() {
     let template = "output\n\t[2 > 5 ? \"yes\" : \"no\"]\n";
     let result = evaluate_with_seed(template, 42);
-    assert!(result.is_ok());
     assert_eq!(result.unwrap(), "no");
 }
 
@@ -592,7 +512,6 @@ fn test_ternary_operator_false() {
 fn test_ternary_with_variable() {
     let template = "output\n\t[n = 3, n < 4 ? \"low\" : \"high\"]\n";
     let result = evaluate_with_seed(template, 42);
-    assert!(result.is_ok());
     assert_eq!(result.unwrap(), "low");
 }
 
@@ -600,7 +519,6 @@ fn test_ternary_with_variable() {
 fn test_ternary_nested() {
     let template = "output\n\t[n = 5, n < 3 ? \"low\" : n > 7 ? \"high\" : \"mid\"]\n";
     let result = evaluate_with_seed(template, 42);
-    assert!(result.is_ok());
     assert_eq!(result.unwrap(), "mid");
 }
 
@@ -610,7 +528,6 @@ fn test_ternary_nested() {
 fn test_binary_op_equal() {
     let template = "output\n\t[5 == 5 ? \"equal\" : \"not equal\"]\n";
     let result = evaluate_with_seed(template, 42);
-    assert!(result.is_ok());
     assert_eq!(result.unwrap(), "equal");
 }
 
@@ -618,7 +535,6 @@ fn test_binary_op_equal() {
 fn test_binary_op_not_equal() {
     let template = "output\n\t[5 != 3 ? \"different\" : \"same\"]\n";
     let result = evaluate_with_seed(template, 42);
-    assert!(result.is_ok());
     assert_eq!(result.unwrap(), "different");
 }
 
@@ -626,7 +542,6 @@ fn test_binary_op_not_equal() {
 fn test_binary_op_less_than() {
     let template = "output\n\t[3 < 5 ? \"less\" : \"not less\"]\n";
     let result = evaluate_with_seed(template, 42);
-    assert!(result.is_ok());
     assert_eq!(result.unwrap(), "less");
 }
 
@@ -634,7 +549,6 @@ fn test_binary_op_less_than() {
 fn test_binary_op_greater_than() {
     let template = "output\n\t[7 > 4 ? \"greater\" : \"not greater\"]\n";
     let result = evaluate_with_seed(template, 42);
-    assert!(result.is_ok());
     assert_eq!(result.unwrap(), "greater");
 }
 
@@ -642,7 +556,6 @@ fn test_binary_op_greater_than() {
 fn test_binary_op_less_equal() {
     let template = "output\n\t[3 <= 3 ? \"yes\" : \"no\"]\n";
     let result = evaluate_with_seed(template, 42);
-    assert!(result.is_ok());
     assert_eq!(result.unwrap(), "yes");
 }
 
@@ -650,7 +563,6 @@ fn test_binary_op_less_equal() {
 fn test_binary_op_greater_equal() {
     let template = "output\n\t[5 >= 5 ? \"yes\" : \"no\"]\n";
     let result = evaluate_with_seed(template, 42);
-    assert!(result.is_ok());
     assert_eq!(result.unwrap(), "yes");
 }
 
@@ -658,7 +570,6 @@ fn test_binary_op_greater_equal() {
 fn test_binary_op_and() {
     let template = "output\n\t[5 > 3 && 7 > 4 ? \"both\" : \"not both\"]\n";
     let result = evaluate_with_seed(template, 42);
-    assert!(result.is_ok());
     assert_eq!(result.unwrap(), "both");
 }
 
@@ -666,7 +577,6 @@ fn test_binary_op_and() {
 fn test_binary_op_and_false() {
     let template = "output\n\t[5 > 3 && 2 > 4 ? \"both\" : \"not both\"]\n";
     let result = evaluate_with_seed(template, 42);
-    assert!(result.is_ok());
     assert_eq!(result.unwrap(), "not both");
 }
 
@@ -674,7 +584,6 @@ fn test_binary_op_and_false() {
 fn test_binary_op_or() {
     let template = "output\n\t[5 > 3 || 2 > 4 ? \"at least one\" : \"neither\"]\n";
     let result = evaluate_with_seed(template, 42);
-    assert!(result.is_ok());
     assert_eq!(result.unwrap(), "at least one");
 }
 
@@ -682,7 +591,6 @@ fn test_binary_op_or() {
 fn test_binary_op_or_false() {
     let template = "output\n\t[2 > 3 || 1 > 4 ? \"at least one\" : \"neither\"]\n";
     let result = evaluate_with_seed(template, 42);
-    assert!(result.is_ok());
     assert_eq!(result.unwrap(), "neither");
 }
 
@@ -692,7 +600,6 @@ fn test_binary_op_or_false() {
 fn test_output_keyword_simple() {
     let template = "greeting\n\thello\n\thi\n\t$output = Welcome\n\noutput\n\t[greeting]\n";
     let result = evaluate_with_seed(template, 42);
-    assert!(result.is_ok());
     assert_eq!(result.unwrap(), "Welcome");
 }
 
@@ -711,7 +618,6 @@ fn test_output_keyword_with_reference() {
 fn test_output_keyword_no_items() {
     let template = "message\n\t$output = Fixed message\n\noutput\n\t[message]\n";
     let result = evaluate_with_seed(template, 42);
-    assert!(result.is_ok());
     assert_eq!(result.unwrap(), "Fixed message");
 }
 
@@ -721,7 +627,6 @@ fn test_output_keyword_no_items() {
 fn test_future_tense() {
     let template = "verb\n\twalk\n\noutput\n\t[verb.futureTense]\n";
     let result = evaluate_with_seed(template, 42);
-    assert!(result.is_ok());
     assert_eq!(result.unwrap(), "will walk");
 }
 
@@ -729,7 +634,6 @@ fn test_future_tense() {
 fn test_future_tense_irregular() {
     let template = "verb\n\tgo\n\noutput\n\t[verb.futureTense]\n";
     let result = evaluate_with_seed(template, 42);
-    assert!(result.is_ok());
     assert_eq!(result.unwrap(), "will go");
 }
 
@@ -737,7 +641,6 @@ fn test_future_tense_irregular() {
 fn test_present_tense_from_past() {
     let template = "verb\n\twent\n\noutput\n\t[verb.presentTense]\n";
     let result = evaluate_with_seed(template, 42);
-    assert!(result.is_ok());
     assert_eq!(result.unwrap(), "goes");
 }
 
@@ -745,7 +648,6 @@ fn test_present_tense_from_past() {
 fn test_present_tense_regular() {
     let template = "verb\n\twalk\n\noutput\n\t[verb.presentTense]\n";
     let result = evaluate_with_seed(template, 42);
-    assert!(result.is_ok());
     assert_eq!(result.unwrap(), "walks");
 }
 
@@ -753,7 +655,6 @@ fn test_present_tense_regular() {
 fn test_negative_form() {
     let template = "verb\n\texamine\n\noutput\n\t[verb.negativeForm]\n";
     let result = evaluate_with_seed(template, 42);
-    assert!(result.is_ok());
     assert_eq!(result.unwrap(), "does not examine");
 }
 
@@ -761,7 +662,6 @@ fn test_negative_form() {
 fn test_negative_form_be() {
     let template = "verb\n\tis\n\noutput\n\t[verb.negativeForm]\n";
     let result = evaluate_with_seed(template, 42);
-    assert!(result.is_ok());
     assert_eq!(result.unwrap(), "is not");
 }
 
@@ -769,7 +669,6 @@ fn test_negative_form_be() {
 fn test_singular_form() {
     let template = "word\n\tcities\n\noutput\n\t[word.singularForm]\n";
     let result = evaluate_with_seed(template, 42);
-    assert!(result.is_ok());
     assert_eq!(result.unwrap(), "city");
 }
 
@@ -777,7 +676,6 @@ fn test_singular_form() {
 fn test_singular_form_irregular() {
     let template = "word\n\tchildren\n\noutput\n\t[word.singularForm]\n";
     let result = evaluate_with_seed(template, 42);
-    assert!(result.is_ok());
     assert_eq!(result.unwrap(), "child");
 }
 
@@ -787,9 +685,7 @@ fn test_singular_form_irregular() {
 fn test_join_items_with_comma() {
     let template =
         "fruit\n\tapple\n\tbanana\n\torange\n\noutput\n\t[fruit.selectMany(3).joinItems(\", \")]\n";
-    let result = evaluate_with_seed(template, 42);
-    assert!(result.is_ok());
-    let output = result.unwrap();
+    let output = evaluate_with_seed(template, 42).unwrap();
     // Should have comma separators
     assert!(output.contains(", "));
     // Should have 3 items (2 commas)
@@ -800,9 +696,7 @@ fn test_join_items_with_comma() {
 fn test_join_items_with_custom_separator() {
     let template =
         "word\n\tfoo\n\tbar\n\tbaz\n\noutput\n\t[word.selectMany(2).joinItems(\" | \")]\n";
-    let result = evaluate_with_seed(template, 42);
-    assert!(result.is_ok());
-    let output = result.unwrap();
+    let output = evaluate_with_seed(template, 42).unwrap();
     // Should have custom separator
     assert!(output.contains(" | "));
 }
@@ -811,9 +705,7 @@ fn test_join_items_with_custom_separator() {
 fn test_join_items_select_unique() {
     let template =
         "color\n\tred\n\tblue\n\tgreen\n\noutput\n\t[color.selectUnique(2).joinItems(\" and \")]\n";
-    let result = evaluate_with_seed(template, 42);
-    assert!(result.is_ok());
-    let output = result.unwrap();
+    let output = evaluate_with_seed(template, 42).unwrap();
     // Should have " and " separator
     assert!(output.contains(" and "));
     // Should have exactly one " and " (2 items)
@@ -823,9 +715,7 @@ fn test_join_items_select_unique() {
 #[test]
 fn test_join_items_default_separator() {
     let template = "num\n\t1\n\t2\n\t3\n\noutput\n\t[num.selectMany(3)]\n";
-    let result = evaluate_with_seed(template, 42);
-    assert!(result.is_ok());
-    let output = result.unwrap();
+    let output = evaluate_with_seed(template, 42).unwrap();
     // Default separator is space
     assert!(output.contains(" "));
 }
@@ -834,9 +724,7 @@ fn test_join_items_default_separator() {
 #[test]
 fn test_consumable_list_basic() {
     let template = "item\n\ta\n\tb\n\tc\n\noutput\n\t[c = item.consumableList][c] [c] [c]\n";
-    let result = evaluate_with_seed(template, 42);
-    assert!(result.is_ok());
-    let output = result.unwrap();
+    let output = evaluate_with_seed(template, 42).unwrap();
     // Should have 3 items (space-separated)
     assert_eq!(output.split_whitespace().count(), 3);
     // Each item should be one of a, b, c
@@ -857,9 +745,7 @@ fn test_consumable_list_exhaustion() {
 #[test]
 fn test_consumable_list_select_unique() {
     let template = "item\n\ta\n\tb\n\tc\n\td\n\noutput\n\t[item.consumableList.selectUnique(3).joinItems(\", \")]\n";
-    let result = evaluate_with_seed(template, 42);
-    assert!(result.is_ok());
-    let output = result.unwrap();
+    let output = evaluate_with_seed(template, 42).unwrap();
     // Should have 3 unique items
     let parts: Vec<&str> = output.split(", ").collect();
     assert_eq!(parts.len(), 3);
@@ -874,9 +760,7 @@ fn test_consumable_list_select_unique() {
 fn test_consumable_list_no_duplicates() {
     // Test that consumableList doesn't repeat items until exhausted
     let template = "item\n\ta\n\tb\n\tc\n\noutput\n\t[c = item.consumableList][c], [c], [c]\n";
-    let result = evaluate_with_seed(template, 42);
-    assert!(result.is_ok());
-    let output = result.unwrap();
+    let output = evaluate_with_seed(template, 42).unwrap();
     let parts: Vec<&str> = output.split(", ").collect();
     assert_eq!(parts.len(), 3);
     // All three should be different
@@ -979,9 +863,7 @@ condiment
 
 output
 	[description]"#;
-    let result = evaluate_with_seed(template, 42);
-    assert!(result.is_ok());
-    let output = result.unwrap();
+    let output = evaluate_with_seed(template, 42).unwrap();
     // Should contain one of the mains
     assert!(
         output.contains("risotto")
@@ -1011,9 +893,7 @@ sentence
 
 output
 	[sentence]"#;
-    let result = evaluate_with_seed(template, 42);
-    assert!(result.is_ok());
-    let output = result.unwrap();
+    let output = evaluate_with_seed(template, 42).unwrap();
     // Should be one of the sentences
     assert!(output.ends_with('!') || output.ends_with('.'));
 }
@@ -1097,9 +977,7 @@ sentence
 
 output
   [sentence]"#;
-    let result = evaluate_with_seed(template, 42);
-    assert!(result.is_ok());
-    let output = result.unwrap();
+    let output = evaluate_with_seed(template, 42).unwrap();
     // Should contain name patterns
     assert!(output.contains("Addison") || output.contains("Alex") || output.contains("Alexis"));
     // Should contain last name
@@ -1168,9 +1046,7 @@ fn test_multiline_hierarchical_sublists() {
 
 output
     {[animal.mammal]|[animal.reptile]|[animal.insect]}"#;
-    let result = evaluate_with_seed(template, 42);
-    assert!(result.is_ok());
-    let output = result.unwrap();
+    let output = evaluate_with_seed(template, 42).unwrap();
     // Should be one of the specific animals
     let animals = [
         "kangaroo",
@@ -1219,9 +1095,7 @@ fn test_multiline_evaluate_item_with_ranges() {
 fruit
   {10-20} apples
   {30-70} pears"#;
-    let result = evaluate_with_seed(template, 42);
-    assert!(result.is_ok());
-    let output = result.unwrap();
+    let output = evaluate_with_seed(template, 42).unwrap();
     // Should have same number in both places
     // e.g., "50 pears?! 50 pears is way too many!"
     assert!(output.contains("apples") || output.contains("pears"));
@@ -1249,9 +1123,7 @@ shade
   red ^[c == "red"]
     maroon
     cherry"#;
-    let result = evaluate_with_seed(template, 42);
-    assert!(result.is_ok());
-    let output = result.unwrap();
+    let output = evaluate_with_seed(template, 42).unwrap();
     // If color is blue, shade should be a blue shade
     if output.contains("were blue") {
         assert!(
