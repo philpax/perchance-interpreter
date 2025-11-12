@@ -170,10 +170,22 @@ impl Parser {
         // Parse item content until newline or weight
         let content = self.parse_content_until_newline()?;
 
-        // Check for weight (^number)
+        // Check for weight (^number or ^[expression])
         let weight = if self.peek_char() == Some('^') {
             self.consume_char('^');
-            Some(self.parse_number()?)
+            if self.peek_char() == Some('[') {
+                // Dynamic weight: ^[expression]
+                self.consume_char('[');
+                let expr = self.parse_expression_in_reference()?;
+                if self.peek_char() != Some(']') {
+                    return Err(ParseError::UnterminatedReference(self.line));
+                }
+                self.consume_char(']');
+                Some(ItemWeight::Dynamic(Box::new(expr)))
+            } else {
+                // Static weight: ^number
+                Some(ItemWeight::Static(self.parse_number()?))
+            }
         } else {
             None
         };
@@ -189,9 +201,11 @@ impl Parser {
         // Check if content is just a simple identifier (potential sublist name)
         let simple_name = if content.len() == 1 {
             if let ContentPart::Text(ref s) = content[0] {
+                // Trim whitespace from the identifier
+                let trimmed = s.trim();
                 // Check if it's a valid identifier (letters, numbers, underscore only)
-                if s.chars().all(|c| c.is_alphanumeric() || c == '_') && !s.is_empty() {
-                    Some(s.clone())
+                if trimmed.chars().all(|c| c.is_alphanumeric() || c == '_') && !trimmed.is_empty() {
+                    Some(trimmed.to_string())
                 } else {
                     None
                 }
@@ -203,15 +217,17 @@ impl Parser {
         };
 
         // Parse sublists
-        // If we have a simple name and indented content, treat it as a sublist
+        // If we have a simple name and indented content, treat all indented items as a single sublist
         if let Some(sublist_name) = simple_name {
             // Check if there are indented items
             self.skip_empty_lines();
             if !self.is_eof() && self.get_indentation_level() == expected_indent + 1 {
-                // Parse all the indented items as a single sublist
-                let mut sublist = List::new(sublist_name);
                 let sublist_indent = expected_indent + 1;
 
+                // Create a single sublist with the parent's name
+                let mut sublist = List::new(sublist_name);
+
+                // Parse all indented items as items in this sublist
                 while !self.is_eof() {
                     self.skip_empty_lines();
                     if self.is_eof() {
@@ -231,7 +247,7 @@ impl Parser {
                     }
                 }
 
-                // Clear the content and add the sublist
+                // Clear the content and add the single sublist
                 item.content.clear();
                 item.add_sublist(sublist);
             }
@@ -305,6 +321,11 @@ impl Parser {
         Ok(expr)
     }
 
+    fn parse_expression_in_reference(&mut self) -> Result<Expression, ParseError> {
+        // Similar to parse_reference but assumes '[' is already consumed
+        self.parse_expression()
+    }
+
     fn parse_expression(&mut self) -> Result<Expression, ParseError> {
         self.skip_spaces();
 
@@ -371,8 +392,17 @@ impl Parser {
                 self.advance();
                 self.advance();
                 self.skip_spaces();
-                let right = self.parse_and_expression()?;
-                left = Expression::BinaryOp(Box::new(left), BinaryOperator::Or, Box::new(right));
+
+                // Check if left is a Property expression - if so, this is property fallback
+                if let Expression::Property(base, prop) = left {
+                    let fallback = self.parse_and_expression()?;
+                    left = Expression::PropertyWithFallback(base, prop, Box::new(fallback));
+                } else {
+                    // Otherwise, it's a logical OR
+                    let right = self.parse_and_expression()?;
+                    left =
+                        Expression::BinaryOp(Box::new(left), BinaryOperator::Or, Box::new(right));
+                }
             } else {
                 break;
             }
@@ -504,8 +534,11 @@ impl Parser {
                     self.consume_char(']');
                     expr = Expression::Dynamic(Box::new(expr), Box::new(index_expr));
                 }
-                Some('=') if matches!(expr, Expression::Simple(_)) => {
-                    // Assignment
+                Some('=')
+                    if matches!(expr, Expression::Simple(_))
+                        && self.peek_two_chars() != Some(('=', '=')) =>
+                {
+                    // Assignment (but not ==)
                     self.consume_char('=');
                     self.skip_spaces();
                     if let Expression::Simple(ident) = expr {
@@ -644,9 +677,21 @@ impl Parser {
                     content_buffer.push(ContentPart::Inline(inline));
                 }
                 '^' => {
-                    // Weight for this choice
+                    // Weight for this choice (^number or ^[expression])
                     self.consume_char('^');
-                    let weight = self.parse_number()?;
+                    let weight = if self.peek_char() == Some('[') {
+                        // Dynamic weight: ^[expression]
+                        self.consume_char('[');
+                        let expr = self.parse_expression_in_reference()?;
+                        if self.peek_char() != Some(']') {
+                            return Err(ParseError::UnterminatedReference(self.line));
+                        }
+                        self.consume_char(']');
+                        ItemWeight::Dynamic(Box::new(expr))
+                    } else {
+                        // Static weight: ^number
+                        ItemWeight::Static(self.parse_number()?)
+                    };
                     let mut choice = InlineChoice::new(content_buffer.clone());
                     choice = choice.with_weight(weight);
                     choices.push(choice);
@@ -1164,8 +1209,14 @@ mod tests {
         let input = "animal\n\tdog^2\n\tcat^0.5\n\tbird\n";
         let result = parse(input);
         let program = result.unwrap();
-        assert_eq!(program.lists[0].items[0].weight, Some(2.0));
-        assert_eq!(program.lists[0].items[1].weight, Some(0.5));
+        assert_eq!(
+            program.lists[0].items[0].weight,
+            Some(ItemWeight::Static(2.0))
+        );
+        assert_eq!(
+            program.lists[0].items[1].weight,
+            Some(ItemWeight::Static(0.5))
+        );
         assert_eq!(program.lists[0].items[2].weight, None);
     }
 }

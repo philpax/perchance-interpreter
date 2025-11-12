@@ -42,6 +42,7 @@ enum Value {
     Text(String),
     List(String),               // Reference to a list by name
     ListInstance(CompiledList), // An actual list instance (for sublists)
+    ItemInstance(CompiledItem), // An item with its properties (sublists) intact
     Array(Vec<String>),         // Multiple items (for selectMany/selectUnique before joinItems)
     ConsumableList(String),     // Reference to a consumable list by unique ID
 }
@@ -139,19 +140,49 @@ impl<'a, R: Rng> Evaluator<'a, R> {
     fn select_weighted_item<'b>(
         &mut self,
         items: &'b [CompiledItem],
-        total_weight: f64,
+        _total_weight: f64,
     ) -> Result<&'b CompiledItem, EvalError> {
         if items.is_empty() {
             return Err(EvalError::EmptyList("(anonymous)".to_string()));
         }
 
-        let random_value = self.rng.gen::<f64>() * total_weight;
-        let mut cumulative = 0.0;
+        // Calculate actual weights for items with dynamic weights
+        let mut actual_weights: Vec<f64> = Vec::new();
+        let mut actual_total = 0.0;
 
         for item in items {
-            cumulative += item.weight;
+            let weight = if let Some(ref expr) = item.dynamic_weight {
+                // Evaluate the dynamic weight expression
+                let result = self.evaluate_expression(expr)?;
+                // Convert to number: "true" -> 1.0, "false" -> 0.0, or parse as number
+                let weight = if result == "true" {
+                    1.0
+                } else if result == "false" || result.is_empty() {
+                    0.0
+                } else {
+                    result.parse::<f64>().unwrap_or(0.0)
+                };
+                weight.max(0.0)
+            } else {
+                item.weight
+            };
+            actual_weights.push(weight);
+            actual_total += weight;
+        }
+
+        if actual_total <= 0.0 {
+            // If all weights are 0, treat all items as having equal weight (1.0)
+            actual_weights = vec![1.0; items.len()];
+            actual_total = items.len() as f64;
+        }
+
+        let random_value = self.rng.gen::<f64>() * actual_total;
+        let mut cumulative = 0.0;
+
+        for (i, weight) in actual_weights.iter().enumerate() {
+            cumulative += weight;
             if random_value < cumulative {
-                return Ok(item);
+                return Ok(&items[i]);
             }
         }
 
@@ -268,17 +299,46 @@ impl<'a, R: Rng> Evaluator<'a, R> {
             }
         }
 
-        // Calculate total weight
-        let total_weight: f64 = inline.choices.iter().map(|c| c.weight.unwrap_or(1.0)).sum();
-
-        // Select a choice
-        let random_value = self.rng.gen::<f64>() * total_weight;
-        let mut cumulative = 0.0;
+        // Calculate actual weights for choices with dynamic weights
+        let mut actual_weights: Vec<f64> = Vec::new();
+        let mut actual_total = 0.0;
 
         for choice in &inline.choices {
-            cumulative += choice.weight.unwrap_or(1.0);
+            let weight = match &choice.weight {
+                Some(ItemWeight::Static(w)) => *w,
+                Some(ItemWeight::Dynamic(expr)) => {
+                    // Evaluate the dynamic weight expression
+                    let result = self.evaluate_expression(expr)?;
+                    // Convert to number: "true" -> 1.0, "false" -> 0.0, or parse as number
+                    let weight = if result == "true" {
+                        1.0
+                    } else if result == "false" || result.is_empty() {
+                        0.0
+                    } else {
+                        result.parse::<f64>().unwrap_or(0.0)
+                    };
+                    weight.max(0.0)
+                }
+                None => 1.0,
+            };
+            actual_weights.push(weight);
+            actual_total += weight;
+        }
+
+        if actual_total <= 0.0 {
+            // If all weights are 0, treat all choices as having equal weight (1.0)
+            actual_weights = vec![1.0; inline.choices.len()];
+            actual_total = inline.choices.len() as f64;
+        }
+
+        // Select a choice
+        let random_value = self.rng.gen::<f64>() * actual_total;
+        let mut cumulative = 0.0;
+
+        for (i, weight) in actual_weights.iter().enumerate() {
+            cumulative += weight;
             if random_value < cumulative {
-                return self.evaluate_content(&choice.content);
+                return self.evaluate_content(&inline.choices[i].content);
             }
         }
 
@@ -408,6 +468,19 @@ impl<'a, R: Rng> Evaluator<'a, R> {
                         // Try as a method call with no arguments
                         let method = MethodCall::new(prop.name.clone());
                         self.call_method(&base_value, &method)
+                    }
+                    Err(e) => Err(e),
+                }
+            }
+
+            Expression::PropertyWithFallback(base, prop, fallback) => {
+                // Try to access the property, fall back to the fallback expression if it doesn't exist
+                let base_value = self.evaluate_to_value(base)?;
+                match self.get_property(&base_value, &prop.name) {
+                    Ok(result) => Ok(result),
+                    Err(EvalError::UndefinedProperty(_, _)) | Err(EvalError::TypeError(_)) => {
+                        // Property doesn't exist, evaluate fallback
+                        self.evaluate_expression(fallback)
                     }
                     Err(e) => Err(e),
                 }
@@ -570,10 +643,23 @@ impl<'a, R: Rng> Evaluator<'a, R> {
                 // Try as property first, then as a zero-argument method
                 match self.get_property_value(&base_value, &prop.name) {
                     Ok(value) => Ok(value),
-                    Err(EvalError::UndefinedProperty(_, _)) => {
+                    Err(EvalError::UndefinedProperty(_, _)) | Err(EvalError::TypeError(_)) => {
                         // Try as a method call with no arguments
                         let method = MethodCall::new(prop.name.clone());
                         self.call_method_value(&base_value, &method)
+                    }
+                    Err(e) => Err(e),
+                }
+            }
+
+            Expression::PropertyWithFallback(base, prop, fallback) => {
+                // Try to access the property, fall back to the fallback expression if it doesn't exist
+                let base_value = self.evaluate_to_value(base)?;
+                match self.get_property_value(&base_value, &prop.name) {
+                    Ok(value) => Ok(value),
+                    Err(EvalError::UndefinedProperty(_, _)) | Err(EvalError::TypeError(_)) => {
+                        // Property doesn't exist, evaluate fallback
+                        self.evaluate_to_value(fallback)
                     }
                     Err(e) => Err(e),
                 }
@@ -602,6 +688,19 @@ impl<'a, R: Rng> Evaluator<'a, R> {
                 self.evaluate_list(list)
             }
             Value::ListInstance(list) => self.evaluate_list(&list),
+            Value::ItemInstance(item) => {
+                // Evaluate the item's content
+                // If it has sublists, pick one randomly
+                if !item.sublists.is_empty() {
+                    let sublist_names: Vec<_> = item.sublists.keys().cloned().collect();
+                    let idx = self.rng.gen_range(0..sublist_names.len());
+                    let sublist_name = &sublist_names[idx];
+                    let sublist = item.sublists.get(sublist_name).unwrap();
+                    self.evaluate_list(sublist)
+                } else {
+                    self.evaluate_content(&item.content)
+                }
+            }
             Value::Array(items) => Ok(items.join(" ")), // Default: space-separated
             Value::ConsumableList(id) => {
                 // Get the consumable list state
@@ -697,6 +796,30 @@ impl<'a, R: Rng> Evaluator<'a, R> {
                     prop_name.to_string(),
                 ))
             }
+            Value::ItemInstance(item) => {
+                // Access a property (sublist) of an item
+                if let Some(sublist) = item.sublists.get(prop_name) {
+                    Ok(Value::ListInstance(sublist.clone()))
+                } else if item.sublists.len() == 1 {
+                    // If the item has exactly one sublist, try to access the property from that sublist
+                    let single_sublist = item.sublists.values().next().unwrap();
+                    // Search through items in the single sublist for the property
+                    for subitem in &single_sublist.items {
+                        if let Some(target_sublist) = subitem.sublists.get(prop_name) {
+                            return Ok(Value::ListInstance(target_sublist.clone()));
+                        }
+                    }
+                    Err(EvalError::UndefinedProperty(
+                        "item".to_string(),
+                        prop_name.to_string(),
+                    ))
+                } else {
+                    Err(EvalError::UndefinedProperty(
+                        "item".to_string(),
+                        prop_name.to_string(),
+                    ))
+                }
+            }
             Value::Text(_) => {
                 // Check if this is a grammar method that can be applied to text
                 if self.is_grammar_method(prop_name) {
@@ -772,13 +895,10 @@ impl<'a, R: Rng> Evaluator<'a, R> {
                             .select_weighted_item(&list.items, list.total_weight)?
                             .clone();
 
-                        // If item has sublists, pick one randomly and return it
+                        // If item has sublists (properties), return the item instance
+                        // so properties can be accessed later
                         if !item.sublists.is_empty() {
-                            let sublist_names: Vec<_> = item.sublists.keys().cloned().collect();
-                            let idx = self.rng.gen_range(0..sublist_names.len());
-                            let sublist_name = &sublist_names[idx];
-                            let sublist = item.sublists.get(sublist_name).unwrap();
-                            return Ok(Value::ListInstance(sublist.clone()));
+                            return Ok(Value::ItemInstance(item));
                         }
 
                         // No sublists, evaluate content directly
@@ -790,17 +910,15 @@ impl<'a, R: Rng> Evaluator<'a, R> {
                             .select_weighted_item(&list.items, list.total_weight)?
                             .clone();
 
+                        // If item has sublists (properties), return the item instance
                         if !item.sublists.is_empty() {
-                            let sublist_names: Vec<_> = item.sublists.keys().cloned().collect();
-                            let idx = self.rng.gen_range(0..sublist_names.len());
-                            let sublist_name = &sublist_names[idx];
-                            let sublist = item.sublists.get(sublist_name).unwrap();
-                            return Ok(Value::ListInstance(sublist.clone()));
+                            return Ok(Value::ItemInstance(item));
                         }
 
                         let result = self.evaluate_content(&item.content)?;
                         Ok(Value::Text(result))
                     }
+                    Value::ItemInstance(item) => Ok(Value::ItemInstance(item.clone())),
                     Value::Text(s) => Ok(Value::Text(s.clone())),
                     Value::Array(items) => {
                         // Select one item from the array
@@ -813,6 +931,26 @@ impl<'a, R: Rng> Evaluator<'a, R> {
                     }
                     Value::ConsumableList(_) => {
                         // For consumable lists, convert to string (which consumes an item)
+                        let result = self.value_to_string(value.clone())?;
+                        Ok(Value::Text(result))
+                    }
+                }
+            }
+
+            "evaluateItem" => {
+                // Evaluate an item immediately, converting it to text
+                match value {
+                    Value::ItemInstance(item) => {
+                        // Evaluate the item's content immediately
+                        let result = self.evaluate_content(&item.content)?;
+                        Ok(Value::Text(result))
+                    }
+                    Value::Text(s) => {
+                        // Already text, just return it
+                        Ok(Value::Text(s.clone()))
+                    }
+                    _ => {
+                        // For other values, convert to string
                         let result = self.value_to_string(value.clone())?;
                         Ok(Value::Text(result))
                     }
@@ -878,6 +1016,11 @@ impl<'a, R: Rng> Evaluator<'a, R> {
                             }
                         }
                         Ok(Value::Text(results.join(" ")))
+                    }
+                    Value::ItemInstance(item) => {
+                        // For an item instance, just evaluate its content
+                        let result = self.evaluate_content(&item.content)?;
+                        Ok(Value::Text(result))
                     }
                     Value::Text(s) => Ok(Value::Text(s.clone())),
                     Value::Array(items) => {
@@ -951,6 +1094,15 @@ impl<'a, R: Rng> Evaluator<'a, R> {
                             } else {
                                 results.push(self.evaluate_content(&item.content)?);
                             }
+                        }
+                        Ok(Value::Array(results))
+                    }
+                    Value::ItemInstance(item) => {
+                        // Repeat the same item n times (convert to string)
+                        let mut results = Vec::new();
+                        for _ in 0..n {
+                            let result = self.evaluate_content(&item.content)?;
+                            results.push(result);
                         }
                         Ok(Value::Array(results))
                     }
@@ -1056,6 +1208,17 @@ impl<'a, R: Rng> Evaluator<'a, R> {
                             }
                         }
                         Ok(Value::Array(results))
+                    }
+                    Value::ItemInstance(item) => {
+                        // Can't select unique items from a single item
+                        if n > 1 {
+                            return Err(EvalError::InvalidMethodCall(
+                                "Cannot select multiple unique items from a single item"
+                                    .to_string(),
+                            ));
+                        }
+                        let result = self.evaluate_content(&item.content)?;
+                        Ok(Value::Array(vec![result]))
                     }
                     Value::Text(s) => Ok(Value::Text(s.clone())),
                     Value::Array(items) => {
