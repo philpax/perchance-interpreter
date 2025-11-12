@@ -830,6 +830,56 @@ output
 }
 
 #[test]
+fn test_multiline_animal_sentence_paragraph_with_spaces_and_tabs_1() {
+    let template = r#"animal
+	pig
+	cow
+	zebra
+
+adjective
+  sneaky
+  happy
+  furry
+
+sentence
+  That [animal] is very [adjective].
+	I befriended a very [adjective] [animal] yesterday.
+
+paragraph = [sentence] [sentence] [sentence]"#;
+    let result = evaluate_with_seed(template, 42);
+    let output = result.unwrap();
+    // Should have 3 sentences (contains 3 periods)
+    assert_eq!(output.matches('.').count(), 3);
+    // Should contain animal names
+    assert!(output.contains("pig") || output.contains("cow") || output.contains("zebra"));
+}
+
+#[test]
+fn test_multiline_animal_sentence_paragraph_with_spaces_and_tabs_2() {
+    let template = r#"animal
+    pig
+    cow
+    zebra
+
+adjective
+  sneaky
+  happy
+  furry
+
+sentence
+    That [animal] is very sneaky.
+    I befriended a wild [animal] yesterday.
+
+paragraph = [sentence] [sentence] [sentence] "#;
+    let result = evaluate_with_seed(template, 42);
+    let output = dbg!(result.unwrap());
+    // Should have 3 sentences (contains 3 periods)
+    assert_eq!(output.matches('.').count(), 3);
+    // Should contain animal names
+    assert!(output.contains("pig") || output.contains("cow") || output.contains("zebra"));
+}
+
+#[test]
 fn test_multiline_food_description() {
     let template = r#"description
 	It's a [adjective] dish with [type] [main].
