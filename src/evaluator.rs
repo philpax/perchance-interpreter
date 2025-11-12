@@ -154,8 +154,15 @@ impl<'a, R: Rng> Evaluator<'a, R> {
             let weight = if let Some(ref expr) = item.dynamic_weight {
                 // Evaluate the dynamic weight expression
                 let result = self.evaluate_expression(expr)?;
-                // Parse as number, default to 0.0 if not a number
-                result.parse::<f64>().unwrap_or(0.0).max(0.0)
+                // Convert to number: "true" -> 1.0, "false" -> 0.0, or parse as number
+                let weight = if result == "true" {
+                    1.0
+                } else if result == "false" || result.is_empty() {
+                    0.0
+                } else {
+                    result.parse::<f64>().unwrap_or(0.0)
+                };
+                weight.max(0.0)
             } else {
                 item.weight
             };
@@ -302,8 +309,15 @@ impl<'a, R: Rng> Evaluator<'a, R> {
                 Some(ItemWeight::Dynamic(expr)) => {
                     // Evaluate the dynamic weight expression
                     let result = self.evaluate_expression(expr)?;
-                    // Parse as number, default to 0.0 if not a number
-                    result.parse::<f64>().unwrap_or(0.0).max(0.0)
+                    // Convert to number: "true" -> 1.0, "false" -> 0.0, or parse as number
+                    let weight = if result == "true" {
+                        1.0
+                    } else if result == "false" || result.is_empty() {
+                        0.0
+                    } else {
+                        result.parse::<f64>().unwrap_or(0.0)
+                    };
+                    weight.max(0.0)
                 }
                 None => 1.0,
             };
@@ -629,7 +643,7 @@ impl<'a, R: Rng> Evaluator<'a, R> {
                 // Try as property first, then as a zero-argument method
                 match self.get_property_value(&base_value, &prop.name) {
                     Ok(value) => Ok(value),
-                    Err(EvalError::UndefinedProperty(_, _)) => {
+                    Err(EvalError::UndefinedProperty(_, _)) | Err(EvalError::TypeError(_)) => {
                         // Try as a method call with no arguments
                         let method = MethodCall::new(prop.name.clone());
                         self.call_method_value(&base_value, &method)
