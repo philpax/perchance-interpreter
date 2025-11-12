@@ -1213,7 +1213,8 @@ impl<'a, R: Rng> Evaluator<'a, R> {
                         // Can't select unique items from a single item
                         if n > 1 {
                             return Err(EvalError::InvalidMethodCall(
-                                "Cannot select multiple unique items from a single item".to_string(),
+                                "Cannot select multiple unique items from a single item"
+                                    .to_string(),
                             ));
                         }
                         let result = self.evaluate_content(&item.content)?;

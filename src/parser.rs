@@ -400,7 +400,8 @@ impl Parser {
                 } else {
                     // Otherwise, it's a logical OR
                     let right = self.parse_and_expression()?;
-                    left = Expression::BinaryOp(Box::new(left), BinaryOperator::Or, Box::new(right));
+                    left =
+                        Expression::BinaryOp(Box::new(left), BinaryOperator::Or, Box::new(right));
                 }
             } else {
                 break;
@@ -533,8 +534,10 @@ impl Parser {
                     self.consume_char(']');
                     expr = Expression::Dynamic(Box::new(expr), Box::new(index_expr));
                 }
-                Some('=') if matches!(expr, Expression::Simple(_))
-                    && self.peek_two_chars() != Some(('=', '=')) => {
+                Some('=')
+                    if matches!(expr, Expression::Simple(_))
+                        && self.peek_two_chars() != Some(('=', '=')) =>
+                {
                     // Assignment (but not ==)
                     self.consume_char('=');
                     self.skip_spaces();
@@ -1206,8 +1209,14 @@ mod tests {
         let input = "animal\n\tdog^2\n\tcat^0.5\n\tbird\n";
         let result = parse(input);
         let program = result.unwrap();
-        assert_eq!(program.lists[0].items[0].weight, Some(ItemWeight::Static(2.0)));
-        assert_eq!(program.lists[0].items[1].weight, Some(ItemWeight::Static(0.5)));
+        assert_eq!(
+            program.lists[0].items[0].weight,
+            Some(ItemWeight::Static(2.0))
+        );
+        assert_eq!(
+            program.lists[0].items[1].weight,
+            Some(ItemWeight::Static(0.5))
+        );
         assert_eq!(program.lists[0].items[2].weight, None);
     }
 }

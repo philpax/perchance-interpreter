@@ -1123,7 +1123,6 @@ fn test_html_tags_with_references() {
     assert_eq!(output, "<b>hello</b> <i>world</i>");
 }
 
-
 #[test]
 fn test_multiline_evaluate_item_with_ranges() {
     let template = r#"output

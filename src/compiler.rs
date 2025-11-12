@@ -19,8 +19,8 @@ pub struct CompiledList {
 #[derive(Debug, Clone)]
 pub struct CompiledItem {
     pub content: Vec<ContentPart>,
-    pub weight: f64,  // For static weights and as default for dynamic ones
-    pub dynamic_weight: Option<Expression>,  // For dynamic weights like ^[condition]
+    pub weight: f64, // For static weights and as default for dynamic ones
+    pub dynamic_weight: Option<Expression>, // For dynamic weights like ^[condition]
     pub sublists: HashMap<String, CompiledList>,
 }
 
@@ -102,7 +102,7 @@ impl CompiledItem {
     pub fn new_with_dynamic_weight(content: Vec<ContentPart>, dynamic_weight: Expression) -> Self {
         CompiledItem {
             content,
-            weight: 0.0,  // Will be calculated at runtime
+            weight: 0.0, // Will be calculated at runtime
             dynamic_weight: Some(dynamic_weight),
             sublists: HashMap::new(),
         }
