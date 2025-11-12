@@ -1134,7 +1134,7 @@ output
     );
     // The second and third topic mentions should be the same
     // One topic should appear exactly twice (the one from [a = t.selectOne, a] and [a])
-    let topics = vec!["trans rights", "animal rights", "science", "mathematics"];
+    let topics = ["trans rights", "animal rights", "science", "mathematics"];
     let topic_counts: Vec<_> = topics
         .iter()
         .map(|topic| output.matches(topic).count())
@@ -1172,7 +1172,7 @@ output
     assert!(result.is_ok());
     let output = result.unwrap();
     // Should be one of the specific animals
-    let animals = vec![
+    let animals = [
         "kangaroo",
         "pig",
         "human",
