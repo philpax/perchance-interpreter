@@ -205,6 +205,6 @@ mod tests {
         let mut program = Program::new();
         program.add_list(List::new("empty".to_string()));
         let result = compile(&program);
-        assert!(result.is_err());
+        result.unwrap_err();
     }
 }

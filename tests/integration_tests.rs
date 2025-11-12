@@ -279,7 +279,6 @@ fn test_default_to_last_list() {
 fn test_undefined_list_error() {
     let template = "output\n\t[nonexistent]\n";
     let result = evaluate_with_seed(template, 42);
-    assert!(result.is_err());
     assert!(result.unwrap_err().to_string().contains("nonexistent"));
 }
 
@@ -287,7 +286,7 @@ fn test_undefined_list_error() {
 fn test_empty_list_error() {
     let template = "animal\n\noutput\n\t[animal]\n";
     let result = evaluate_with_seed(template, 42);
-    assert!(result.is_err());
+    result.unwrap_err();
 }
 
 #[test]
@@ -624,7 +623,6 @@ fn test_output_keyword_simple() {
 fn test_output_keyword_with_reference() {
     let template = "name\n\tAlice\n\tBob\n\ngreeting\n\titem\n\t$output = Hello [name]\n\noutput\n\t[greeting]\n";
     let result = evaluate_with_seed(template, 42);
-    assert!(result.is_ok());
     // Should output "Hello Alice" or "Hello Bob"
     let output = result.unwrap();
     assert!(output.starts_with("Hello "));
@@ -756,7 +754,7 @@ fn test_consumable_list_exhaustion() {
     let template = "item\n\ta\n\tb\n\noutput\n\t[c = item.consumableList][c] [c] [c]\n";
     let result = evaluate_with_seed(template, 42);
     // Should fail because we try to consume 3 items from a 2-item list
-    assert!(result.is_err());
+    result.unwrap_err();
 }
 
 #[test]
@@ -797,7 +795,7 @@ fn test_consumable_list_independent_instances() {
     // Test that different consumableList instances are independent
     let template = "item\n\ta\n\tb\n\tc\n\noutput\n\t[c1 = item.consumableList][c2 = item.consumableList][c1] [c2]\n";
     let result = evaluate_with_seed(template, 42);
-    assert!(result.is_ok());
+    let _ = result.unwrap();
     // Both c1 and c2 should work independently
 }
 
@@ -824,10 +822,6 @@ paragraph = [sentence] [sentence] [sentence]
 output
 	[paragraph]"#;
     let result = evaluate_with_seed(template, 42);
-    if result.is_err() {
-        eprintln!("Error: {:?}", result.as_ref().unwrap_err());
-    }
-    assert!(result.is_ok());
     let output = result.unwrap();
     // Should have 3 sentences (contains 3 periods)
     assert_eq!(output.matches('.').count(), 3);
@@ -930,10 +924,6 @@ sentence
 output
 	[sentence]"#;
     let result = evaluate_with_seed(template, 42);
-    if result.is_err() {
-        eprintln!("Error: {:?}", result.as_ref().unwrap_err());
-    }
-    assert!(result.is_ok());
     let output = result.unwrap();
     // Should contain pluralized animals
     assert!(
@@ -962,10 +952,6 @@ sentence
 output
   [sentence]"#;
     let result = evaluate_with_seed(template, 42);
-    if result.is_err() {
-        eprintln!("Error: {:?}", result.as_ref().unwrap_err());
-    }
-    assert!(result.is_ok());
     let output = result.unwrap();
     // Should have consistent flower (e.g., "rose" and "roses")
     if output.contains("rose") {
@@ -1015,10 +1001,6 @@ sentence
 output
   [sentence]"#;
     let result = evaluate_with_seed(template, 42);
-    if result.is_err() {
-        eprintln!("Error: {:?}", result.as_ref().unwrap_err());
-    }
-    assert!(result.is_ok());
     let output = result.unwrap();
     // Should contain topics
     assert!(
@@ -1093,10 +1075,6 @@ animal
 	cat
 	moose"#;
     let result = evaluate_with_seed(template, 42);
-    if result.is_err() {
-        eprintln!("Error: {:?}", result.as_ref().unwrap_err());
-    }
-    assert!(result.is_ok());
     let output = result.unwrap();
     // Should contain either "feathers", "scales", or "fur"
     assert!(output.contains("feathers") || output.contains("scales") || output.contains("fur"));
@@ -1109,7 +1087,6 @@ fn test_html_tag_passthrough() {
     // HTML tags should be passed through as-is
     let template = "output\n\t<b>Bold</b> and <i>italic</i> text<br>New line\n";
     let result = evaluate_with_seed(template, 42);
-    assert!(result.is_ok());
     let output = result.unwrap();
     assert_eq!(output, "<b>Bold</b> and <i>italic</i> text<br>New line");
 }
@@ -1118,7 +1095,6 @@ fn test_html_tag_passthrough() {
 fn test_html_tags_with_references() {
     let template = "word\n\thello\n\noutput\n\t<b>[word]</b> <i>world</i>\n";
     let result = evaluate_with_seed(template, 42);
-    assert!(result.is_ok());
     let output = result.unwrap();
     assert_eq!(output, "<b>hello</b> <i>world</i>");
 }
