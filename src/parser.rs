@@ -48,6 +48,7 @@ pub struct Parser {
     input: Vec<char>,
     pos: usize,
     line: usize,
+    space_indent_unit: Option<usize>, // Detected space indentation unit (2 or 4 spaces)
 }
 
 impl Parser {
@@ -56,6 +57,7 @@ impl Parser {
             input: input.chars().collect(),
             pos: 0,
             line: 1,
+            space_indent_unit: None,
         }
     }
 
@@ -854,7 +856,30 @@ impl Parser {
             .map_err(|_| ParseError::InvalidNumberRange(self.line))
     }
 
-    fn get_indentation_level(&self) -> usize {
+    fn detect_space_indent_unit(&mut self) {
+        // Detect the space indentation unit from the first indented line
+        if self.space_indent_unit.is_some() {
+            return; // Already detected
+        }
+
+        let mut i = self.pos;
+        let mut space_count = 0;
+
+        // Count leading spaces
+        while i < self.input.len() && self.input[i] == ' ' {
+            space_count += 1;
+            i += 1;
+        }
+
+        // If we found spaces, determine the unit
+        if space_count >= 4 {
+            self.space_indent_unit = Some(4);
+        } else if space_count >= 2 {
+            self.space_indent_unit = Some(2);
+        }
+    }
+
+    fn get_indentation_level(&mut self) -> usize {
         let mut level = 0;
         let mut i = self.pos;
 
@@ -865,10 +890,25 @@ impl Parser {
                     i += 1;
                 }
                 ' ' => {
-                    // Two spaces = one level
-                    if i + 1 < self.input.len() && self.input[i + 1] == ' ' {
+                    // Detect space indent unit if not already done
+                    if self.space_indent_unit.is_none() {
+                        self.detect_space_indent_unit();
+                    }
+
+                    let unit = self.space_indent_unit.unwrap_or(2);
+
+                    // Check if we have enough spaces for one indentation level
+                    let mut has_full_unit = true;
+                    for offset in 0..unit {
+                        if i + offset >= self.input.len() || self.input[i + offset] != ' ' {
+                            has_full_unit = false;
+                            break;
+                        }
+                    }
+
+                    if has_full_unit {
                         level += 1;
-                        i += 2;
+                        i += unit;
                     } else {
                         break;
                     }
@@ -881,12 +921,18 @@ impl Parser {
     }
 
     fn skip_indent(&mut self, level: usize) {
+        let unit = self.space_indent_unit.unwrap_or(2);
+
         for _ in 0..level {
             if self.peek_char() == Some('\t') {
                 self.advance();
-            } else if self.peek_char() == Some(' ') && self.peek_ahead(1) == Some(' ') {
-                self.advance();
-                self.advance();
+            } else if self.peek_char() == Some(' ') {
+                // Skip the detected number of spaces
+                for _ in 0..unit {
+                    if self.peek_char() == Some(' ') {
+                        self.advance();
+                    }
+                }
             }
         }
     }

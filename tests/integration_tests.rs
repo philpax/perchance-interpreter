@@ -15,9 +15,17 @@ fn test_simple_list_selection_with_multiline() {
     cow
     zebra
 sentence
-    That [animal] is very sneaky."#;
+    That [animal] is very sneaky.
+
+output
+    [sentence]"#;
     let output = evaluate_with_seed(template, 100).unwrap();
-    assert!(output == "dog" || output == "cat" || output == "bird");
+    assert!(
+        output.contains("pig") || output.contains("cow") || output.contains("zebra"),
+        "Expected output to contain one of the animals, got: {}",
+        output
+    );
+    assert!(output.contains("sneaky"));
 }
 
 #[test]
