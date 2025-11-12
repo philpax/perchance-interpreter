@@ -352,9 +352,7 @@ fn test_hierarchical_with_tabs() {
     let result = evaluate_with_seed(template, 42);
     assert!(result.is_ok());
     let output = result.unwrap();
-    assert!(
-        output == "dog" || output == "cat" || output == "sparrow" || output == "eagle"
-    );
+    assert!(output == "dog" || output == "cat" || output == "sparrow" || output == "eagle");
 }
 
 #[test]
@@ -363,9 +361,7 @@ fn test_hierarchical_with_spaces() {
     let result = evaluate_with_seed(template, 42);
     assert!(result.is_ok());
     let output = result.unwrap();
-    assert!(
-        output == "dog" || output == "cat" || output == "sparrow" || output == "eagle"
-    );
+    assert!(output == "dog" || output == "cat" || output == "sparrow" || output == "eagle");
 }
 
 #[test]
@@ -935,9 +931,7 @@ output
     // Should have 3 sentences (contains 3 periods)
     assert_eq!(output.matches('.').count(), 3);
     // Should contain animal names
-    assert!(
-        output.contains("pig") || output.contains("cow") || output.contains("zebra")
-    );
+    assert!(output.contains("pig") || output.contains("cow") || output.contains("zebra"));
 }
 
 #[test]
@@ -1107,13 +1101,9 @@ output
     assert!(result.is_ok());
     let output = result.unwrap();
     // Should contain name patterns
-    assert!(
-        output.contains("Addison") || output.contains("Alex") || output.contains("Alexis")
-    );
+    assert!(output.contains("Addison") || output.contains("Alex") || output.contains("Alexis"));
     // Should contain last name
-    assert!(
-        output.contains("Smith") || output.contains("Johnson") || output.contains("Williams")
-    );
+    assert!(output.contains("Smith") || output.contains("Johnson") || output.contains("Williams"));
 }
 
 #[test]
@@ -1183,7 +1173,15 @@ output
     let output = result.unwrap();
     // Should be one of the specific animals
     let animals = vec![
-        "kangaroo", "pig", "human", "lizard", "crocodile", "turtle", "spider", "beetle", "ant",
+        "kangaroo",
+        "pig",
+        "human",
+        "lizard",
+        "crocodile",
+        "turtle",
+        "spider",
+        "beetle",
+        "ant",
     ];
     assert!(animals.iter().any(|&a| output.contains(a)));
 }
@@ -1208,9 +1206,7 @@ animal
     assert!(result.is_ok());
     let output = result.unwrap();
     // Should contain either "feathers", "scales", or "fur"
-    assert!(
-        output.contains("feathers") || output.contains("scales") || output.contains("fur")
-    );
+    assert!(output.contains("feathers") || output.contains("scales") || output.contains("fur"));
     // Should start with "A " (article)
     assert!(output.starts_with("A "));
 }
