@@ -1,0 +1,214 @@
+// https://perchance.org/venue
+// Fetched at: 2025-11-13T01:18:54.882085+00:00
+
+title = Random Venue Generator
+subtitle = Simply generates a random venue (for events, etc.) at each click :)
+fontSize = 200
+fontColor = black
+buttonText = randomize
+numberOfItems = 1
+itemSeperator = <hr style\="opacity:0;margin: 0.15em;"/>
+description
+	{import:simple-gen-footer}
+	$output = <p>[this.joinItems("</p><p>")]</p> // <-- don't remove this last line, it uses the special "$output" property to join and format your description as HTML paragraphs :)
+
+
+$output = [venue]
+
+// Credit goes to: https://github.com/dariusk/corpora/blob/master/data/geography/venues.json
+
+venue
+	Art Museum
+	History Museum
+	Planetarium
+	Science Museum
+	Jazz Club
+	Piano Bar
+	Rock Club
+	Dance Studio
+	Indie Theater
+	Opera House
+	Theater
+	Baseball Stadium
+	Basketball Stadium
+	Cricket Ground
+	Football Stadium
+	Hockey Arena
+	Soccer Stadium
+	Tennis Stadium
+	Aquarium
+	Arcade
+	Art Gallery
+	Bowling Alley
+	Casino
+	Circus
+	Comedy Club
+	Concert Hall
+	Country Dance Club
+	Disc Golf
+	General Entertainment
+	Go Kart Track
+	Historic Site
+	Laser Tag
+	Mini Golf
+	Movie Theater
+	Museum
+	Music Venue
+	Outdoor Sculpture
+	Performing Arts Venue
+	Pool Hall
+	Public Art
+	Racetrack
+	Roller Rink
+	Salsa Club
+	Stadium
+	Street Art
+	Theme Park
+	Water Park
+	Zoo
+	Afghan Restaurant
+	African Restaurant
+	Arepa Restaurant
+	Argentinian Restaurant
+	Asian Restaurant
+	Austrian Restaurant
+	Bagel Shop
+	Bakery
+	Belarusian Restaurant
+	Belgian Restaurant
+	Bistro
+	Brazilian Restaurant
+	Bubble Tea Shop
+	Cafeteria
+	Café
+	Cambodian Restaurant
+	Caribbean Restaurant
+	Chinese Restaurant
+	Creperie
+	Cuban Restaurant
+	Cupcake Shop
+	Czech Restaurant
+	Dessert Shop
+	Dim Sum Restaurant
+	Donut Shop
+	Dumpling Restaurant
+	Eastern European Restaurant
+	English Restaurant
+	Ethiopian Restaurant
+	Falafel Restaurant
+	Fast Food Restaurant
+	Filipino Restaurant
+	Fish & Chips Shop
+	Fondue Restaurant
+	Food Truck
+	French Restaurant
+	Fried Chicken Joint
+	Gastropub
+	German Restaurant
+	Gluten-free Restaurant
+	Greek Restaurant
+	Halal Restaurant
+	Hawaiian Restaurant
+	Himalayan Restaurant
+	Hot Dog Joint
+	Hotpot Restaurant
+	Hungarian Restaurant
+	Ice Cream Shop
+	Indian Restaurant
+	Indonesian Restaurant
+	Irish Pub
+	Italian Restaurant
+	Japanese Restaurant
+	Jewish Restaurant
+	Juice Bar
+	Korean Restaurant
+	Kosher Restaurant
+	Latin American Restaurant
+	Mac & Cheese Joint
+	Malaysian Restaurant
+	Mediterranean Restaurant
+	Mexican Restaurant
+	Middle Eastern Restaurant
+	Modern European Restaurant
+	Molecular Gastronomy Restaurant
+	Mongolian Restaurant
+	Moroccan Restaurant
+	New American Restaurant
+	Pakistani Restaurant
+	Persian Restaurant
+	Peruvian Restaurant
+	Pie Shop
+	Pizza Place
+	Polish Restaurant
+	Portuguese Restaurant
+	Ramen / Noodle House
+	Restaurant
+	Romanian Restaurant
+	Russian Restaurant
+	Scandinavian Restaurant
+	Seafood Restaurant
+	South American Restaurant
+	Southern / Soul Food Restaurant
+	Souvlaki Shop
+	Spanish Restaurant
+	Sri Lankan Restaurant
+	Sushi Restaurant
+	Swiss Restaurant
+	Taco Place
+	Tapas Restaurant
+	Tatar Restaurant
+	Tea Room
+	Thai Restaurant
+	Tibetan Restaurant
+	Turkish Restaurant
+	Ukrainian Restaurant
+	Vegetarian / Vegan Restaurant
+	Vietnamese Restaurant
+	Winery
+	Bar
+	Beach Bar
+	Beer Garden
+	Brewery
+	Champagne Bar
+	Cocktail Bar
+	Dive Bar
+	Gay Bar
+	Hookah Bar
+	Hotel Bar
+	Karaoke Bar
+	Lounge
+	Night Market
+	Nightclub
+	Other Nightlife
+	Pub
+	Sake Bar
+	Speakeasy
+	Sports Bar
+	Strip Club
+	Whisky Bar
+	Wine Bar
+	Bath House
+	Beach
+	Botanical Garden
+	Bridge
+	Campground
+	Castle
+	Cemetery
+	Farm
+	Field
+	Forest
+	Garden
+	Gun Range
+	Harbor / Marina
+	Lighthouse
+	National Park
+	Nature Preserve
+	Park
+	Pedestrian Plaza
+	Playground
+	Pool
+	Scenic Lookout
+	Sculpture Garden
+	Vineyard
+	Airport Food Court
+	Airport Terminal

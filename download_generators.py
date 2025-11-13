@@ -1,18 +1,25 @@
 # /// script
 # requires-python = ">=3.13"
 # ///
+import argparse
 import json
 import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-if len(sys.argv) < 2:
-    print("Error: cf_clearance is required")
-    print(f"Usage: {sys.argv[0]} <cf_clearance>")
-    sys.exit(1)
+parser = argparse.ArgumentParser(description="Download Perchance generators")
+parser.add_argument("cf_clearance", help="Cloudflare clearance cookie value")
+parser.add_argument(
+    "-f",
+    "--force",
+    action="store_true",
+    help="Force download even if generator already exists",
+)
+args = parser.parse_args()
 
-cf_clearance = sys.argv[1]
+cf_clearance = args.cf_clearance
+force = args.force
 generator_names = [
     "abstract-noun",
     "animal",
@@ -33,7 +40,9 @@ generator_names = [
     "greek-titan",
     "ingredient",
     "land-animal",
+    "monster-edited",
     "monster-type",
+    "nationality",
     "nautical-term",
     "netflix-category",
     "noun",
@@ -41,11 +50,37 @@ generator_names = [
     "occupation",
     "person-adjective",
     "planet-name",
+    "room-type",
     "sci-fi-noun",
+    "terrain",
+    "type-of-art-edited",
     "uncountable-noun",
     "unusual-animal",
     "vegetable",
+    "venue",
 ]
+
+# Create generators directory if it doesn't exist
+generators_dir = Path("src/builtin_generators")
+generators_dir.mkdir(parents=True, exist_ok=True)
+
+# Filter out generators that already exist (unless force is set)
+if not force:
+    generators_to_download = [
+        name
+        for name in generator_names
+        if not (generators_dir / f"{name}.perchance").exists()
+    ]
+    skipped = len(generator_names) - len(generators_to_download)
+    if skipped > 0:
+        print(
+            f"Skipping {skipped} generator(s) that already exist (use -f/--force to override)"
+        )
+    generator_names = generators_to_download
+
+if not generator_names:
+    print("All generators already exist. Use -f/--force to re-download them.")
+    sys.exit(0)
 
 # Make the POST request using curl (since it bypasses Cloudflare challenges)
 url = "https://perchance.org/api/getGeneratorsAndDependencies"
@@ -124,10 +159,6 @@ for gen in generators:
     if name:
         generator_dict[name] = model_text
 
-# Create generators directory if it doesn't exist
-generators_dir = Path("src/builtin_generators")
-generators_dir.mkdir(parents=True, exist_ok=True)
-
 # Get the current UTC timestamp in ISO8601 format
 fetch_timestamp = datetime.now(timezone.utc).isoformat()
 
@@ -143,10 +174,14 @@ for key, value in generator_dict.items():
     print(f"Saved {file_path}")
 
 # Generate mod.rs file
+# Include all generators that exist on disk, not just the ones downloaded
 mod_rs_path = generators_dir / "mod.rs"
+existing_generators = sorted(
+    [path.stem for path in generators_dir.glob("*.perchance") if path.is_file()]
+)
 with open(mod_rs_path, "w", encoding="utf-8") as f:
     f.write("pub const GENERATORS: &[(&str, &str)] = &[\n")
-    for key in sorted(generator_dict.keys()):
+    for key in existing_generators:
         f.write(f'    ("{key}", include_str!("{key}.perchance")),\n')
     f.write("];\n")
 

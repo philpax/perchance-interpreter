@@ -24,7 +24,9 @@ pub const GENERATORS: &[(&str, &str)] = &[
     ("greek-titan", include_str!("greek-titan.perchance")),
     ("ingredient", include_str!("ingredient.perchance")),
     ("land-animal", include_str!("land-animal.perchance")),
+    ("monster-edited", include_str!("monster-edited.perchance")),
     ("monster-type", include_str!("monster-type.perchance")),
+    ("nationality", include_str!("nationality.perchance")),
     ("nautical-term", include_str!("nautical-term.perchance")),
     (
         "netflix-category",
@@ -38,10 +40,16 @@ pub const GENERATORS: &[(&str, &str)] = &[
         include_str!("person-adjective.perchance"),
     ),
     ("planet-name", include_str!("planet-name.perchance")),
+    ("room-type", include_str!("room-type.perchance")),
     ("sci-fi-noun", include_str!("sci-fi-noun.perchance")),
     (
         "simple-gen-footer",
         include_str!("simple-gen-footer.perchance"),
+    ),
+    ("terrain", include_str!("terrain.perchance")),
+    (
+        "type-of-art-edited",
+        include_str!("type-of-art-edited.perchance"),
     ),
     (
         "uncountable-noun",
@@ -49,4 +57,5 @@ pub const GENERATORS: &[(&str, &str)] = &[
     ),
     ("unusual-animal", include_str!("unusual-animal.perchance")),
     ("vegetable", include_str!("vegetable.perchance")),
+    ("venue", include_str!("venue.perchance")),
 ];

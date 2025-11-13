@@ -1,0 +1,79 @@
+// https://perchance.org/terrain
+// Fetched at: 2025-11-13T01:18:54.882085+00:00
+
+title = Random Terrain Generator
+subtitle = Simply generates a random terrain type at each click :)
+fontSize = 200
+fontColor = black
+buttonText = randomize
+numberOfItems = 1
+itemSeperator = <hr style\="opacity:0;margin: 0.15em;"/>
+description
+  {import:simple-gen-footer}
+  $output = <p>[this.joinItems("</p><p>")]</p> // <-- don't remove this last line, it uses the special "$output" property to join and format your description as HTML paragraphs :)
+
+$output = [terrain]
+
+terrain
+  badlands
+  bay
+  bluff
+  bog
+  canyon
+  cliff
+  deciduous forest
+  desert
+  downs
+  dune
+  evergreen forest
+  fen
+  flats
+  foothills
+  forest
+  geothermal area
+  glacier
+  grassland
+  grove
+  heath
+  heights
+  hill
+  hollows
+  jungle
+  lake
+  lowland
+  march
+  marsh
+  meadow
+  mesa
+  mixed forest
+  moor
+  morass
+  mound
+  mountain
+  ocean
+  palm forest
+  peak
+  plains
+  prairie
+  quagmire
+  range
+  rocky desert
+  sands
+  sandy desert
+  savannah
+  sea
+  shrubland
+  slough
+  sound
+  steppe
+  subterranean area
+  swamp
+  taiga
+  thicket
+  tropical area
+  tundra
+  waste
+  wasteland
+  wetland
+  woodland
+  woods
