@@ -15,20 +15,23 @@
 /// # });
 /// ```
 pub mod ast;
-#[cfg(feature = "builtin-generators")]
-pub mod builtin_generators;
 pub mod compiler;
 pub mod evaluator;
 pub mod loader;
 pub mod parser;
 
+#[cfg(feature = "builtin-generators")]
+pub mod builtin_generators;
+
 use rand::rngs::StdRng;
-use rand::SeedableRng;
+use rand::{Rng, SeedableRng};
+use std::sync::Arc;
 
 /// Re-export main types for convenience
 pub use ast::Program;
 pub use compiler::{CompileError, CompiledProgram};
 pub use evaluator::EvalError;
+pub use loader::GeneratorLoader;
 pub use parser::ParseError;
 
 /// Combined error type for the interpreter
@@ -69,77 +72,157 @@ impl From<EvalError> for InterpreterError {
     }
 }
 
+/// Options for evaluating a compiled program
+pub struct EvaluateOptions<R: Rng + Send> {
+    /// Random number generator
+    pub rng: R,
+    /// Generator loader for imports (optional, defaults to BuiltinGeneratorsLoader if available)
+    pub loader: Option<Arc<dyn GeneratorLoader>>,
+}
+
+impl<R: Rng + Send> EvaluateOptions<R> {
+    /// Create new options with provided RNG
+    pub fn new(rng: R) -> Self {
+        EvaluateOptions { rng, loader: None }
+    }
+
+    /// Set the loader
+    pub fn with_loader(mut self, loader: Arc<dyn GeneratorLoader>) -> Self {
+        self.loader = Some(loader);
+        self
+    }
+}
+
 /// Parse a Perchance template into an AST
+///
+/// # Example
+/// ```
+/// use perchance_interpreter::parse;
+///
+/// let template = "output\n\thello\n";
+/// let program = parse(template).unwrap();
+/// ```
 pub fn parse(input: &str) -> Result<Program, ParseError> {
     parser::parse(input)
 }
 
 /// Compile an AST into an evaluatable program
+///
+/// # Example
+/// ```
+/// use perchance_interpreter::{parse, compile};
+///
+/// let template = "output\n\thello\n";
+/// let program = parse(template).unwrap();
+/// let compiled = compile(&program).unwrap();
+/// ```
 pub fn compile(program: &Program) -> Result<CompiledProgram, CompileError> {
     compiler::compile(program)
 }
 
-/// Evaluate a compiled program with a provided RNG
-pub async fn evaluate<R: rand::Rng + Send>(
-    program: &CompiledProgram,
-    rng: &mut R,
-) -> Result<String, EvalError> {
-    evaluator::evaluate(program, rng).await
-}
-
-/// Convenience function: evaluate a template with a seed value
-///
-/// This function parses, compiles, and evaluates a Perchance template
-/// using a seeded RNG for deterministic output.
-///
-/// # Arguments
-///
-/// * `template` - The Perchance template string
-/// * `seed` - A seed value for the random number generator
+/// Evaluate a compiled program with options
 ///
 /// # Example
-///
-/// ```
-/// use perchance_interpreter::evaluate_with_seed;
-///
-/// let template = "output\n\tHello {world|universe}!\n";
-/// # tokio_test::block_on(async {
-/// let result = evaluate_with_seed(template, 12345).await.unwrap();
-/// println!("{}", result);
-/// # });
-/// ```
-pub async fn evaluate_with_seed(template: &str, seed: u64) -> Result<String, InterpreterError> {
-    let program = parse(template)?;
-    let compiled = compile(&program)?;
-    let mut rng = StdRng::seed_from_u64(seed);
-    let result = evaluate(&compiled, &mut rng).await?;
-    Ok(result)
-}
-
-/// Compile a template for repeated evaluation
-///
-/// This function parses and compiles a template, returning a compiled program
-/// that can be evaluated multiple times with different RNGs.
-///
-/// # Example
-///
 /// ```
 /// # tokio_test::block_on(async {
-/// use perchance_interpreter::{compile_template, evaluate};
+/// use perchance_interpreter::{parse, compile, evaluate, EvaluateOptions};
 /// use rand::SeedableRng;
 /// use rand::rngs::StdRng;
 ///
-/// let template = "output\n\t{1-100}\n";
-/// let compiled = compile_template(template).unwrap();
+/// let template = "output\n\thello\n";
+/// let program = parse(template).unwrap();
+/// let compiled = compile(&program).unwrap();
 ///
-/// // Evaluate multiple times with different seeds
-/// let mut rng1 = StdRng::seed_from_u64(1);
-/// let result1 = evaluate(&compiled, &mut rng1).await.unwrap();
-///
-/// let mut rng2 = StdRng::seed_from_u64(2);
-/// let result2 = evaluate(&compiled, &mut rng2).await.unwrap();
+/// let rng = StdRng::seed_from_u64(42);
+/// let options = EvaluateOptions::new(rng);
+/// let result = evaluate(&compiled, options).await.unwrap();
 /// # });
 /// ```
+pub async fn evaluate<R: Rng + Send>(
+    program: &CompiledProgram,
+    mut options: EvaluateOptions<R>,
+) -> Result<String, EvalError> {
+    // Get or create default loader
+    let loader = if let Some(loader) = options.loader {
+        Some(loader)
+    } else {
+        #[cfg(feature = "builtin-generators")]
+        {
+            Some(Arc::new(loader::BuiltinGeneratorsLoader::new()) as Arc<dyn GeneratorLoader>)
+        }
+        #[cfg(not(feature = "builtin-generators"))]
+        {
+            None
+        }
+    };
+
+    // Create evaluator
+    let mut evaluator = evaluator::Evaluator::new(program, &mut options.rng);
+    if let Some(loader) = loader {
+        evaluator = evaluator.with_loader(loader);
+    }
+
+    evaluator.evaluate().await
+}
+
+/// Parse, compile, and evaluate a template in one step
+///
+/// # Example
+/// ```
+/// # tokio_test::block_on(async {
+/// use perchance_interpreter::{run, EvaluateOptions};
+/// use rand::SeedableRng;
+/// use rand::rngs::StdRng;
+///
+/// let template = "output\n\thello\n";
+/// let rng = StdRng::seed_from_u64(42);
+/// let options = EvaluateOptions::new(rng);
+/// let result = run(template, options).await.unwrap();
+/// # });
+/// ```
+pub async fn run<R: Rng + Send>(
+    template: &str,
+    options: EvaluateOptions<R>,
+) -> Result<String, InterpreterError> {
+    let program = parse(template)?;
+    let compiled = compile(&program)?;
+    let result = evaluate(&compiled, options).await?;
+    Ok(result)
+}
+
+/// Parse, compile, and evaluate a template with a seed
+///
+/// This is a convenience function for deterministic output.
+///
+/// # Example
+/// ```
+/// # tokio_test::block_on(async {
+/// use perchance_interpreter::run_with_seed;
+///
+/// let template = "output\n\thello\n";
+/// let result = run_with_seed(template, 42, None).await.unwrap();
+/// # });
+/// ```
+pub async fn run_with_seed(
+    template: &str,
+    seed: u64,
+    loader: Option<Arc<dyn GeneratorLoader>>,
+) -> Result<String, InterpreterError> {
+    let rng = StdRng::seed_from_u64(seed);
+    let mut options = EvaluateOptions::new(rng);
+    if let Some(loader) = loader {
+        options = options.with_loader(loader);
+    }
+    run(template, options).await
+}
+
+// Deprecated functions - kept for backward compatibility
+#[deprecated(since = "0.1.0", note = "Use `run_with_seed` instead")]
+pub async fn evaluate_with_seed(template: &str, seed: u64) -> Result<String, InterpreterError> {
+    run_with_seed(template, seed, None).await
+}
+
+#[deprecated(since = "0.1.0", note = "Use `parse` and `compile` instead")]
 pub fn compile_template(template: &str) -> Result<CompiledProgram, InterpreterError> {
     let program = parse(template)?;
     let compiled = compile(&program)?;
@@ -151,9 +234,9 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn test_evaluate_with_seed() {
+    async fn test_run_with_seed() {
         let template = "output\n\tHello world!\n";
-        let result = evaluate_with_seed(template, 42).await;
+        let result = run_with_seed(template, 42, None).await;
         assert_eq!(result.unwrap(), "Hello world!");
     }
 
@@ -161,19 +244,21 @@ mod tests {
     async fn test_deterministic_output() {
         let template = "animal\n\tdog\n\tcat\n\tbird\n\noutput\n\t[animal]\n";
 
-        let result1 = evaluate_with_seed(template, 12345).await.unwrap();
-        let result2 = evaluate_with_seed(template, 12345).await.unwrap();
+        let result1 = run_with_seed(template, 12345, None).await.unwrap();
+        let result2 = run_with_seed(template, 12345, None).await.unwrap();
 
         assert_eq!(result1, result2);
     }
 
     #[tokio::test]
-    async fn test_compile_and_evaluate() {
+    async fn test_parse_compile_evaluate() {
         let template = "output\n\t{1-10}\n";
-        let compiled = compile_template(template).unwrap();
+        let program = parse(template).unwrap();
+        let compiled = compile(&program).unwrap();
 
-        let mut rng = StdRng::seed_from_u64(999);
-        let result = evaluate(&compiled, &mut rng).await;
+        let rng = StdRng::seed_from_u64(999);
+        let options = EvaluateOptions::new(rng);
+        let result = evaluate(&compiled, options).await;
 
         let num: i32 = result.unwrap().parse().unwrap();
         assert!((1..=10).contains(&num));
@@ -183,7 +268,7 @@ mod tests {
     async fn test_complex_template() {
         let template = "animal\n\tdog\n\tcat^2\n\tbird^0.5\n\ncolor\n\tred\n\tblue\n\tgreen\n\noutput\n\tI saw a {beautiful|pretty} [color] [animal].\n";
 
-        let result = evaluate_with_seed(template, 42).await;
+        let result = run_with_seed(template, 42, None).await;
         let output = result.unwrap();
         assert!(output.starts_with("I saw a"));
     }

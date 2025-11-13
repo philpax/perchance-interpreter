@@ -8,6 +8,9 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::{Arc, RwLock};
 
+#[cfg(feature = "builtin-generators")]
+use crate::builtin_generators;
+
 /// Error types for generator loading
 #[derive(Debug, Clone, PartialEq)]
 pub enum LoadError {
@@ -187,6 +190,110 @@ impl GeneratorLoader for InMemoryLoader {
             .get(name)
             .cloned()
             .ok_or_else(|| LoadError::NotFound(name.to_string()))
+    }
+}
+
+/// Builtin generators loader
+///
+/// Loads generators from a built-in set of common generators.
+/// Only available with the `builtin-generators` feature.
+#[cfg(feature = "builtin-generators")]
+#[derive(Clone, Default)]
+pub struct BuiltinGeneratorsLoader;
+
+#[cfg(feature = "builtin-generators")]
+impl BuiltinGeneratorsLoader {
+    /// Create a new BuiltinGeneratorsLoader with all builtin generators
+    ///
+    /// # Example
+    /// ```
+    /// use perchance_interpreter::loader::BuiltinGeneratorsLoader;
+    ///
+    /// let loader = BuiltinGeneratorsLoader::new();
+    /// ```
+    pub fn new() -> Self {
+        BuiltinGeneratorsLoader
+    }
+}
+
+#[cfg(feature = "builtin-generators")]
+#[async_trait]
+impl GeneratorLoader for BuiltinGeneratorsLoader {
+    async fn load(&self, name: &str) -> Result<String, LoadError> {
+        builtin_generators::GENERATORS
+            .iter()
+            .find(|(gen_name, _)| *gen_name == name)
+            .map(|(_, content)| content.to_string())
+            .ok_or_else(|| LoadError::NotFound(name.to_string()))
+    }
+}
+
+/// Chain loader that tries multiple loaders in sequence
+///
+/// This loader allows fallback behavior by trying loaders in order
+/// until one succeeds. Useful for having custom generators with
+/// builtin fallbacks.
+#[derive(Clone)]
+pub struct ChainLoader {
+    loaders: Vec<Arc<dyn GeneratorLoader>>,
+}
+
+impl ChainLoader {
+    /// Create a new empty ChainLoader
+    ///
+    /// # Example
+    /// ```
+    /// use perchance_interpreter::loader::ChainLoader;
+    ///
+    /// let loader = ChainLoader::new();
+    /// ```
+    pub fn new() -> Self {
+        ChainLoader {
+            loaders: Vec::new(),
+        }
+    }
+
+    /// Add a loader to the chain
+    ///
+    /// Loaders are tried in the order they are added.
+    ///
+    /// # Example
+    /// ```
+    /// use perchance_interpreter::loader::{ChainLoader, InMemoryLoader};
+    /// use std::sync::Arc;
+    ///
+    /// let memory_loader = InMemoryLoader::new();
+    /// let chain = ChainLoader::new()
+    ///     .with_loader(Arc::new(memory_loader));
+    /// ```
+    pub fn with_loader(mut self, loader: Arc<dyn GeneratorLoader>) -> Self {
+        self.loaders.push(loader);
+        self
+    }
+
+    /// Create a ChainLoader from a vector of loaders
+    pub fn from_loaders(loaders: Vec<Arc<dyn GeneratorLoader>>) -> Self {
+        ChainLoader { loaders }
+    }
+}
+
+impl Default for ChainLoader {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[async_trait]
+impl GeneratorLoader for ChainLoader {
+    async fn load(&self, name: &str) -> Result<String, LoadError> {
+        for loader in &self.loaders {
+            match loader.load(name).await {
+                Ok(source) => return Ok(source),
+                Err(LoadError::NotFound(_)) => continue,
+                Err(e) => return Err(e),
+            }
+        }
+        Err(LoadError::NotFound(name.to_string()))
     }
 }
 

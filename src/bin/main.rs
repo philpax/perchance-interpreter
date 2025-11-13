@@ -1,5 +1,5 @@
 /// CLI tool for Perchance interpreter
-use perchance_interpreter::{compile_template, evaluate, evaluate_with_seed};
+use perchance_interpreter::{parse, compile, evaluate, EvaluateOptions, run_with_seed};
 use rand::rngs::StdRng;
 use rand::SeedableRng;
 use std::env;
@@ -60,16 +60,21 @@ async fn main() {
             eprintln!("Error parsing seed '{}': {}", args[2], e);
             process::exit(1);
         });
-        evaluate_with_seed(&template, seed).await
+        run_with_seed(&template, seed, None).await
     } else {
         // No seed provided, use random seed
-        let compiled = compile_template(&template).unwrap_or_else(|e| {
+        let program = parse(&template).unwrap_or_else(|e| {
+            eprintln!("Error: {}", e);
+            process::exit(1);
+        });
+        let compiled = compile(&program).unwrap_or_else(|e| {
             eprintln!("Error: {}", e);
             process::exit(1);
         });
 
-        let mut rng = StdRng::from_entropy();
-        evaluate(&compiled, &mut rng).await.map_err(|e| e.into())
+        let rng = StdRng::from_entropy();
+        let options = EvaluateOptions::new(rng);
+        evaluate(&compiled, options).await.map_err(|e| e.into())
     };
 
     match result {
