@@ -120,7 +120,11 @@ async fn test_multiple_imports() {
         .await
         .unwrap();
 
-    assert!(result.starts_with("A ") && result.ends_with("."), "Got: {}", result);
+    assert!(
+        result.starts_with("A ") && result.ends_with("."),
+        "Got: {}",
+        result
+    );
 }
 
 #[tokio::test]
@@ -184,7 +188,10 @@ async fn test_import_with_weights() {
         }
     }
 
-    assert!(got_common, "Should get 'common' at least once with proper weights");
+    assert!(
+        got_common,
+        "Should get 'common' at least once with proper weights"
+    );
 }
 
 #[tokio::test]
@@ -204,11 +211,7 @@ async fn test_import_with_sublists() {
 
     // With sublists, any of the animals or breeds might be selected
     let valid_results = ["dog", "cat", "labrador", "poodle", "siamese", "persian"];
-    assert!(
-        valid_results.contains(&result.as_str()),
-        "Got: {}",
-        result
-    );
+    assert!(valid_results.contains(&result.as_str()), "Got: {}", result);
 }
 
 #[tokio::test]
@@ -236,8 +239,8 @@ async fn test_import_parser_syntax() {
     loader.add("test", "output\n\tvalue\n");
 
     let templates = vec![
-        "{import:test}",           // Inline import
-        " {import:test} ",         // With spaces
+        "{import:test}",              // Inline import
+        " {import:test} ",            // With spaces
         "{import:test}{import:test}", // Multiple inline imports
     ];
 

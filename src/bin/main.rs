@@ -1,5 +1,5 @@
 /// CLI tool for Perchance interpreter
-use perchance_interpreter::{parse, compile, evaluate, EvaluateOptions, run_with_seed};
+use perchance_interpreter::{compile, evaluate, parse, run_with_seed, EvaluateOptions};
 use rand::rngs::StdRng;
 use rand::SeedableRng;
 use std::env;
