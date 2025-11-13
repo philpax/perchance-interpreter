@@ -556,6 +556,19 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
             }
 
             Expression::Method(base, method) => {
+                // Check if this is a direct function call (e.g., joinLists(args))
+                // where the base is a Simple identifier that matches the method name
+                if let Expression::Simple(ident) = base.as_ref() {
+                    if ident.name == method.name && method.name == "joinLists" {
+                        // Handle as a built-in function call
+                        // We create a dummy value to pass to call_method_value
+                        let result = self
+                            .call_method_value(&Value::Text(String::new()), method)
+                            .await?;
+                        return self.value_to_string(result).await;
+                    }
+                }
+
                 let base_value = self.evaluate_to_value(base).await?;
                 self.call_method(&base_value, method).await
             }
@@ -749,6 +762,16 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
             }
 
             Expression::Method(base, method) => {
+                // Check if this is a direct function call (e.g., joinLists(args))
+                if let Expression::Simple(ident) = base.as_ref() {
+                    if ident.name == method.name && method.name == "joinLists" {
+                        // Handle as a built-in function call
+                        return self
+                            .call_method_value(&Value::Text(String::new()), method)
+                            .await;
+                    }
+                }
+
                 let base_value = self.evaluate_to_value(base).await?;
                 self.call_method_value(&base_value, method).await
             }
@@ -1544,6 +1567,59 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                         "consumableList can only be called on lists".to_string(),
                     )),
                 }
+            }
+
+            "joinLists" => {
+                // Join multiple lists into a single list
+                // This is a built-in function that mimics the join-lists-plugin
+
+                if method.args.is_empty() {
+                    return Err(EvalError::InvalidMethodCall(
+                        "joinLists requires at least one argument".to_string(),
+                    ));
+                }
+
+                // Collect all items from all list arguments
+                let mut combined_items = Vec::new();
+
+                for arg in &method.args {
+                    // Evaluate the argument to get a list value
+                    let list_value = self.evaluate_to_value(arg).await?;
+
+                    // Get the items from the list
+                    match list_value {
+                        Value::List(name) => {
+                            let list = self
+                                .program
+                                .get_list(&name)
+                                .ok_or_else(|| EvalError::UndefinedList(name.clone()))?;
+                            combined_items.extend(list.items.clone());
+                        }
+                        Value::ListInstance(list) => {
+                            combined_items.extend(list.items.clone());
+                        }
+                        Value::Text(_)
+                        | Value::Array(_)
+                        | Value::ItemInstance(_)
+                        | Value::ConsumableList(_)
+                        | Value::ImportedGenerator(_) => {
+                            return Err(EvalError::TypeError(format!(
+                                "joinLists arguments must be lists, got {:?}",
+                                list_value
+                            )));
+                        }
+                    }
+                }
+
+                // Create a new list with all combined items
+                let combined_list = CompiledList {
+                    name: "__joined__".to_string(),
+                    items: combined_items.clone(),
+                    total_weight: combined_items.iter().map(|item| item.weight).sum(),
+                    output: None,
+                };
+
+                Ok(Value::ListInstance(combined_list))
             }
 
             _ => Err(EvalError::InvalidMethodCall(format!(

@@ -1204,3 +1204,124 @@ shade
         assert!(output.contains("maroon") || output.contains("cherry"));
     }
 }
+
+#[tokio::test]
+async fn test_join_lists_basic() {
+    let template = r#"mammal
+  dog
+  cat
+  horse
+
+reptile
+  snake
+  lizard
+  turtle
+
+output
+  [animal = joinLists(mammal, reptile), animal]"#;
+    let output = run_with_seed(template, 42, None).await.unwrap();
+    // Should select from combined list
+    assert!(
+        output == "dog"
+            || output == "cat"
+            || output == "horse"
+            || output == "snake"
+            || output == "lizard"
+            || output == "turtle",
+        "Expected one of the animals, got: {}",
+        output
+    );
+}
+
+#[tokio::test]
+async fn test_join_lists_with_methods() {
+    let template = r#"tree
+  oak
+  pine
+
+shrub
+  bush
+  hedge
+
+output
+  [joinLists(tree, shrub).selectMany(5)]"#;
+    let output = run_with_seed(template, 42, None).await.unwrap();
+    // Should have 5 space-separated items
+    let parts: Vec<&str> = output.split_whitespace().collect();
+    assert_eq!(parts.len(), 5, "Expected 5 items, got: {}", output);
+    // Each should be from one of the lists
+    for part in parts {
+        assert!(
+            part == "oak" || part == "pine" || part == "bush" || part == "hedge",
+            "Unexpected item: {}",
+            part
+        );
+    }
+}
+
+#[tokio::test]
+async fn test_join_lists_assignment() {
+    let template = r#"fruit
+  apple
+  banana
+
+vegetable
+  carrot
+  broccoli
+
+output
+  [food = joinLists(fruit, vegetable), food]"#;
+    let output = run_with_seed(template, 42, None).await.unwrap();
+    assert!(
+        output == "apple" || output == "banana" || output == "carrot" || output == "broccoli",
+        "Expected a food item, got: {}",
+        output
+    );
+}
+
+#[tokio::test]
+async fn test_join_lists_multiple_uses() {
+    let template = r#"color1
+  red
+  blue
+
+color2
+  green
+  yellow
+
+output
+  [joined = joinLists(color1, color2), joined] and [joined]"#;
+    let output = run_with_seed(template, 42, None).await.unwrap();
+    assert!(output.contains("and"), "Expected 'and' in output");
+    // Both selections should be valid colors
+    let parts: Vec<&str> = output.split(" and ").collect();
+    assert_eq!(parts.len(), 2);
+    for part in parts {
+        assert!(
+            part == "red" || part == "blue" || part == "green" || part == "yellow",
+            "Unexpected color: {}",
+            part
+        );
+    }
+}
+
+#[tokio::test]
+async fn test_join_lists_three_lists() {
+    let template = r#"list1
+  a
+
+list2
+  b
+
+list3
+  c
+
+output
+  [joinLists(list1, list2, list3)]"#;
+    let output = run_with_seed(template, 42, None).await.unwrap();
+    assert!(
+        output == "a" || output == "b" || output == "c",
+        "Expected a, b, or c, got: {}",
+        output
+    );
+}
