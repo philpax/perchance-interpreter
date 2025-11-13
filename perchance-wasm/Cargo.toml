@@ -9,6 +9,10 @@ wasm-opt = false
 [lib]
 crate-type = ["cdylib"]
 
+[features]
+default = ["builtin-generators"]
+builtin-generators = ["perchance-interpreter/builtin-generators"]
+
 [dependencies]
 perchance-interpreter = { path = "..", default-features = false }
 wasm-bindgen = "0.2"

@@ -1,5 +1,6 @@
-import { useState, useEffect, useCallback } from 'react';
-import init, { evaluate_multiple } from './wasm/perchance_wasm';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import init, { evaluate_multiple, get_available_generators } from './wasm/perchance_wasm';
+import AutocompleteDropdown from './AutocompleteDropdown';
 
 const DEFAULT_TEMPLATE = `animal
 \tdog
@@ -23,10 +24,26 @@ function App() {
   const [sampleCount, setSampleCount] = useState<number>(5);
   const [samples, setSamples] = useState<string[]>([]);
 
+  // Autocomplete state
+  const [availableGenerators, setAvailableGenerators] = useState<string[]>([]);
+  const [showAutocomplete, setShowAutocomplete] = useState(false);
+  const [autocompletePosition, setAutocompletePosition] = useState({ top: 0, left: 0 });
+  const [autocompleteSearch, setAutocompleteSearch] = useState('');
+  const [autocompleteSelectedIndex, setAutocompleteSelectedIndex] = useState(0);
+  const [importStartPos, setImportStartPos] = useState(0);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
   // Initialize WASM
   useEffect(() => {
     init().then(() => {
       setWasmReady(true);
+      // Load available generators
+      try {
+        const generators = get_available_generators();
+        setAvailableGenerators(generators);
+      } catch (e) {
+        console.error('Failed to load generators:', e);
+      }
     });
   }, []);
 
@@ -73,6 +90,89 @@ function App() {
     }
   };
 
+  // Handle template change with autocomplete detection
+  const handleTemplateChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const newValue = e.target.value;
+    const cursorPos = e.target.selectionStart;
+
+    setTemplate(newValue);
+
+    // Check if we should show autocomplete
+    const beforeCursor = newValue.substring(0, cursorPos);
+    const importMatch = beforeCursor.match(/\{import:([^}]*)$/);
+
+    if (importMatch && textareaRef.current) {
+      // Found {import: pattern
+      const searchTerm = importMatch[1];
+      setAutocompleteSearch(searchTerm);
+      setImportStartPos(cursorPos - searchTerm.length);
+      setAutocompleteSelectedIndex(0);
+
+      // Calculate position for dropdown
+      const textarea = textareaRef.current;
+      const textBeforeCursor = beforeCursor;
+      const lines = textBeforeCursor.split('\n');
+      const currentLineIndex = lines.length - 1;
+      const currentLineText = lines[currentLineIndex];
+
+      // Rough calculation of position
+      const lineHeight = 20; // approximate
+      const charWidth = 8; // approximate for monospace
+      const top = textarea.offsetTop + (currentLineIndex + 1) * lineHeight + 40;
+      const left = textarea.offsetLeft + currentLineText.length * charWidth + 20;
+
+      setAutocompletePosition({ top, left });
+      setShowAutocomplete(true);
+    } else {
+      setShowAutocomplete(false);
+    }
+  };
+
+  // Filter generators based on search
+  const filteredGenerators = availableGenerators.filter((gen) =>
+    gen.toLowerCase().includes(autocompleteSearch.toLowerCase())
+  );
+
+  // Handle autocomplete selection
+  const handleAutocompleteSelect = (generatorName: string) => {
+    if (!textareaRef.current) return;
+
+    const cursorPos = textareaRef.current.selectionStart;
+    const before = template.substring(0, importStartPos);
+    const after = template.substring(cursorPos);
+
+    const newTemplate = `${before}${generatorName}}${after}`;
+    setTemplate(newTemplate);
+
+    // Move cursor after the inserted text
+    const newCursorPos = importStartPos + generatorName.length + 1;
+    setTimeout(() => {
+      if (textareaRef.current) {
+        textareaRef.current.selectionStart = newCursorPos;
+        textareaRef.current.selectionEnd = newCursorPos;
+        textareaRef.current.focus();
+      }
+    }, 0);
+
+    setShowAutocomplete(false);
+  };
+
+  // Handle autocomplete navigation
+  const handleAutocompleteNavigate = (direction: 'up' | 'down') => {
+    setAutocompleteSelectedIndex((prev) => {
+      if (direction === 'down') {
+        return Math.min(prev + 1, filteredGenerators.length - 1);
+      } else {
+        return Math.max(prev - 1, 0);
+      }
+    });
+  };
+
+  // Close autocomplete
+  const handleAutocompleteClose = () => {
+    setShowAutocomplete(false);
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white">
       <div className="container mx-auto px-4 py-8">
@@ -108,14 +208,27 @@ function App() {
               <div className="bg-gradient-to-r from-purple-600 to-pink-600 px-6 py-3">
                 <h2 className="text-xl font-semibold">Template Editor</h2>
               </div>
-              <div className="p-6">
+              <div className="p-6 relative">
                 <textarea
+                  ref={textareaRef}
                   value={template}
-                  onChange={(e) => setTemplate(e.target.value)}
+                  onChange={handleTemplateChange}
                   className="w-full h-[500px] bg-slate-900 text-gray-100 font-mono text-sm p-4 rounded-lg border border-slate-600 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 focus:outline-none transition-all resize-none"
                   placeholder="Enter your Perchance template here..."
                   spellCheck={false}
                 />
+
+                {/* Autocomplete Dropdown */}
+                {showAutocomplete && (
+                  <AutocompleteDropdown
+                    items={filteredGenerators}
+                    position={autocompletePosition}
+                    selectedIndex={autocompleteSelectedIndex}
+                    onSelect={handleAutocompleteSelect}
+                    onClose={handleAutocompleteClose}
+                    onNavigate={handleAutocompleteNavigate}
+                  />
+                )}
 
                 {/* Controls */}
                 <div className="mt-4 space-y-4">
