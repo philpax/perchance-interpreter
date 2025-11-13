@@ -1384,7 +1384,11 @@ lighting
         );
 
         let output = result.unwrap();
-        assert!(!output.is_empty(), "Output should not be empty for seed {}", seed);
+        assert!(
+            !output.is_empty(),
+            "Output should not be empty for seed {}",
+            seed
+        );
 
         // Note: Some outputs may be just "." when the quirks list selects an item
         // with only an assignment like "[f = joinLists(flavour, anypunks)]."
