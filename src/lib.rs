@@ -15,6 +15,8 @@
 /// # });
 /// ```
 pub mod ast;
+#[cfg(feature = "builtin-generators")]
+pub mod builtin_generators;
 pub mod compiler;
 pub mod evaluator;
 pub mod loader;

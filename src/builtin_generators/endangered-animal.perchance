@@ -1,0 +1,131 @@
+// https://perchance.org/endangered-animal
+// Fetched at: 2025-11-13T01:13:03.448878+00:00
+
+
+title = Random Endangered Animal Generator
+subtitle = Generates a random endangered animal like "Black Rhinoceros" and  "Armadillo".
+fontSize = 190
+fontColor = black
+buttonText = randomize
+description
+	{import:simple-gen-footer}
+	$output = <p>[this.joinItems("</p><p>")]</p> // <-- don't remove this last line, it uses the special "$output" property to join and format your description as HTML paragraphs :)
+
+
+$output = [animal]
+
+// Credit goes to: https://raw.githubusercontent.com/farazfazli/Animals/master/animals.txt
+
+animal
+	Black Rhinoceros
+	Borneo Elephant
+	Cottontop Tamarin
+	Cross River Gorilla
+	Javan Rhinoceros
+	Monte Iberia Eleuth
+	Radiated Tortoise
+	Red Wolf
+	Saola
+	Sumatran Elephant
+	Sumatran Orang-utan
+	Sumatran Rhinoceros
+	Western Gorilla
+	Western Lowland Gorilla
+	African Forest Elephant
+	African Penguin
+	African Wild Dog
+	Albatross
+	Armadillo
+	Asian Elephant
+	Asiatic Black Bear
+	Axolotl
+	Aye Aye
+	Bactrian Camel
+	Bandicoot
+	Bear
+	Bengal Tiger
+	Blue Whale
+	Bonobo
+	Bornean Orang-utan
+	Brown Bear
+	Butterfly Fish
+	Chimpanzee
+	Chinchilla
+	Dhole
+	Eastern Gorilla
+	Eastern Lowland Gorilla
+	Fin Whale
+	Fishing Cat
+	Fossa
+	Galapagos Penguin
+	Galapagos Tortoise
+	Gharial
+	Giant Panda Bear
+	Golden Lion Tamarin
+	Grizzly Bear
+	Honey Bee
+	Hummingbird
+	Indian Elephant
+	Indian Rhinoceros
+	Indochinese Tiger
+	Indri
+	Kakapo
+	Killer Whale
+	Macaw
+	Magellanic Penguin
+	Malayan Tiger
+	Manatee
+	Markhor
+	Mongoose
+	Mountain Gorilla
+	Numbat
+	Parrot
+	Pied Tamarin
+	Proboscis Monkey
+	Pygmy Hippopotamus
+	Red Panda
+	Rhinoceros
+	River Dolphin
+	Sea Otter
+	Sea Turtle
+	Seahorse
+	Siberian Tiger
+	Sloth
+	South China Tiger
+	Spectacled Bear
+	Sri Lankan Elephant
+	Sumatran Tiger
+	Tapir
+	Tarsier
+	Tiger
+	Tortoise
+	Vulture
+	Water Buffalo
+	White Rhinoceros
+	White Tiger
+	Wildebeest
+	Wombat
+	Yellow-Eyed Penguin
+	Aldabra Giant Tortoise
+	Asian Palm Civet
+	Banded Palm Civet
+	Binturong
+	Cassowary
+	Cheetah
+	Clouded Leopard
+	Crested Penguin
+	Darwin's Frog
+	Dwarf Crocodile
+	Hippopotamus
+	Humboldt Penguin
+	Komodo Dragon
+	Lion
+	Malayan Civet
+	Masked Palm Civet
+	Polar Bear
+	Quokka
+	Royal Penguin
+	Sperm Whale
+	Sun Bear
+	Uakari
+	Umbrellabird

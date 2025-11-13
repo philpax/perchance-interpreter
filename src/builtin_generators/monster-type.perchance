@@ -1,0 +1,103 @@
+// https://perchance.org/monster-type
+// Fetched at: 2025-11-13T01:13:03.448878+00:00
+
+title = Random Monster/Creature Type Generator
+subtitle = Simply generates a random monster type at each click :)
+fontSize = 200
+fontColor = black
+buttonText = randomize
+numberOfItems = 1
+itemSeperator = <hr style\="opacity:0;margin: 0.15em;"/>
+description
+	{import:simple-gen-footer}
+	$output = <p>[this.joinItems("</p><p>")]</p> // <-- don't remove this last line, it uses the special "$output" property to join and format your description as HTML paragraphs :)
+
+
+$output = [monster]
+
+// Credit goes to: https://github.com/dariusk/corpora/blob/master/data/mythology/monsters.json
+
+monster
+	brownie
+	bugbear
+	centaur
+	chimera
+	chupacabra
+	cockatrice
+	cyclops
+	demon
+	djinn
+	dragon
+	draugr
+	dryad
+	dwarf
+	elemental
+	elf
+	fairy
+	faun
+	frost giant
+	gargoyle
+	genie
+	ghast
+	ghost
+	ghoul
+	giant
+	gnome
+	goblin
+	golem
+	gorgon
+	gremlin
+	griffon
+	hag
+	harpy
+	hippogriff
+	hobgoblin
+	homonculus
+	hydra
+	imp
+	incubus
+	kappa
+	kobold
+	kraken
+	lamassu
+	leprechaun
+	lich
+	manticore
+	mermaid
+	merman
+	minotaur
+	mummy
+	naga
+	nix
+	nymph
+	ogre
+	oni
+	orc
+	pegasus
+	phoenix
+	pixie
+	poltergeist
+	roc
+	sasquatch
+	satyr
+	selkie
+	siren
+	spectre
+	sphinx
+	sprite
+	succubus
+	sylph
+	thunderbird
+	troll
+	unicorn
+	vampire
+	valkyrie
+	warg
+	wendigo
+	werewolf
+	wight
+	witch
+	wraith
+	wyvern
+	yeti
+	zombie

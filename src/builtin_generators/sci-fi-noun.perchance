@@ -1,0 +1,137 @@
+// https://perchance.org/sci-fi-noun
+// Fetched at: 2025-11-13T01:13:03.448878+00:00
+
+title = Random Sci-Fi Noun Generator
+subtitle = Generates random sci-fi-sounding nouns like "forcefield" and "replicator".
+fontSize = 190
+fontColor = black
+buttonText = randomize
+numberOfItems = 1
+itemSeperator = <br/>
+description
+	{import:simple-gen-footer}
+	$output = <p>[this.joinItems("</p><p>")]</p> // <-- don't remove this last line, it uses the special "$output" property to join and format your description as HTML paragraphs :)
+
+
+$output = [sciFiNoun]
+
+// Credit goes to: http://orteil.dashnet.org/randomgen/gens/corvophraser.txt
+	
+sciFiNoun
+	synchrotron
+	magnet
+	alignment
+	amplifier
+	annihilator
+	capsule
+	assimilator
+	beacon
+	shield
+	jester
+	buffer
+	calcifrage
+	capacity
+	capilectomy
+	causality
+	chamber
+	field
+	forcefield
+	core
+	duct
+	configuration
+	continuum
+	converter
+	corridor
+	crevice
+	crystal
+	cybergement
+	deflector
+	disintegrator
+	detonator
+	diagnosis
+	disruptor
+	distortion
+	echo
+	efficiency
+	emission
+	containment
+	energy
+	entity
+	tendril
+	filter
+	flow
+	flux
+	force
+	formation
+	fragment
+	fragmenticule
+	frequency
+	gain
+	generator
+	spurter
+	glomerule
+	goniotron
+	graviton
+	grid
+	hologram
+	impulse
+	incursion
+	inductor
+	inertia
+	inhibitor
+	laplaxmol
+	matter
+	matrix
+	mechanism
+	mine
+	mitochondria
+	engine
+	millotron
+	multiplexer
+	pod
+	nucleus
+	cloud
+	computer
+	papsol
+	parallax
+	particle
+	plasma
+	plutonator
+	carrier
+	thrust
+	radiation
+	beam
+	enhancer
+	relay
+	grinder
+	replicator
+	replication
+	network
+	resonator
+	spring
+	rotation
+	schism
+	sequence
+	signal
+	signature
+	singularity
+	probe
+	spoonifier
+	booster
+	sustenance
+	syntagm
+	tachyon
+	transistor
+	translator
+	conveyor
+	trigloid
+	trophoblast
+	tropism
+	tube
+	tunnel
+	turbulence
+	wail
+	wave
+	vibration
+	void
+	vortex

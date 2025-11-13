@@ -1,0 +1,399 @@
+// https://perchance.org/ingredient
+// Fetched at: 2025-11-13T01:13:03.448878+00:00
+
+title = Random Ingredient Generator
+subtitle = Simply generates a random ingredient at each click :)
+fontSize = 200
+fontColor = black
+buttonText = randomize
+numberOfItems = 1
+itemSeperator = <br/> 
+description
+	{import:simple-gen-footer}
+	$output = <p>[this.joinItems("</p><p>")]</p> // <-- don't remove this last line, it uses the special "$output" property to join and format your description as HTML paragraphs :)
+
+
+$output = [word]
+	
+	
+word
+	acorn
+	acorn squash
+	alfalfa sprout
+	allspice
+	apple cider vinegar
+	almond
+	almond butter
+	almond extract
+	almond paste
+	anise
+	apple butter
+	apple pie spice
+	apple
+	applesauce
+	apricot
+	artichoke
+	artificial sweetener
+	arugula
+	asparagus
+	aspic
+	avocado
+	bagel
+	baguette
+	baking powder
+	baking soda
+	balsamic vinegar
+	banana
+	barbecue
+	barbecue sauce
+	barley
+	barley sugar
+	basil
+	bay leaf
+	bean
+	bean sauce
+	bean sprout
+	bean thread
+	beancurd
+	beet
+	berry
+	black bean
+	black olive
+	black-eyed pea
+	blackberry
+	blueberry
+	bok choy
+	bouillon
+	boysenberry
+	bran
+	brandy
+	brazil nuts
+	breadcrumb
+	broccoli
+	brown rice
+	brown sugar
+	brunoise
+	bruschetta
+	brussels sprout
+	buckwheat
+	cabbage
+	cannellini beans
+	canola oil
+	cantaloupe
+	capers
+	caramel
+	carrot
+	cashew
+	cashew nut
+	cauliflower
+	cayenne pepper
+	celery
+	celery seeds
+	cherry
+	chestnut
+	chickpeas
+	chicory
+	chilli flake
+	chilli powder
+	chilli sauce
+	chipotle pepper
+	chip
+	chives
+	chocolate
+	chutney
+	cider
+	cider vinegar
+	cilantro
+	cinnamon
+	citron
+	citrus
+	cocoa powder
+	coconut
+	coconut milk
+	coconut oil
+	coleslaw
+	cooking wine
+	coriander
+	corn
+	corn flour
+	corn syrup
+	cornflake
+	cornmeal
+	cornstarch
+	couscous
+	cranberry
+	coconut cream
+	cream of tartar
+	cremini mushrooms
+	crouton
+	cucumber
+	cumin
+	currant
+	curry leaves
+	curry paste
+	curry powder
+	dandelion
+	date sugar
+	date
+	dill
+	dragonfruit
+	dried leek
+	durian
+	eggplant
+	elderberry
+	endive
+	fennel
+	fennel seed
+	fig
+	five-spice powder
+	flax seed
+	flour
+	frosting
+	garlic
+	garlic powder
+	ginger
+	ginger ale
+	Goji berry
+	grape
+	grapefruit
+	gravy
+	green bean
+	green onion
+	guacamole
+	guava
+	habanero chillies
+	hash brown
+	hazelnut
+	heavy cream
+	hoisin sauce
+	honeydew melon
+	horseradish
+	hot sauce
+	huckleberry
+	hummus
+	coconut ice cream
+	soy ice cream
+	icing
+	jackfruit
+	jalapeno
+	jam
+	jelly
+	jelly bean
+	Kahlua
+	kale
+	ketchup
+	kidney bean
+	kiwi fruit
+	kohlrabi
+	kumquat
+	leek
+	legume
+	lemon
+	lemon grass
+	lemon juice
+	lemon peel
+	lemonade
+	lemon
+	lentil
+	lettuce
+	licorice
+	lima bean
+	lime
+	lychee
+	macaroni
+	maize
+	mandarin
+	mango
+	maple syrup
+	maraschino cherry
+	margarine
+	marionberry
+	marmalade
+	Marsala
+	marshmallow
+	mascarpone
+	mayonnaise
+	melon
+	almond milk
+	coconut milk
+	rice milk
+	mint
+	molasses
+	muffin
+	mushroom
+	mustard
+	mustard seeds
+	navy beans
+	nectar
+	nectarine
+	noodle
+	nosh
+	nutmeg
+	oatmeal
+	oats
+	oil
+	olive oil
+	olive
+	onion
+	onion powder
+	orange
+	orange peels
+	oregano
+	pancake
+	pancetta
+	panko bread crumbs
+	papaya
+	paprika
+	parsley
+	parsnip
+	passion fruit
+	pasta
+	pastry
+	pea
+	pea beans
+	peach
+	peaches
+	peanut
+	peanut butter
+	peapod
+	pear
+	peas
+	pecan
+	pecans
+	pepper
+	persimmon
+	pesto
+	pickle
+	pilaf
+	pine nuts
+	pineapple
+	pineapples
+	pink beans
+	pinto beans
+	pistachios
+	pita bread
+	plum
+	plum tomato
+	pomegranate
+	pomelo
+	popcorn
+	poppy seed
+	portabello mushroom
+	potato
+	potato chip
+	powdered sugar
+	pretzel
+	provolone
+	prune
+	pumpernickel
+	pumpkin
+	pumpkin seed
+	quiche
+	quinoa
+	radish
+	raisin
+	raspberry
+	ravioli
+	raw sugar
+	red beans
+	red cabbage
+	red chile powder
+	red pepper flake
+	relish
+	remoulade
+	rhubarb
+	rice
+	rice paper
+	rice vinegar
+	rice wine
+	romaine lettuce
+	rose water
+	rosemary
+	rum
+	rye
+	saffron
+	sage
+	salad
+	salsa
+	salt
+	sauerkraut
+	sea cucumber
+	seaweed
+	sesame seed
+	sherbet
+	sherry
+	shish
+	snap pea
+	snow pea
+	sorbet
+	sorghum
+	sour cream
+	soy beans
+	soy milk
+	soy sauce
+	spaghetti
+	spearmint
+	spinach
+	split pea
+	sprout
+	spud
+	squash
+	strawberry
+	strudel
+	succotash
+	sugar
+	summer squash
+	sunflower seed
+	sweet chilli sauce
+	sweet pepper
+	sweet potato
+	syrup
+	Tabasco sauce
+	taco
+	tamale
+	tangerine
+	tapioca
+	tarragon
+	tart
+	tartar sauce
+	thyme
+	toast
+	toffee
+	tofu
+	tomatillo
+	tomato juice
+	tomato paste
+	tomato puree
+	tomato sauce
+	tomato
+	tonic water
+	torte
+	tortilla
+	truffle
+	tuber
+	turmeric
+	turnip
+	unsweetened chocolate
+	vanilla bean
+	vegemite
+	vinegar
+	wafer
+	waffle
+	walnut
+	wasabi
+	water
+	water chestnut
+	watercress
+	watermelon
+	wheat
+	white bean
+	wild rice
+	wine
+	wine vinegar
+	Worcestershire sauce
+	yam
+	yeast
+	coconut yogurt
+	lemon zest
+	zinfandel wine
+	zucchini

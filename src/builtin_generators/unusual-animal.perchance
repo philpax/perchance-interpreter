@@ -1,0 +1,663 @@
+// https://perchance.org/unusual-animal
+// Fetched at: 2025-11-13T01:13:03.448878+00:00
+
+title = Random Unusual Animal Generator
+subtitle = Simply generates a random unusual animal at each click :)
+fontSize = 200
+fontColor = black
+buttonText = randomize
+numberOfItems = 1
+itemSeperator = <hr style\="opacity:0;margin: 0.15em;"/>
+description
+	{import:simple-gen-footer}
+	$output = <p>[this.joinItems("</p><p>")]</p> // <-- don't remove this last line, it uses the special "$output" property to join and format your description as HTML paragraphs :)
+
+
+$output = [animal]
+output = [w=animal.selectOne]<p style\="opacity:0.5;font-size:60%;margin:0;">([w.def])</p>
+
+// Credit goes to: http://phrontistery.info/animals.html
+
+animal
+	aardwolf
+		def = South African carnivorous fox-like quadruped
+	aasvogel
+		def = South African vulture
+	aberdevine
+		def = alternate name for the siskin
+	accentor
+		def = songbird
+	acipenser
+		def = sturgeon
+	addax
+		def = spiral-horned antelope dwelling in the Sahara desert
+	adjutant
+		def = enormous Indian stork
+	adzebill
+		def = prehistoric flightless bird of New Zealand
+	aepyornis
+		def = gigantic flightless bird of Madagascar
+	agouti
+		def = tropical rabbit-sized rodent
+	amberjack
+		def = spiny-finned Atlantic sport fish
+	amphiuma
+		def = aquatic American salamander with two pairs of small feet
+	anhinga
+		def = long-necked fish-eating tropical American bird
+	anoa
+		def = small wild ox of Indonesia
+	anole
+		def = arboreal American lizard with ability to change colour
+	antechinus
+		def = carnivorous mouselike Australian marsupial
+	argali
+		def = large-horned Asian wild sheep
+	aurochs
+		def = extinct wild ox
+	avocet
+		def = long-legged wading bird with upward-curving bill
+	axolotl
+		def = salamander dwelling in mountainous lakes
+	aye-aye
+		def = nocturnal lemur-like animal of Madagascar
+	babirusa
+		def = large wild pig of Indonesia
+	bandicoot
+		def = small long-nosed ratlike marsupial
+	bangtail
+		def = mustang or wild horse
+	banteng
+		def = wild ox of Southeast Asia
+	barasingha
+		def = deer dwelling in swamps of India
+	barbet
+		def = stout-billed tropical bird
+	beira
+		def = pygmy antelope
+	bharal
+		def = bluish-gray Himalayan goat
+	binturong
+		def = civet of southeastern Asia with long prehensile tail
+	biscacha
+		def = burrowing South American rodent
+	bittern
+		def = small heron
+	blauwbok
+		def = extinct bluish-coloured antelope of southern Africa
+	blenny
+		def = small elongated marine fish
+	blesbok
+		def = South African antelope with white patch on forehead
+	bongo
+		def = reddish African antelope with white vertical stripes
+	bontbok
+		def = South African antelope with unusual coloration
+	borzoi
+		def = wolf-hound
+	brach
+		def = female hunting hound
+	brachet
+		def = whelp; brat; bitch hound
+	brandling
+		def = striped earthworm used as fishing bait
+	brocken
+		def = two-year-old stag
+	bulbul
+		def = gregarious songbird
+	bullock
+		def = an ox or castrated bull
+	cabrilla
+		def = Atlantic sea bass
+	caiman
+		def = small alligator-like reptile
+	caple
+		def = a horse
+	capybara
+		def = tailless aquatic rodent of South America
+	caracal
+		def = long-legged nocturnal cat of African and Asian savannahs with long ears
+	caracara
+		def = long-legged South American falcon
+	cassowary
+		def = large flightless Melanesian bird
+	chamois
+		def = goatlike antelope of mountainous regions of Europe
+	chevrotain
+		def = small cloven-footed deerlike animal of southeast Asia
+	chiru
+		def = straight-horned Tibetan antelope
+	chital
+		def = Indian spotted deer
+	chuckwalla
+		def = herbivorous desert-dwelling lizard
+	civet
+		def = long-tailed catlike carnivorous mammal with musk glands
+	cleg
+		def = horse-fly
+	coelacanth
+		def = lobe-finned fish long thought to be extinct
+	colobus
+		def = long-tailed African monkey
+	colocolo
+		def = wild South American cat
+	colugo
+		def = flying lemur
+	conure
+		def = tropical parrot-like bird of Central and South America
+	corella
+		def = cockateel
+	coypu
+		def = large aquatic South American rodent
+	culex
+		def = mosquito
+	culver
+		def = dove or pigeon
+	curlew
+		def = long-legged migratory bird with downward-curving bill
+	cusk
+		def = large Atlantic fish like the cod
+	dabchick
+		def = small grebe
+	daw
+		def = simpleton; bird of the crow family
+	degu
+		def = rat-like rodent of South America
+	desman
+		def = aquatic insectivorous musk-secreting Russian rat
+	dhole
+		def = wild Asian dog
+	dibatag
+		def = Somali antelope with recurved horns
+	dik-dik
+		def = small east African antelope
+	diprotodon
+		def = gigantic prehistoric marsupial with two incisors in lower jaw
+	dobbin
+		def = workhorse
+	dobsonfly
+		def = soft-bodied insect with large mandibles
+	douc
+		def = southern Chinese monkey
+	douroucouli
+		def = small South American nocturnal monkey
+	dowitcher
+		def = long-billed North American wading bird
+	duarf
+		def = fictitious nineteen-toed fish of Erewhon
+	dugong
+		def = aquatic herbivorous mammal like the manatee
+	duiker
+		def = small African antelope
+	dunnart
+		def = mouse-like marsupial with pointed snout
+	earwig
+		def = a small insect; to bias; to pester with demands; to eavesdrop
+	echidna
+		def = Australian toothless spined monotreme resembling a hedgehog
+	eland
+		def = large heavily built African antelope
+	emmet
+		def = ant
+	eyas
+		def = unfledged falcon or other bird of prey
+	falanouc
+		def = carnivorous mongoose-like mammal of Madagascar
+	falconet
+		def = small variety of falcon
+	fossa
+		def = carnivorous mongoose-like mammal of Madagascar
+	francolin
+		def = type of Asian and African partridge
+	froghopper
+		def = leaping and spitting insect
+	galago
+		def = woolly long-tailed nocturnal lemur (bush baby)
+	galah
+		def = blue-gray Australian cockatoo
+	gannet
+		def = large white Atlantic seabird
+	gaur
+		def = wild ox
+	gayal
+		def = domesticated ox with tufted tail, native to south Asia
+	gelada
+		def = long-haired Ethiopian baboon
+	gemsbok
+		def = large South African antelope
+	genet
+		def = spotted long-tailed carnivorous mammal like the civet
+	gerenuk
+		def = long-necked antelope with large eyes
+	gharial
+		def = large Indian crocodile with long snout
+	goa
+		def = Tibetan gazelle with backward-curving horns
+	goanna
+		def = large Australian lizard
+	goral
+		def = small horned antelope living in mountainous regions of south Asia
+	gowk
+		def = a cuckoo; a fool
+	graphiure
+		def = African rodent with pencil-thin tail
+	grayling
+		def = silver-grey freshwater fish
+	grebe
+		def = diving bird resembling the loon
+	grilse
+		def = salmon first returning to the river from the sea
+	grison
+		def = weasel-like tropical American gray and black carnivore
+	grivet
+		def = white and olive tufted African monkey
+	grysbok
+		def = small speckled south African antelope
+	guenon
+		def = small, slender bearded African monkey
+	guereza
+		def = black and white Ethiopian tufted monkey
+	guillemot
+		def = narrow-billed Atlantic auk
+	gundi
+		def = desert-dwelling small rodent of northern Africa with bristles on feet
+	gymnure
+		def = hairy hedgehog
+	hammerkop
+		def = brown African heron with hammer-shaped crest on head
+	harrier
+		def = medium-sized scenting dog for hunting hares
+	havier
+		def = castrated deer
+	hellbender
+		def = large flat North American aquatic salamander
+	hoatzin
+		def = South American tropical bird whose young have clawed wings
+	hocco
+		def = South American bird resembling a turkey
+	hogget
+		def = one-year-old sheep or colt
+	huemul
+		def = yellow-brown South American deer
+	hutia
+		def = large Caribbean rat-like rodent
+	hyrax
+		def = small rodent-like ungulate
+	ibex
+		def = wild mountain goat with recurved horns
+	ibis
+		def = large stork-like bird; a pale apricot colour
+	ichneumon
+		def = small mongoose-like carnivorous quadruped
+	iguana
+		def = large tropical New World lizard
+	iiwi
+		def = bright red Hawaiian bird
+	ipiti
+		def = a small antelope
+	isatis
+		def = Arctic fox
+	ithomiid
+		def = tropical South American butterfly
+	iulus
+		def = millipede
+	izard
+		def = goatlike antelope found in the Pyrenees
+	jabiru
+		def = large tropical stork with massive bill
+	jacana
+		def = long-toed tropical freshwater wading bird
+	jade
+		def = pitiful horse; a nag
+	jennet
+		def = small Spanish horse
+	jerboa
+		def = nocturnal desert-dwelling jumping rodent
+	jiboya
+		def = boa constrictor
+	junco
+		def = North American finch
+	jurel
+		def = coastal fish of southern United States
+	kagu
+		def = long-legged bird of New Caledonia
+	kaka
+		def = olive-brown parrot native to New Zealand
+	kea
+		def = green parrot of New Zealand
+	keffel
+		def = a horse; a nag
+	kereru
+		def = pigeon variety of New Zealand
+	kiang
+		def = wild Tibetan horse
+	kine
+		def = cows
+	kinkajou
+		def = carnivorous South American raccoon-like mammal
+	kleenebok
+		def = small South African antelope
+	klipspringer
+		def = small African antelope
+	knobber
+		def = a stag in its second year
+	kob
+		def = African water antelope
+	kouprey
+		def = wild ox of Cambodia
+	kudu
+		def = African antelope with spiralling horns
+	kyloe
+		def = small long-haired cattle
+	lammergeier
+		def = giant vulture-like bird of prey
+	langur
+		def = long-tailed Indian monkey
+	lechwe
+		def = light brown water antelope of South Africa
+	leopon
+		def = crossbreed between a leopard and a lion
+	leveret
+		def = a hare in its first year; a mistress
+	limpkin
+		def = Caribbean crane-like bird
+	linsang
+		def = white civet-like Javanese mammal
+	lorikeet
+		def = brightly coloured southeast Asian parrot
+	loris
+		def = large-eyed south Asian arboreal primate
+	lutung
+		def = small monkey of Malaysia
+	malbrouck
+		def = arboreal monkey of West Africa
+	mangabey
+		def = long-tailed tropical African monkey
+	markhor
+		def = reddish-grey central Asian wild goat
+	meerkat
+		def = small long-tailed African ground squirrel or mongoose
+	morel
+		def = dark-coloured horse; blackish colour
+	muntjac
+		def = small tusked East Asian deer
+	murre
+		def = white-breasted North Atlantic seabird
+	nightjar
+		def = nocturnal insectivorous Old World migratory bird
+	numbat
+		def = termite-eating anteater-like marsupial with white stripes
+	nutria
+		def = amphibious South American rodent
+	nyala
+		def = large south African antelope
+	octodont
+		def = degu
+	okapi
+		def = short-necked giraffe
+	olm
+		def = blind aquatic cave-dwelling European salamander
+	onager
+		def = Asiatic wild ass
+	onocrotal
+		def = old term for the pelican
+	oribi
+		def = small African antelope with vertical horns
+	oropendola
+		def = tropical oriole living in long hanging nests
+	oryx
+		def = large antelope of Africa and Arabia with long horns
+	ouzel
+		def = blackbird; a dark-haired person
+	oystercatcher
+		def = wading shorebird with reddish bill
+	palfrey
+		def = riding horse, especially one for a lady
+	pangolin
+		def = scaly insectivorous mammal with elongated snout
+	peccary
+		def = tropical New World piglike mammal
+	percheron
+		def = dappled cart horse
+	petrel
+		def = long-winged seabird with hooked bill
+	phalarope
+		def = migratory shorebird with lobed feet
+	phoenicopter
+		def = flamingo
+	pichi
+		def = small dark Argentinian armadillo
+	pichiciego
+		def = small South American armadillo
+	pika
+		def = rabbit-like mountain-dwelling mammal with rounded ears
+	porbeagle
+		def = shark with a pointed snout
+	potto
+		def = small nocturnal West African monkey
+	pratincole
+		def = fork-tailed, long-winged Australian bird
+	prion
+		def = small Antarctic petrel
+	pudu
+		def = small Chilean deer
+	puku
+		def = red Central African antelope
+	quarrion
+		def = Australian parrot like the cockatiel
+	quaviver
+		def = fish otherwise known as the sea-dragon or dragonet
+	quawk
+		def = black-crowned night heron
+	quelea
+		def = an African weaver-bird
+	querquedule
+		def = pin-tail duck; a teal
+	quetzal
+		def = gold and green bird with long tail feathers
+	queyock
+		def = heifer
+	quickhatch
+		def = wolverine
+	quinnat
+		def = the king salmon
+	quokka
+		def = short-tailed wallaby
+	quoll
+		def = native cat-like marsupial of Australia
+	raad
+		def = electric catfish
+	rach
+		def = dog that hunts by scent
+	ratel
+		def = honey-eating Old World badger
+	reebok
+		def = small South African antelope
+	reedbuck
+		def = antelope frequenting reeds
+	rooibok
+		def = impala
+	rooirhebok
+		def = reddish South African antelope
+	rorqual
+		def = large whale with dorsal fin
+	rosella
+		def = bright-coloured Australian parakeet
+	saiga
+		def = migratory Russian antelope
+	saki
+		def = South American monkey
+	sambar
+		def = large reddish deer of southern Asia
+	scanderoon
+		def = homing pigeon
+	seriema
+		def = large crested Brazilian bird
+	serow
+		def = Himalayan and South Asian goatlike antelope
+	serval
+		def = tawny carnivorous South African catlike quadruped
+	shearling
+		def = one-year-old sheep
+	siamang
+		def = southeast Asian gibbon-like black ape
+	siskin
+		def = small finch-like songbird
+	sitatunga
+		def = medium-sized east African antelope with elongated hooves
+	skink
+		def = small north African lizard
+	skua
+		def = large north Atlantic gull
+	solenodon
+		def = large Caribbean ratlike insectivore with long snout
+	sounder
+		def = herd of pigs; young boar
+	spatangoid
+		def = kind of sea-urchin
+	springbok
+		def = South African antelope known for leaping
+	springhare
+		def = South African jumping hare
+	steenbok
+		def = small South African antelope
+	stellion
+		def = lizard with starry spots
+	stirk
+		def = yearling ox or cow; pasture for yearlings
+	sumpter
+		def = pack horse; beast of burden
+	sunbittern
+		def = brightly coloured South American bird
+	suni
+		def = dwarfed southern African antelope
+	tabanid
+		def = blood-sucking insect; gad-fly
+	tahr
+		def = wild Asian goat with shaggy reddish coat
+	takin
+		def = heavily built Himalayan goatlike ruminant
+	tamandua
+		def = arboreal New World anteater with hairless tail
+	tamaraw
+		def = water buffalo
+	tarpan
+		def = small wild horse of southern Russia
+	tayra
+		def = small South American weasel-like carnivore
+	teg
+		def = a sheep in its second year; the fleece of such a sheep
+	tenrec
+		def = spiny insectivorous mammal of Madagascar
+	thamin
+		def = small deer with curved horns, native to southeast Asia
+	thylacine
+		def = extinct doglike marsupial of Tasmania
+	tinamou
+		def = ground-dwelling South American bird
+	titi
+		def = small South American arboreal monkey
+	topi
+		def = reddish-brown antelope of sub-Saharan Africa
+	trogon
+		def = tropical bird with brilliant plumage
+	tsessebe
+		def = central African antelope with lyre-shaped horns
+	tuatara
+		def = spiny reptile of New Zealand with vestigial third eye
+	tucutucu
+		def = rat-like burrowing South American rodent
+	turaco
+		def = crested African colourful bird with long tail and red wings
+	tuza
+		def = Mexican pouched rodent
+	uakari
+		def = short-tailed, long-haired monkey
+	uguisu
+		def = olive-plumed bush warbler
+	uintathere
+		def = extinct Pleistocene hoofed herbivore
+	uraster
+		def = starfish
+	urial
+		def = wild central Asian sheep with reddish coat and long curved horns
+	urochs
+		def = extinct wild ox or bison
+	uromastix
+		def = spiky-tailed ground-dwelling lizard
+	urraca
+		def = noisy South American bird
+	urubu
+		def = black tropical New World vulture
+	vaquita
+		def = small porpoise living in the Gulf of California
+	vedalia
+		def = Australian pest-eating ladybug
+	vicuna
+		def = soft-fleeced Andean ruminant
+	vireo
+		def = olive-gray insectivorous American bird
+	viscacha
+		def = South American burrowing rodent
+	wapiti
+		def = elk
+	wether
+		def = castrated ram
+	whiffet
+		def = paltry person; little dog
+	whitecoat
+		def = white-furred seal pup
+	widgeon
+		def = freshwater duck
+	wisent
+		def = extinct European bison
+	woolbird
+		def = sheep
+	xanthareel
+		def = yellow eel formerly used in medicinal foods
+	xeme
+		def = fork-tailed gull
+	xenops
+		def = a small tropical rainforest bird
+	xenurine
+		def = species of armadillo
+	xiphias
+		def = swordfish
+	xiphosuran
+		def = horseshoe crab
+	yabby
+		def = small edible freshwater crayfish
+	yaffingale
+		def = green woodpecker
+	yakow
+		def = animal crossbred from male yak and domestic cow
+	yapok
+		def = an amphibious opossum of South America
+	yeanling
+		def = lamb; kid
+	yelt
+		def = a young sow
+	yelting
+		def = glass-eyed snapper
+	yowie
+		def = a little ewe
+	zander
+		def = a variety of European perch
+	zebrinny
+		def = offspring of male horse and female zebra
+	zebrule
+		def = hybrid offspring of male zebra and female horse
+	zebu
+		def = ox with hump and dewlap
+	zemni
+		def = blind mole-rat
+	zeren
+		def = light brown Mongolian gazelle
+	zho
+		def = cross between a yak and a cow
+	zokor
+		def = central Asian mole-like burrowing rodent
+	zonure
+		def = small South African lizard
+	zyzzyva
+		def = South American weevil

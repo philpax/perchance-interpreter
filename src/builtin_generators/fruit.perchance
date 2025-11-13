@@ -1,0 +1,94 @@
+// https://perchance.org/fruit
+// Fetched at: 2025-11-13T01:13:03.448878+00:00
+
+title = Random Fruit Generator
+subtitle = Simply generates a random fruit at each click :)
+fontSize = 200
+fontColor = black
+buttonText = randomize
+numberOfItems = 1
+itemSeperator = <hr style\="opacity:0;margin: 0.15em;"/>
+description
+	{import:simple-gen-footer}
+	$output = <p>[this.joinItems("</p><p>")]</p> // <-- don't remove this last line, it uses the special "$output" property to join and format your description as HTML paragraphs :)
+
+
+$output = [fruit]
+
+// Credit goes to: https://github.com/dariusk/corpora/blob/master/data/foods/fruits.json
+
+fruit
+	apple
+	apricot
+	avocado
+	banana
+	bell pepper
+	bilberry
+	blackberry
+	blackcurrant
+	blood orange
+	blueberry
+	boysenberry
+	breadfruit
+	canary melon
+	cantaloupe
+	cherimoya
+	cherry
+	clementine
+	cloudberry
+	coconut
+	cranberry
+	currant
+	damson
+	date
+	dragonfruit
+	durian
+	elderberry
+	feijoa
+	fig
+	goji berry
+	gooseberry
+	grape
+	grapefruit
+	guava
+	honeydew
+	huckleberry
+	jackfruit
+	jambul
+	jujube
+	kiwi fruit
+	kumquat
+	lemon
+	lime
+	loquat
+	lychee
+	mandarin
+	mango
+	mulberry
+	nectarine
+	orange
+	pamelo
+	papaya
+	passionfruit
+	peach
+	pear
+	persimmon
+	physalis
+	pineapple
+	plum
+	pomegranate
+	pomelo
+	purple mangosteen
+	quince
+	rambutan
+	raspberry
+	redcurrant
+	rock melon
+	salal berry
+	satsuma
+	star fruit
+	strawberry
+	tamarillo
+	tangerine
+	ugli fruit
+	watermelon

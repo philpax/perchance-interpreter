@@ -1,0 +1,192 @@
+// https://perchance.org/animal
+// Fetched at: 2025-11-13T01:13:03.448878+00:00
+
+title = Random Animal Generator
+subtitle = A simple generator that gives you a random animal name.
+fontSize = 230
+fontColor = black
+buttonText = randomize 
+numberOfItems = 1
+itemSeperator = <br/>
+description
+  {import:simple-gen-footer}
+  $output = <p>[this.joinItems("</p><p>")]</p> // <-- don't remove this last line, it uses the special "$output" property to join and format your description as HTML paragraphs :)
+
+
+$output = [animal]
+
+// Credit goes to: https://github.com/dariusk/corpora
+animal
+  aardvark
+  alligator
+  alpaca
+  antelope
+  ape
+  armadillo
+  baboon
+  badger
+  bat
+  bear
+  beaver
+  bison
+  boar
+  buffalo
+  bull
+  camel
+  canary
+  capybara
+  cat
+  chameleon
+  cheetah
+  chimpanzee
+  chinchilla
+  chipmunk
+  cougar
+  cow
+  coyote
+  crocodile
+  crow
+  deer
+  dingo
+  dog
+  donkey
+  dromedary
+  elephant
+  elk
+  ewe
+  ferret
+  finch
+  fish
+  fox
+  frog
+  gazelle
+  gila monster
+  giraffe
+  gnu
+  goat
+  gopher
+  gorilla
+  grizzly bear
+  ground hog
+  guinea pig
+  hamster
+  hedgehog
+  hippopotamus
+  hog
+  horse
+  hyena
+  ibex
+  iguana
+  impala
+  jackal
+  jaguar
+  kangaroo
+  koala
+  lamb
+  lemur
+  leopard
+  lion
+  lizard
+  llama
+  lynx
+  mandrill
+  marmoset
+  mink
+  mole
+  mongoose
+  monkey
+  moose
+  mountain goat
+  mouse
+  mule
+  muskrat
+  mustang
+  mynah bird
+  newt
+  ocelot
+  opossum
+  orangutan
+  oryx
+  otter
+  ox
+  panda
+  panther
+  parakeet
+  parrot
+  pig
+  platypus
+  polar bear
+  porcupine
+  porpoise
+  prairie dog
+  puma
+  rabbit
+  raccoon
+  ram
+  rat
+  reindeer
+  reptile
+  rhinoceros
+  salamander
+  seal
+  sheep
+  shrew
+  silver fox
+  skunk
+  sloth
+  snake
+  squirrel
+  tapir
+  tiger
+  toad
+  turtle
+  walrus
+  warthog
+  weasel
+  whale
+  wildcat
+  wolf
+  wolverine
+  wombat
+  woodchuck
+  yak
+  zebra
+  anaconda
+  anteater
+  bobcat
+  buzzard
+  catfish
+  chicken
+  cobra
+  crab
+  cuckoo
+  dinosaur
+  dolphin
+  dove
+  duck
+  eagle
+  eel
+  emu
+  falcon
+  flamingo
+  goose
+  hare
+  hawk
+  hummingbird
+  lobster
+  meerkat
+  octopus
+  ostrich
+  owl
+  oyster
+  peacock
+  pelican
+  penguin
+  pheasant
+  pigeon
+  pony
+  quail
+  rattlesnake
+  rooster
+  shark
+  sparrow
