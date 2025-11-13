@@ -536,6 +536,13 @@ impl Parser {
                     self.consume_char(']');
                     expr = Expression::Dynamic(Box::new(expr), Box::new(index_expr));
                 }
+                Some('(') if matches!(expr, Expression::Simple(_)) => {
+                    // Direct function call like joinLists(arg1, arg2)
+                    if let Expression::Simple(ident) = expr.clone() {
+                        let method = self.parse_method_call(ident.name.clone())?;
+                        expr = Expression::Method(Box::new(Expression::Simple(ident)), method);
+                    }
+                }
                 Some('=')
                     if matches!(expr, Expression::Simple(_))
                         && self.peek_two_chars() != Some(('=', '=')) =>
@@ -562,7 +569,9 @@ impl Parser {
         self.skip_spaces();
         if self.peek_char() != Some(')') {
             loop {
-                args.push(self.parse_expression()?);
+                // Use parse_ternary_expression instead of parse_expression
+                // to avoid treating commas as sequence separators
+                args.push(self.parse_ternary_expression()?);
                 self.skip_spaces();
 
                 if self.peek_char() == Some(',') {

@@ -742,7 +742,9 @@ async fn test_join_items_default_separator() {
 // Tests for consumableList
 #[tokio::test]
 async fn test_consumable_list_basic() {
-    let template = "item\n\ta\n\tb\n\tc\n\noutput\n\t[c = item.consumableList][c] [c] [c]\n";
+    // Assignment to consumable list outputs the first item
+    // So [c = item.consumableList] [c] [c] would output 3 items total (with spaces)
+    let template = "item\n\ta\n\tb\n\tc\n\noutput\n\t[c = item.consumableList] [c] [c]\n";
     let output = run_with_seed(template, 42, None).await.unwrap();
     // Should have 3 items (space-separated)
     assert_eq!(output.split_whitespace().count(), 3);
@@ -778,7 +780,8 @@ async fn test_consumable_list_select_unique() {
 #[tokio::test]
 async fn test_consumable_list_no_duplicates() {
     // Test that consumableList doesn't repeat items until exhausted
-    let template = "item\n\ta\n\tb\n\tc\n\noutput\n\t[c = item.consumableList][c], [c], [c]\n";
+    // Assignment outputs the first item, so we only need 2 more [c] references for 3 total
+    let template = "item\n\ta\n\tb\n\tc\n\noutput\n\t[c = item.consumableList], [c], [c]\n";
     let output = run_with_seed(template, 42, None).await.unwrap();
     let parts: Vec<&str> = output.split(", ").collect();
     assert_eq!(parts.len(), 3);
@@ -1202,5 +1205,325 @@ shade
     // If color is red, shade should be a red shade
     if output.contains("were red") {
         assert!(output.contains("maroon") || output.contains("cherry"));
+    }
+}
+
+#[tokio::test]
+async fn test_join_lists_basic() {
+    let template = r#"mammal
+  dog
+  cat
+  horse
+
+reptile
+  snake
+  lizard
+  turtle
+
+output
+  [animal = joinLists(mammal, reptile), animal]"#;
+    let output = run_with_seed(template, 42, None).await.unwrap();
+    // Should select from combined list
+    assert!(
+        output == "dog"
+            || output == "cat"
+            || output == "horse"
+            || output == "snake"
+            || output == "lizard"
+            || output == "turtle",
+        "Expected one of the animals, got: {}",
+        output
+    );
+}
+
+#[tokio::test]
+async fn test_join_lists_with_methods() {
+    let template = r#"tree
+  oak
+  pine
+
+shrub
+  bush
+  hedge
+
+output
+  [joinLists(tree, shrub).selectMany(5)]"#;
+    let output = run_with_seed(template, 42, None).await.unwrap();
+    // Should have 5 space-separated items
+    let parts: Vec<&str> = output.split_whitespace().collect();
+    assert_eq!(parts.len(), 5, "Expected 5 items, got: {}", output);
+    // Each should be from one of the lists
+    for part in parts {
+        assert!(
+            part == "oak" || part == "pine" || part == "bush" || part == "hedge",
+            "Unexpected item: {}",
+            part
+        );
+    }
+}
+
+#[tokio::test]
+async fn test_join_lists_assignment() {
+    let template = r#"fruit
+  apple
+  banana
+
+vegetable
+  carrot
+  broccoli
+
+output
+  [food = joinLists(fruit, vegetable), food]"#;
+    let output = run_with_seed(template, 42, None).await.unwrap();
+    assert!(
+        output == "apple" || output == "banana" || output == "carrot" || output == "broccoli",
+        "Expected a food item, got: {}",
+        output
+    );
+}
+
+#[tokio::test]
+async fn test_join_lists_multiple_uses() {
+    let template = r#"color1
+  red
+  blue
+
+color2
+  green
+  yellow
+
+output
+  [joined = joinLists(color1, color2), joined] and [joined]"#;
+    let output = run_with_seed(template, 42, None).await.unwrap();
+    assert!(output.contains("and"), "Expected 'and' in output");
+    // Both selections should be valid colors
+    let parts: Vec<&str> = output.split(" and ").collect();
+    assert_eq!(parts.len(), 2);
+    for part in parts {
+        assert!(
+            part == "red" || part == "blue" || part == "green" || part == "yellow",
+            "Unexpected color: {}",
+            part
+        );
+    }
+}
+
+#[tokio::test]
+async fn test_join_lists_three_lists() {
+    let template = r#"list1
+  a
+
+list2
+  b
+
+list3
+  c
+
+output
+  [joinLists(list1, list2, list3)]"#;
+    let output = run_with_seed(template, 42, None).await.unwrap();
+    assert!(
+        output == "a" || output == "b" || output == "c",
+        "Expected a, b, or c, got: {}",
+        output
+    );
+}
+
+#[tokio::test]
+async fn test_join_lists_complex_realistic() {
+    // Test a realistic complex template with joinLists, weighted items, and dynamic weights
+    let template = r#"numberOfItems = 1
+itemSeperator = <br><br>
+
+title
+  Random Image Prompt Generator
+
+output
+  [quirks]
+
+quirks
+  [moods]. [lighting]. [flavour]. [anypunks].
+  [moods]. [f = joinLists(flavour, anypunks)].^0.5
+  [f = joinLists(flavour, anypunks)].^0.5
+  [lighting.sentenceCase]. [moods].
+  [lighting.sentenceCase]. [moods]. [f = joinLists(flavour, anypunks)].^0.5
+  [lighting.sentenceCase]. [f = joinLists(flavour, anypunks)].^0.5
+
+moods
+  Colorful
+  Humorous
+  Abandoned
+  Zestful
+
+flavour
+  Aged
+  Lucid Dream
+
+anypunks
+  Steampunk^5
+  Hopepunk
+
+lighting
+  backlit
+  ambient lighting"#;
+
+    let output = run_with_seed(template, 42, None).await.unwrap();
+
+    // Verify the output is not empty
+    assert!(!output.is_empty(), "Output should not be empty");
+
+    // The output should contain at least one word (period-separated)
+    let parts: Vec<&str> = output.split(". ").collect();
+    assert!(!parts.is_empty(), "Expected at least one element in output");
+
+    // Test multiple seeds to ensure variety and that joinLists works consistently
+    for seed in [1, 2, 10, 20, 100, 200, 300, 400, 500] {
+        let output = run_with_seed(template, seed, None).await.unwrap();
+        assert!(
+            !output.is_empty(),
+            "Output should not be empty for seed {}",
+            seed
+        );
+    }
+
+    // Run many times to test that dynamic weights work with joinLists
+    let mut outputs = std::collections::HashSet::new();
+    for seed in 0..50 {
+        let result = run_with_seed(template, seed, None).await.unwrap();
+        outputs.insert(result);
+    }
+
+    // We should get multiple different outputs due to randomness
+    assert!(
+        outputs.len() > 5,
+        "Expected diverse outputs with joinLists and dynamic weights, got {} unique outputs",
+        outputs.len()
+    );
+}
+
+#[tokio::test]
+async fn test_join_lists_with_dynamic_weights() {
+    // Test that joinLists works correctly with dynamic weights on the list items
+    let template = r#"list1
+  item1^10
+  item2^1
+
+list2
+  item3^1
+  item4^10
+
+output
+  [joinLists(list1, list2)]"#;
+
+    // Run multiple times to verify it works consistently
+    for seed in [1, 2, 3, 4, 5, 10, 20, 30, 40, 50] {
+        let output = run_with_seed(template, seed, None).await.unwrap();
+        assert!(
+            output == "item1" || output == "item2" || output == "item3" || output == "item4",
+            "Expected one of the items, got: {} (seed {})",
+            output,
+            seed
+        );
+    }
+
+    // Test that the weights are preserved (item1 and item4 have weight 10, others have weight 1)
+    // Over many runs, we should see item1 and item4 more frequently
+    let mut counts = std::collections::HashMap::new();
+    for seed in 0..1000 {
+        let output = run_with_seed(template, seed, None).await.unwrap();
+        *counts.entry(output).or_insert(0) += 1;
+    }
+
+    // item1 and item4 should appear more frequently than item2 and item3
+    let count_item1 = *counts.get("item1").unwrap_or(&0);
+    let count_item2 = *counts.get("item2").unwrap_or(&0);
+    let count_item3 = *counts.get("item3").unwrap_or(&0);
+    let count_item4 = *counts.get("item4").unwrap_or(&0);
+
+    // With weights 10:1:1:10, we expect roughly 10x more item1/item4 than item2/item3
+    assert!(
+        count_item1 > count_item2 * 3,
+        "item1 (weight 10) should appear more than item2 (weight 1): {} vs {}",
+        count_item1,
+        count_item2
+    );
+    assert!(
+        count_item4 > count_item3 * 3,
+        "item4 (weight 10) should appear more than item3 (weight 1): {} vs {}",
+        count_item4,
+        count_item3
+    );
+}
+
+#[tokio::test]
+async fn test_join_lists_as_builtin_no_import_needed() {
+    // Test that joinLists works as a built-in function without requiring
+    // the {import:join-lists-plugin} line that would be needed in original Perchance.
+    // This demonstrates our implementation is a convenient drop-in replacement.
+    let template = r#"
+mammal
+  dog
+  cat
+
+reptile
+  snake
+  lizard
+
+output
+  [animal = joinLists(mammal, reptile), animal]"#;
+
+    // Verify it works without any import statement
+    let output = run_with_seed(template, 42, None).await.unwrap();
+    assert!(
+        output == "dog" || output == "cat" || output == "snake" || output == "lizard",
+        "Expected an animal, got: {}",
+        output
+    );
+}
+
+#[tokio::test]
+async fn test_join_lists_realistic_with_comment() {
+    // Test the realistic template structure that would typically have imports
+    // Note: In real Perchance, you'd have: joinLists = {import:join-lists-plugin}
+    // But our implementation provides it as a built-in, so no import is needed!
+    let template = r#"
+// In original Perchance, you would need:
+// joinLists = {import:join-lists-plugin}
+// But our implementation provides it as a built-in!
+
+numberOfItems = 1
+itemSeperator = <br><br>
+
+title
+  Random Image Prompt Generator
+
+output
+  [quirks]
+
+quirks
+  [moods]. [lighting]. [f = joinLists(flavour, anypunks)].^0.5
+  [lighting.sentenceCase]. [moods]. [f = joinLists(flavour, anypunks)].^0.5
+
+moods
+  Colorful
+  Humorous
+  Abandoned
+  Zestful
+
+flavour
+  Aged
+  Lucid Dream
+
+anypunks
+  Steampunk^5
+  Hopepunk
+
+lighting
+  backlit
+  ambient lighting"#;
+
+    // Test that it works across multiple seeds
+    for seed in [1, 42, 100, 200, 500] {
+        run_with_seed(template, seed, None).await.unwrap();
     }
 }

@@ -99,6 +99,35 @@ cargo test -- --nocapture
 cargo test --test import_tests
 ```
 
+**Important Testing Guidelines:**
+
+- **ALWAYS use `.unwrap()` or `.unwrap_err()` instead of asserting on `.is_ok()` or `.is_err()`**
+  - ❌ Bad: `assert!(result.is_ok(), "Should work");`
+  - ✅ Good: `let output = result.unwrap();`
+  - **Why?** Unwrapping provides the actual error message in the panic, while `is_ok()` assertions only give you a boolean failure without context.
+
+- For error cases, use `.unwrap_err()`:
+  - ❌ Bad: `assert!(result.is_err(), "Should fail");`
+  - ✅ Good: `let _err = result.unwrap_err();`
+
+- Example of good test error handling:
+  ```rust
+  #[tokio::test]
+  async fn test_something() {
+      let template = "...";
+      // This will show the actual error if it fails
+      let output = run_with_seed(template, 42, None).await.unwrap();
+      assert_eq!(output, "expected");
+  }
+
+  #[tokio::test]
+  async fn test_error_case() {
+      let template = "...invalid...";
+      // This will show the actual success value if it unexpectedly passes
+      let _err = run_with_seed(template, 42, None).await.unwrap_err();
+  }
+  ```
+
 ### Clippy (Linter)
 
 ```bash
