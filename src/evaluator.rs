@@ -574,9 +574,19 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
             }
 
             Expression::Assignment(ident, value) => {
-                let val = self.evaluate_to_value(value).await?;
-                self.variables.insert(ident.name.clone(), val);
-                Ok(String::new())
+                let mut val = self.evaluate_to_value(value).await?;
+
+                // If assigning a list reference (but not a consumable list), select one item from it
+                // This ensures subsequent uses of the variable get the same selection
+                // Consumable lists and ListInstances are excluded because they have their own selection logic
+                if matches!(val, Value::List(_)) {
+                    let method = MethodCall::new("selectOne".to_string());
+                    val = self.call_method_value(&val, &method).await?;
+                }
+
+                self.variables.insert(ident.name.clone(), val.clone());
+                // Assignments return the assigned value
+                self.value_to_string(val).await
             }
 
             Expression::Sequence(exprs, output) => {

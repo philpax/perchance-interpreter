@@ -742,7 +742,9 @@ async fn test_join_items_default_separator() {
 // Tests for consumableList
 #[tokio::test]
 async fn test_consumable_list_basic() {
-    let template = "item\n\ta\n\tb\n\tc\n\noutput\n\t[c = item.consumableList][c] [c] [c]\n";
+    // Assignment to consumable list outputs the first item
+    // So [c = item.consumableList] [c] [c] would output 3 items total (with spaces)
+    let template = "item\n\ta\n\tb\n\tc\n\noutput\n\t[c = item.consumableList] [c] [c]\n";
     let output = run_with_seed(template, 42, None).await.unwrap();
     // Should have 3 items (space-separated)
     assert_eq!(output.split_whitespace().count(), 3);
@@ -778,7 +780,8 @@ async fn test_consumable_list_select_unique() {
 #[tokio::test]
 async fn test_consumable_list_no_duplicates() {
     // Test that consumableList doesn't repeat items until exhausted
-    let template = "item\n\ta\n\tb\n\tc\n\noutput\n\t[c = item.consumableList][c], [c], [c]\n";
+    // Assignment outputs the first item, so we only need 2 more [c] references for 3 total
+    let template = "item\n\ta\n\tb\n\tc\n\noutput\n\t[c = item.consumableList], [c], [c]\n";
     let output = run_with_seed(template, 42, None).await.unwrap();
     let parts: Vec<&str> = output.split(", ").collect();
     assert_eq!(parts.len(), 3);
@@ -1371,7 +1374,7 @@ lighting
 
     // The output should contain at least one word (period-separated)
     let parts: Vec<&str> = output.split(". ").collect();
-    assert!(parts.len() >= 1, "Expected at least one element in output");
+    assert!(!parts.is_empty(), "Expected at least one element in output");
 
     // Test multiple seeds to ensure variety and that joinLists works consistently
     for seed in [1, 2, 10, 20, 100, 200, 300, 400, 500] {
@@ -1389,10 +1392,6 @@ lighting
             "Output should not be empty for seed {}",
             seed
         );
-
-        // Note: Some outputs may be just "." when the quirks list selects an item
-        // with only an assignment like "[f = joinLists(flavour, anypunks)]."
-        // This is expected behavior - assignments return empty strings
     }
 
     // Run many times to test that dynamic weights work with joinLists
