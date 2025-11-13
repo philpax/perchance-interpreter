@@ -38,7 +38,7 @@ impl std::error::Error for EvalError {}
 
 #[derive(Debug, Clone)]
 struct ConsumableListState {
-    source_list_name: String,
+    source_list: CompiledList,
     remaining_indices: Vec<usize>,
 }
 
@@ -836,28 +836,29 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                 if state.remaining_indices.is_empty() {
                     return Err(EvalError::EmptyList(format!(
                         "Consumable list '{}' has been exhausted",
-                        state.source_list_name
+                        state.source_list.name
                     )));
                 }
 
-                // Get the source list
-                let source_list_name = state.source_list_name.clone();
-                let source_list = self
-                    .program
-                    .get_list(&source_list_name)
-                    .ok_or_else(|| EvalError::UndefinedList(source_list_name.clone()))?;
-
-                // Clone the remaining indices before selecting
+                // Clone the source list and remaining indices before selecting
+                let source_list = state.source_list.clone();
                 let remaining_indices = state.remaining_indices.clone();
 
                 // Select a random index from remaining_indices
                 let idx = self.rng.gen_range(0..remaining_indices.len());
                 let item_idx = remaining_indices[idx];
 
-                // Get the item
-                let item = source_list.items.get(item_idx).ok_or_else(|| {
-                    EvalError::EmptyList(format!("Invalid index {} in consumable list", item_idx))
-                })?;
+                // Get and clone the item
+                let item = source_list
+                    .items
+                    .get(item_idx)
+                    .ok_or_else(|| {
+                        EvalError::EmptyList(format!(
+                            "Invalid index {} in consumable list",
+                            item_idx
+                        ))
+                    })?
+                    .clone();
 
                 // Remove the selected index from remaining_indices
                 let mut new_remaining = remaining_indices;
@@ -867,7 +868,7 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                 self.consumable_lists.insert(
                     id.clone(),
                     ConsumableListState {
-                        source_list_name,
+                        source_list,
                         remaining_indices: new_remaining,
                     },
                 );
@@ -1545,7 +1546,18 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                         let list = self
                             .program
                             .get_list(name)
-                            .ok_or_else(|| EvalError::UndefinedList(name.clone()))?;
+                            .ok_or_else(|| EvalError::UndefinedList(name.clone()))?
+                            .clone();
+
+                        // Check if the list has $output that evaluates to an ImportedGenerator
+                        // If so, delegate to the ImportedGenerator instead
+                        if list.items.is_empty() && list.output.is_some() {
+                            let result_value = self.evaluate_list_to_value(&list).await?;
+                            if matches!(result_value, Value::ImportedGenerator(_)) {
+                                // Recursively call consumableList on the ImportedGenerator
+                                return self.call_method_value(&result_value, method).await;
+                            }
+                        }
 
                         // Generate unique ID for this consumable list
                         let id = format!("__consumable_{}__", self.consumable_list_counter);
@@ -1558,7 +1570,7 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                         self.consumable_lists.insert(
                             id.clone(),
                             ConsumableListState {
-                                source_list_name: name.clone(),
+                                source_list: list,
                                 remaining_indices,
                             },
                         );
@@ -1566,12 +1578,73 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                         // Return reference to consumable list
                         Ok(Value::ConsumableList(id))
                     }
-                    Value::ListInstance(_list) => {
-                        // For list instances, we can't create a consumable version
-                        // because we don't have a source list name
-                        Err(EvalError::InvalidMethodCall(
-                            "consumableList can only be called on named lists".to_string(),
-                        ))
+                    Value::ListInstance(list) => {
+                        // Create a consumable version from the list instance
+                        let list_clone = list.clone();
+
+                        // Generate unique ID for this consumable list
+                        let id = format!("__consumable_{}__", self.consumable_list_counter);
+                        self.consumable_list_counter += 1;
+
+                        // Create list of all item indices
+                        let remaining_indices: Vec<usize> = (0..list_clone.items.len()).collect();
+
+                        // Store the consumable list state
+                        self.consumable_lists.insert(
+                            id.clone(),
+                            ConsumableListState {
+                                source_list: list_clone,
+                                remaining_indices,
+                            },
+                        );
+
+                        // Return reference to consumable list
+                        Ok(Value::ConsumableList(id))
+                    }
+                    Value::ImportedGenerator(generator_name) => {
+                        // For imported generators, get the output list and create a consumable version
+                        let imported_program = self.load_import(generator_name).await?;
+
+                        // Find the output list (check $output, then output, then last list)
+                        let output_list = if let Some(list) = imported_program.get_list("$output") {
+                            list.clone()
+                        } else if let Some(list) = imported_program.get_list("output") {
+                            list.clone()
+                        } else if let Some(last_list_name) = imported_program.list_order.last() {
+                            imported_program
+                                .get_list(last_list_name)
+                                .ok_or_else(|| {
+                                    EvalError::ImportError(format!(
+                                        "Cannot find output list in imported generator '{}'",
+                                        generator_name
+                                    ))
+                                })?
+                                .clone()
+                        } else {
+                            return Err(EvalError::ImportError(format!(
+                                "Imported generator '{}' has no lists",
+                                generator_name
+                            )));
+                        };
+
+                        // Generate unique ID for this consumable list
+                        let id = format!("__consumable_{}__", self.consumable_list_counter);
+                        self.consumable_list_counter += 1;
+
+                        // Create list of all item indices
+                        let remaining_indices: Vec<usize> = (0..output_list.items.len()).collect();
+
+                        // Store the consumable list state
+                        self.consumable_lists.insert(
+                            id.clone(),
+                            ConsumableListState {
+                                source_list: output_list,
+                                remaining_indices,
+                            },
+                        );
+
+                        // Return reference to consumable list
+                        Ok(Value::ConsumableList(id))
                     }
                     _ => Err(EvalError::InvalidMethodCall(
                         "consumableList can only be called on lists".to_string(),

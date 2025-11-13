@@ -249,3 +249,43 @@ async fn test_import_parser_syntax() {
             .unwrap();
     }
 }
+
+#[tokio::test]
+async fn test_import_with_consumable_list() {
+    // Test that we can use .consumableList on an imported generator
+    let loader = InMemoryLoader::new();
+    loader.add("color", "color\n\tred\n\tblue\n\tgreen\n");
+
+    let template = "color = {import:color}\n\ntest\n\t[c = color.consumableList]\n";
+    let result = run_with_seed(template, 42, Some(Arc::new(loader))).await;
+
+    // This should work - creating a consumable list from imported generator
+    let output = result.unwrap();
+    assert!(output == "red" || output == "blue" || output == "green");
+}
+
+#[tokio::test]
+async fn test_import_consumable_list_multiple_selections() {
+    // Test that consumable lists work correctly with multiple selections from imported generator
+    let loader = InMemoryLoader::new();
+    loader.add("item", "item\n\ta\n\tb\n\tc\n");
+
+    let template = "items = {import:item}\n\ntest\n\t[c = items.consumableList] [c] [c]\n";
+    let result = run_with_seed(template, 42, Some(Arc::new(loader))).await;
+
+    let output = result.unwrap();
+    // Assignment outputs first item, then we select 2 more = 3 items total
+    let parts: Vec<&str> = output.split_whitespace().collect();
+    assert_eq!(parts.len(), 3, "Expected 3 parts, got: {}", output);
+
+    // All items should be unique
+    let mut sorted = parts.clone();
+    sorted.sort();
+    sorted.dedup();
+    assert_eq!(
+        sorted.len(),
+        3,
+        "Expected all items to be unique, got: {}",
+        output
+    );
+}
