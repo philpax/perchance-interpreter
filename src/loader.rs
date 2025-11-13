@@ -45,6 +45,17 @@ pub trait GeneratorLoader: Send + Sync {
     /// # Returns
     /// The generator's source code as a string, or an error if not found
     async fn load(&self, name: &str) -> Result<String, LoadError>;
+
+    /// List all available generator names
+    ///
+    /// This is useful for autocomplete and discovering what generators are available.
+    /// Default implementation returns an empty list.
+    ///
+    /// # Returns
+    /// A vector of all available generator names
+    fn list_available(&self) -> Vec<String> {
+        Vec::new()
+    }
 }
 
 /// Filesystem-based generator loader
@@ -191,6 +202,11 @@ impl GeneratorLoader for InMemoryLoader {
             .cloned()
             .ok_or_else(|| LoadError::NotFound(name.to_string()))
     }
+
+    fn list_available(&self) -> Vec<String> {
+        let generators = self.generators.read().unwrap();
+        generators.keys().cloned().collect()
+    }
 }
 
 /// Builtin generators loader
@@ -225,6 +241,13 @@ impl GeneratorLoader for BuiltinGeneratorsLoader {
             .find(|(gen_name, _)| *gen_name == name)
             .map(|(_, content)| content.to_string())
             .ok_or_else(|| LoadError::NotFound(name.to_string()))
+    }
+
+    fn list_available(&self) -> Vec<String> {
+        builtin_generators::GENERATORS
+            .iter()
+            .map(|(name, _)| name.to_string())
+            .collect()
     }
 }
 
@@ -294,6 +317,17 @@ impl GeneratorLoader for ChainLoader {
             }
         }
         Err(LoadError::NotFound(name.to_string()))
+    }
+
+    fn list_available(&self) -> Vec<String> {
+        let mut all_names: Vec<String> = self
+            .loaders
+            .iter()
+            .flat_map(|loader| loader.list_available())
+            .collect();
+        all_names.sort();
+        all_names.dedup();
+        all_names
     }
 }
 

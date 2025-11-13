@@ -216,6 +216,31 @@ pub async fn run_with_seed(
     run(template, options).await
 }
 
+/// Get list of available builtin generators
+///
+/// Returns the names of all available builtin generators if the
+/// `builtin-generators` feature is enabled. Useful for autocomplete
+/// and discovering what generators can be imported.
+///
+/// # Example
+/// ```
+/// use perchance_interpreter::list_builtin_generators;
+///
+/// let generators = list_builtin_generators();
+/// println!("Available generators: {:?}", generators);
+/// ```
+pub fn list_builtin_generators() -> Vec<String> {
+    #[cfg(feature = "builtin-generators")]
+    {
+        let loader = loader::BuiltinGeneratorsLoader::new();
+        loader.list_available()
+    }
+    #[cfg(not(feature = "builtin-generators"))]
+    {
+        Vec::new()
+    }
+}
+
 // Deprecated functions - kept for backward compatibility
 #[deprecated(since = "0.1.0", note = "Use `run_with_seed` instead")]
 pub async fn evaluate_with_seed(template: &str, seed: u64) -> Result<String, InterpreterError> {

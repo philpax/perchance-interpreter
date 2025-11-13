@@ -72,3 +72,22 @@ pub fn validate_template(template: &str) -> Result<(), String> {
     let program = parse(template).map_err(|e| format!("{}", e))?;
     compile(&program).map(|_| ()).map_err(|e| format!("{}", e))
 }
+
+/// Get list of all available builtin generators for autocomplete
+/// Returns a JS array of generator names
+#[wasm_bindgen]
+pub fn get_available_generators() -> JsValue {
+    #[cfg(feature = "builtin-generators")]
+    {
+        use perchance_interpreter::loader::{BuiltinGeneratorsLoader, GeneratorLoader};
+        let loader = BuiltinGeneratorsLoader::new();
+        let names = loader.list_available();
+        serde_wasm_bindgen::to_value(&names).unwrap_or(JsValue::NULL)
+    }
+    #[cfg(not(feature = "builtin-generators"))]
+    {
+        // Return empty array if builtin generators not available
+        let empty: Vec<String> = Vec::new();
+        serde_wasm_bindgen::to_value(&empty).unwrap_or(JsValue::NULL)
+    }
+}
