@@ -134,18 +134,16 @@ async fn test_import_not_found() {
 
     // Try to import a non-existent generator
     let template = "output\n\t{import:nonexistent}\n";
-    let result = run_with_seed(template, 42, Some(Arc::new(loader))).await;
-
-    assert!(result.is_err(), "Should error when generator not found");
+    let _err = run_with_seed(template, 42, Some(Arc::new(loader)))
+        .await
+        .unwrap_err();
 }
 
 #[tokio::test]
 async fn test_import_without_loader() {
     // Try to import without a loader
     let template = "output\n\t{import:something}\n";
-    let result = run_with_seed(template, 42, None).await;
-
-    assert!(result.is_err(), "Should error when no loader available");
+    let _err = run_with_seed(template, 42, None).await.unwrap_err();
 }
 
 #[tokio::test]
@@ -246,7 +244,8 @@ async fn test_import_parser_syntax() {
 
     for template_str in templates {
         let template = format!("output\n\t{}\n", template_str);
-        let result = run_with_seed(&template, 42, Some(Arc::new(loader.clone()))).await;
-        assert!(result.is_ok(), "Template should parse: {}", template_str);
+        run_with_seed(&template, 42, Some(Arc::new(loader.clone())))
+            .await
+            .unwrap();
     }
 }

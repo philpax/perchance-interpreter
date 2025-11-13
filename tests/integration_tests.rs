@@ -1378,15 +1378,7 @@ lighting
 
     // Test multiple seeds to ensure variety and that joinLists works consistently
     for seed in [1, 2, 10, 20, 100, 200, 300, 400, 500] {
-        let result = run_with_seed(template, seed, None).await;
-        assert!(
-            result.is_ok(),
-            "Template should evaluate successfully with seed {}: {:?}",
-            seed,
-            result.err()
-        );
-
-        let output = result.unwrap();
+        let output = run_with_seed(template, seed, None).await.unwrap();
         assert!(
             !output.is_empty(),
             "Output should not be empty for seed {}",
@@ -1425,15 +1417,7 @@ output
 
     // Run multiple times to verify it works consistently
     for seed in [1, 2, 3, 4, 5, 10, 20, 30, 40, 50] {
-        let result = run_with_seed(template, seed, None).await;
-        assert!(
-            result.is_ok(),
-            "joinLists with weighted items should work, seed {}: {:?}",
-            seed,
-            result.err()
-        );
-
-        let output = result.unwrap();
+        let output = run_with_seed(template, seed, None).await.unwrap();
         assert!(
             output == "item1" || output == "item2" || output == "item3" || output == "item4",
             "Expected one of the items, got: {} (seed {})",
@@ -1489,14 +1473,7 @@ output
   [animal = joinLists(mammal, reptile), animal]"#;
 
     // Verify it works without any import statement
-    let result = run_with_seed(template, 42, None).await;
-    assert!(
-        result.is_ok(),
-        "joinLists should work as built-in without import: {:?}",
-        result.err()
-    );
-
-    let output = result.unwrap();
+    let output = run_with_seed(template, 42, None).await.unwrap();
     assert!(
         output == "dog" || output == "cat" || output == "snake" || output == "lizard",
         "Expected an animal, got: {}",
@@ -1547,12 +1524,6 @@ lighting
 
     // Test that it works across multiple seeds
     for seed in [1, 42, 100, 200, 500] {
-        let result = run_with_seed(template, seed, None).await;
-        assert!(
-            result.is_ok(),
-            "Template should work with built-in joinLists (seed {}): {:?}",
-            seed,
-            result.err()
-        );
+        run_with_seed(template, seed, None).await.unwrap();
     }
 }
