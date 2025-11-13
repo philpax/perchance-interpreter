@@ -120,7 +120,13 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
     }
 
     pub async fn evaluate(&mut self) -> Result<String, EvalError> {
-        // Evaluate the "output" list, or default to the last list if not defined
+        // Priority order: $output, output, then last list
+        // Check for $output list first (top-level $output = ...)
+        if let Some(output_list) = self.program.get_list("$output") {
+            return self.evaluate_list(output_list).await;
+        }
+
+        // Check for output list
         match self.program.get_list("output") {
             Some(output_list) => self.evaluate_list(output_list).await,
             None => {
