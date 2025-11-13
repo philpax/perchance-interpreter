@@ -1325,3 +1325,145 @@ output
         output
     );
 }
+
+#[tokio::test]
+async fn test_join_lists_complex_realistic() {
+    // Test a realistic complex template with joinLists, weighted items, and dynamic weights
+    let template = r#"numberOfItems = 1
+itemSeperator = <br><br>
+
+title
+  Random Image Prompt Generator
+
+output
+  [quirks]
+
+quirks
+  [moods]. [lighting]. [flavour]. [anypunks].
+  [moods]. [f = joinLists(flavour, anypunks)].^0.5
+  [f = joinLists(flavour, anypunks)].^0.5
+  [lighting.sentenceCase]. [moods].
+  [lighting.sentenceCase]. [moods]. [f = joinLists(flavour, anypunks)].^0.5
+  [lighting.sentenceCase]. [f = joinLists(flavour, anypunks)].^0.5
+
+moods
+  Colorful
+  Humorous
+  Abandoned
+  Zestful
+
+flavour
+  Aged
+  Lucid Dream
+
+anypunks
+  Steampunk^5
+  Hopepunk
+
+lighting
+  backlit
+  ambient lighting"#;
+
+    let output = run_with_seed(template, 42, None).await.unwrap();
+
+    // Verify the output is not empty
+    assert!(!output.is_empty(), "Output should not be empty");
+
+    // The output should contain at least one word (period-separated)
+    let parts: Vec<&str> = output.split(". ").collect();
+    assert!(parts.len() >= 1, "Expected at least one element in output");
+
+    // Test multiple seeds to ensure variety and that joinLists works consistently
+    for seed in [1, 2, 10, 20, 100, 200, 300, 400, 500] {
+        let result = run_with_seed(template, seed, None).await;
+        assert!(
+            result.is_ok(),
+            "Template should evaluate successfully with seed {}: {:?}",
+            seed,
+            result.err()
+        );
+
+        let output = result.unwrap();
+        assert!(!output.is_empty(), "Output should not be empty for seed {}", seed);
+
+        // Note: Some outputs may be just "." when the quirks list selects an item
+        // with only an assignment like "[f = joinLists(flavour, anypunks)]."
+        // This is expected behavior - assignments return empty strings
+    }
+
+    // Run many times to test that dynamic weights work with joinLists
+    let mut outputs = std::collections::HashSet::new();
+    for seed in 0..50 {
+        let result = run_with_seed(template, seed, None).await.unwrap();
+        outputs.insert(result);
+    }
+
+    // We should get multiple different outputs due to randomness
+    assert!(
+        outputs.len() > 5,
+        "Expected diverse outputs with joinLists and dynamic weights, got {} unique outputs",
+        outputs.len()
+    );
+}
+
+#[tokio::test]
+async fn test_join_lists_with_dynamic_weights() {
+    // Test that joinLists works correctly with dynamic weights on the list items
+    let template = r#"list1
+  item1^10
+  item2^1
+
+list2
+  item3^1
+  item4^10
+
+output
+  [joinLists(list1, list2)]"#;
+
+    // Run multiple times to verify it works consistently
+    for seed in [1, 2, 3, 4, 5, 10, 20, 30, 40, 50] {
+        let result = run_with_seed(template, seed, None).await;
+        assert!(
+            result.is_ok(),
+            "joinLists with weighted items should work, seed {}: {:?}",
+            seed,
+            result.err()
+        );
+
+        let output = result.unwrap();
+        assert!(
+            output == "item1" || output == "item2" || output == "item3" || output == "item4",
+            "Expected one of the items, got: {} (seed {})",
+            output,
+            seed
+        );
+    }
+
+    // Test that the weights are preserved (item1 and item4 have weight 10, others have weight 1)
+    // Over many runs, we should see item1 and item4 more frequently
+    let mut counts = std::collections::HashMap::new();
+    for seed in 0..1000 {
+        let output = run_with_seed(template, seed, None).await.unwrap();
+        *counts.entry(output).or_insert(0) += 1;
+    }
+
+    // item1 and item4 should appear more frequently than item2 and item3
+    let count_item1 = *counts.get("item1").unwrap_or(&0);
+    let count_item2 = *counts.get("item2").unwrap_or(&0);
+    let count_item3 = *counts.get("item3").unwrap_or(&0);
+    let count_item4 = *counts.get("item4").unwrap_or(&0);
+
+    // With weights 10:1:1:10, we expect roughly 10x more item1/item4 than item2/item3
+    assert!(
+        count_item1 > count_item2 * 3,
+        "item1 (weight 10) should appear more than item2 (weight 1): {} vs {}",
+        count_item1,
+        count_item2
+    );
+    assert!(
+        count_item4 > count_item3 * 3,
+        "item4 (weight 10) should appear more than item3 (weight 1): {} vs {}",
+        count_item4,
+        count_item3
+    );
+}
