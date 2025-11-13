@@ -1467,3 +1467,89 @@ output
         count_item3
     );
 }
+
+#[tokio::test]
+async fn test_join_lists_as_builtin_no_import_needed() {
+    // Test that joinLists works as a built-in function without requiring
+    // the {import:join-lists-plugin} line that would be needed in original Perchance.
+    // This demonstrates our implementation is a convenient drop-in replacement.
+    let template = r#"
+mammal
+  dog
+  cat
+
+reptile
+  snake
+  lizard
+
+output
+  [animal = joinLists(mammal, reptile), animal]"#;
+
+    // Verify it works without any import statement
+    let result = run_with_seed(template, 42, None).await;
+    assert!(
+        result.is_ok(),
+        "joinLists should work as built-in without import: {:?}",
+        result.err()
+    );
+
+    let output = result.unwrap();
+    assert!(
+        output == "dog" || output == "cat" || output == "snake" || output == "lizard",
+        "Expected an animal, got: {}",
+        output
+    );
+}
+
+#[tokio::test]
+async fn test_join_lists_realistic_with_comment() {
+    // Test the realistic template structure that would typically have imports
+    // Note: In real Perchance, you'd have: joinLists = {import:join-lists-plugin}
+    // But our implementation provides it as a built-in, so no import is needed!
+    let template = r#"
+// In original Perchance, you would need:
+// joinLists = {import:join-lists-plugin}
+// But our implementation provides it as a built-in!
+
+numberOfItems = 1
+itemSeperator = <br><br>
+
+title
+  Random Image Prompt Generator
+
+output
+  [quirks]
+
+quirks
+  [moods]. [lighting]. [f = joinLists(flavour, anypunks)].^0.5
+  [lighting.sentenceCase]. [moods]. [f = joinLists(flavour, anypunks)].^0.5
+
+moods
+  Colorful
+  Humorous
+  Abandoned
+  Zestful
+
+flavour
+  Aged
+  Lucid Dream
+
+anypunks
+  Steampunk^5
+  Hopepunk
+
+lighting
+  backlit
+  ambient lighting"#;
+
+    // Test that it works across multiple seeds
+    for seed in [1, 42, 100, 200, 500] {
+        let result = run_with_seed(template, seed, None).await;
+        assert!(
+            result.is_ok(),
+            "Template should work with built-in joinLists (seed {}): {:?}",
+            seed,
+            result.err()
+        );
+    }
+}
