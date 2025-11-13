@@ -1064,6 +1064,29 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
         )
     }
 
+    /// Helper to extract a simple list reference from content like [listname]
+    /// Returns the list name if the content is a simple reference, None otherwise
+    fn extract_simple_list_reference(content: &[ContentPart]) -> Option<String> {
+        // Check if content is exactly one reference
+        if content.len() == 1 {
+            // Case 1: Direct reference like in $output = [color]
+            if let ContentPart::Reference(Expression::Simple(ident)) = &content[0] {
+                return Some(ident.name.clone());
+            }
+            // Case 2: Inline expression with one choice containing one reference
+            if let ContentPart::Inline(inline) = &content[0] {
+                if inline.choices.len() == 1 && inline.choices[0].content.len() == 1 {
+                    if let ContentPart::Reference(Expression::Simple(ident)) =
+                        &inline.choices[0].content[0]
+                    {
+                        return Some(ident.name.clone());
+                    }
+                }
+            }
+        }
+        None
+    }
+
     #[async_recursion]
     async fn get_property(&mut self, value: &Value, prop_name: &str) -> Result<String, EvalError> {
         let prop_value = self.get_property_value(value, prop_name).await?;
@@ -1606,7 +1629,9 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                         let imported_program = self.load_import(generator_name).await?;
 
                         // Find the output list (check $output, then output, then last list)
-                        let output_list = if let Some(list) = imported_program.get_list("$output") {
+                        let mut output_list = if let Some(list) =
+                            imported_program.get_list("$output")
+                        {
                             list.clone()
                         } else if let Some(list) = imported_program.get_list("output") {
                             list.clone()
@@ -1626,6 +1651,27 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                                 generator_name
                             )));
                         };
+
+                        // If the output list has no items but has an output property,
+                        // we need to resolve it to get the actual source list
+                        // This handles cases like: $output = [color]
+                        while output_list.items.is_empty() && output_list.output.is_some() {
+                            // Try to find the referenced list
+                            // Parse the output to find list references
+                            let output_content = output_list.output.as_ref().unwrap();
+                            let referenced_list_name =
+                                Self::extract_simple_list_reference(output_content);
+
+                            if let Some(ref_name) = referenced_list_name {
+                                if let Some(list) = imported_program.get_list(&ref_name) {
+                                    output_list = list.clone();
+                                } else {
+                                    break;
+                                }
+                            } else {
+                                break;
+                            }
+                        }
 
                         // Generate unique ID for this consumable list
                         let id = format!("__consumable_{}__", self.consumable_list_counter);

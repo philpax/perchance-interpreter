@@ -289,3 +289,32 @@ async fn test_import_consumable_list_multiple_selections() {
         output
     );
 }
+
+#[tokio::test]
+async fn test_import_consumable_list_with_output_assignment() {
+    // Test that consumableList works with imported generators that use $output = [listname]
+    let loader = InMemoryLoader::new();
+    loader.add(
+        "color",
+        "color\n\tred\n\tblue\n\tgreen\n\n$output = [color]\n",
+    );
+
+    let template = "colors = {import:color}\n\ntest\n\t[c = colors.consumableList] [c] [c]\n";
+    let result = run_with_seed(template, 42, Some(Arc::new(loader))).await;
+
+    let output = result.unwrap();
+    // Should have 3 unique items
+    let parts: Vec<&str> = output.split_whitespace().collect();
+    assert_eq!(parts.len(), 3, "Expected 3 parts, got: {}", output);
+
+    // All items should be unique
+    let mut sorted = parts.clone();
+    sorted.sort();
+    sorted.dedup();
+    assert_eq!(
+        sorted.len(),
+        3,
+        "Expected all items to be unique, got: {}",
+        output
+    );
+}
