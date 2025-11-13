@@ -613,6 +613,30 @@ impl Parser {
         let start_line = self.line;
         self.consume_char('{');
 
+        // Check for import: {import:generator-name}
+        if self.peek_identifier().starts_with("import") {
+            let ident = self.parse_identifier()?;
+            if ident == "import" && self.peek_char() == Some(':') {
+                self.consume_char(':');
+                // Parse the generator name (everything until })
+                let mut generator_name = String::new();
+                while let Some(&ch) = self.peek_char_ref() {
+                    if ch == '}' {
+                        self.consume_char('}');
+                        // Return the import as an inline list with a single choice containing an Import expression
+                        return Ok(InlineList::new(vec![InlineChoice::new(vec![
+                            ContentPart::Reference(Expression::Import(generator_name)),
+                        ])]));
+                    }
+                    generator_name.push(ch);
+                    self.advance();
+                }
+                return Err(ParseError::UnterminatedInline(start_line));
+            }
+            // If it's not an import, we need to backtrack or handle it differently
+            // For now, we'll fall through to regular parsing
+        }
+
         // Check for special inline functions: {a} and {s}
         if self.peek_char() == Some('a') {
             let next_pos = self.pos + 1;

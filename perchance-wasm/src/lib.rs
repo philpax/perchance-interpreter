@@ -1,46 +1,93 @@
-use perchance_interpreter::{compile_template, evaluate, evaluate_with_seed};
+use perchance_interpreter::{compile, evaluate, parse, run_with_seed, EvaluateOptions};
 use rand::rngs::StdRng;
 use rand::SeedableRng;
 use wasm_bindgen::prelude::*;
+use wasm_bindgen_futures::future_to_promise;
 
 /// Evaluate a Perchance template with a specific seed
+/// Returns a Promise that resolves to a string
 #[wasm_bindgen]
-pub fn evaluate_perchance(template: &str, seed: u64) -> Result<String, String> {
-    evaluate_with_seed(template, seed).map_err(|e| format!("{}", e))
+pub fn evaluate_perchance(template: String, seed: u64) -> js_sys::Promise {
+    future_to_promise(async move {
+        run_with_seed(&template, seed, None)
+            .await
+            .map(|s| JsValue::from_str(&s))
+            .map_err(|e| JsValue::from_str(&format!("{}", e)))
+    })
 }
 
 /// Evaluate a Perchance template with a random seed
+/// Returns a Promise that resolves to a string
 #[wasm_bindgen]
-pub fn evaluate_perchance_random(template: &str) -> Result<String, String> {
-    let compiled = compile_template(template).map_err(|e| format!("{}", e))?;
-    let mut rng = StdRng::from_entropy();
-    evaluate(&compiled, &mut rng).map_err(|e| format!("{}", e))
+pub fn evaluate_perchance_random(template: String) -> js_sys::Promise {
+    future_to_promise(async move {
+        let program = parse(&template).map_err(|e| JsValue::from_str(&format!("{}", e)))?;
+        let compiled = compile(&program).map_err(|e| JsValue::from_str(&format!("{}", e)))?;
+        let rng = StdRng::from_entropy();
+        let options = EvaluateOptions::new(rng);
+        evaluate(&compiled, options)
+            .await
+            .map(|s| JsValue::from_str(&s))
+            .map_err(|e| JsValue::from_str(&format!("{}", e)))
+    })
 }
 
 /// Generate multiple samples from a template
-/// Returns a JS array of strings on success, or throws an error if template is invalid
+/// Returns a Promise that resolves to a JS array of strings
 #[wasm_bindgen]
-pub fn evaluate_multiple(template: &str, count: u32, seed: Option<u64>) -> Result<JsValue, String> {
-    let compiled = compile_template(template).map_err(|e| format!("{}", e))?;
+pub fn evaluate_multiple(template: String, count: u32, seed: Option<u64>) -> js_sys::Promise {
+    future_to_promise(async move {
+        let mut results = Vec::new();
 
-    let mut results = Vec::new();
-    let mut rng = match seed {
-        Some(s) => StdRng::seed_from_u64(s),
-        None => StdRng::from_entropy(),
-    };
+        // If seed is provided, use sequential seeds for deterministic but varied output
+        if let Some(base_seed) = seed {
+            for i in 0..count {
+                let output = run_with_seed(&template, base_seed.wrapping_add(i as u64), None)
+                    .await
+                    .map_err(|e| JsValue::from_str(&format!("{}", e)))?;
+                results.push(output);
+            }
+        } else {
+            // No seed: parse/compile once, then evaluate multiple times
+            let program = parse(&template).map_err(|e| JsValue::from_str(&format!("{}", e)))?;
+            let compiled = compile(&program).map_err(|e| JsValue::from_str(&format!("{}", e)))?;
 
-    for _ in 0..count {
-        let output = evaluate(&compiled, &mut rng).map_err(|e| format!("{}", e))?;
-        results.push(output);
-    }
+            for _ in 0..count {
+                let rng = StdRng::from_entropy();
+                let options = EvaluateOptions::new(rng);
+                let output = evaluate(&compiled, options)
+                    .await
+                    .map_err(|e| JsValue::from_str(&format!("{}", e)))?;
+                results.push(output);
+            }
+        }
 
-    serde_wasm_bindgen::to_value(&results).map_err(|e| format!("{}", e))
+        serde_wasm_bindgen::to_value(&results).map_err(|e| JsValue::from_str(&format!("{}", e)))
+    })
 }
 
 /// Validate a template without evaluating it
 #[wasm_bindgen]
 pub fn validate_template(template: &str) -> Result<(), String> {
-    compile_template(template)
-        .map(|_| ())
-        .map_err(|e| format!("{}", e))
+    let program = parse(template).map_err(|e| format!("{}", e))?;
+    compile(&program).map(|_| ()).map_err(|e| format!("{}", e))
+}
+
+/// Get list of all available builtin generators for autocomplete
+/// Returns a JS array of generator names
+#[wasm_bindgen]
+pub fn get_available_generators() -> JsValue {
+    #[cfg(feature = "builtin-generators")]
+    {
+        use perchance_interpreter::loader::{BuiltinGeneratorsLoader, GeneratorLoader};
+        let loader = BuiltinGeneratorsLoader::new();
+        let names = loader.list_available();
+        serde_wasm_bindgen::to_value(&names).unwrap_or(JsValue::NULL)
+    }
+    #[cfg(not(feature = "builtin-generators"))]
+    {
+        // Return empty array if builtin generators not available
+        let empty: Vec<String> = Vec::new();
+        serde_wasm_bindgen::to_value(&empty).unwrap_or(JsValue::NULL)
+    }
 }

@@ -1,0 +1,54 @@
+// https://perchance.org/greek-titan
+// Fetched at: 2025-11-13T01:13:03.448878+00:00
+
+title = Random Greek Titan Generator
+subtitle = Simply generates a random titan from Greek mythology :)
+fontSize = 200
+fontColor = black
+buttonText = randomize
+numberOfItems = 1
+itemSeperator = <hr style\="opacity:0;margin: 0.15em;"/>
+description
+	{import:simple-gen-footer}
+	$output = <p>[this.joinItems("</p><p>")]</p> // <-- don't remove this last line, it uses the special "$output" property to join and format your description as HTML paragraphs :)
+
+
+$output = [titan]
+output = [c=titan.selectOne]<p style\="opacity:0.5;font-size:60%;margin:0;">(<a href\="https://www.google.com/search?ie=UTF-8&oe=UTF-8&sourceid=navclient&gfns=1&q=[c] greek mythology site:wikipedia.org">wikipeida</a>)</p>
+
+// Credit goes to: https://github.com/dariusk/corpora/blob/master/data/mythology/greek_monsters.json
+
+titan
+	Coeus
+	Crius
+	Cronus
+	Hyperion
+	Iapetus
+	Mnemosyne
+	Oceanus
+	Phoebe
+	Rhea
+	Tethys
+	Theia
+	Themis
+	Asteria
+	Astraeus
+	Atlas
+	Aura
+	Clymene
+	Dione
+	Helios
+	Selene
+	Eos
+	Epimetheus
+	Eurybia
+	Eurynome
+	Lelantos
+	Leto
+	Menoeltius
+	Metis
+	Ophion
+	Pallas
+	Perses
+	Prometheus
+	Styx

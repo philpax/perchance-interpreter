@@ -1,0 +1,126 @@
+// https://perchance.org/room-type
+// Fetched at: 2025-11-13T01:18:54.882085+00:00
+
+title = Random Room Type Generator
+subtitle = Simply generates a random room type at each click :)
+fontSize = 200
+fontColor = black
+buttonText = randomize
+numberOfItems = 1
+itemSeperator = <br/>
+description
+	{import:simple-gen-footer}
+	$output = <p>[this.joinItems("</p><p>")]</p> // <-- don't remove this last line, it uses the special "$output" property to join and format your description as HTML paragraphs :)
+
+
+$output = [roomType]
+
+roomType
+	aerary
+	aircraft cabin
+	airport lounge
+	alcove
+	anatomical theatre
+	anechoic chamber
+	antechamber
+	anteroom
+	armory
+	assembly room
+	atelier
+	attic
+	auditorium
+	backroom
+	ballroom
+	basement
+	bathroom
+	bedroom
+	billiard room
+	boardroom
+	boiler room
+	boudoir
+	breakfast nook
+	breezeway
+	cabin
+	cafeteria
+	caldarium
+	cellar
+	changing room
+	chapel
+	classroom
+	clean room
+	cloakroom
+	closet
+	cold room
+	common room
+	computer lab
+	conference room
+	conservatory
+	control room
+	conversation pit
+	corner office
+	courtroom
+	cry room
+	darkroom
+	den
+	dining room
+	dormitory
+	drawing room
+	dressing room
+	electrical room
+	emergency room
+	engine room
+	equipment room
+	fallout shelter
+	family room
+	fitting room
+	foyer
+	game room
+	garage
+	guest room
+	gym
+	hotel room
+	kitchen
+	laundry room
+	library
+	living room
+	lobby
+	locker room
+	loft
+	lounge
+	mailroom
+	map room
+	motel room
+	mud room
+	newsroom
+	nursery
+	office
+	panic room
+	pantry
+	parlor
+	playroom
+	pool room
+	print room
+	rec room
+	salon
+	sauna
+	schoolroom
+	showroom
+	sitting room
+	staff room
+	stockroom
+	storm cellar
+	studio
+	study
+	sunroom
+	tearoom
+	throne room
+	transmission control room
+	tv room
+	utility room
+	waiting room
+	washroom
+	water closet
+	weight room
+	wine cellar
+	wiring closet
+	workshop

@@ -1,0 +1,200 @@
+// https://perchance.org/monster-edited
+// Fetched at: 2025-11-13T01:18:54.882085+00:00
+
+title = Edited Random Monster/Creature Type Generator
+subtitle = Edited from <a href="https://perchance.org/monster-type">monster-type</a> to have more monsters!
+fontSize = 200
+fontColor = black
+buttonText = randomize
+numberOfItems = 1
+itemSeperator = <hr style\="opacity:0;margin: 0.15em;"/>
+description
+  Edited by Cadaeic for own purposes, added more monsters from around the world! {import:simple-gen-footer}
+  $output = <p>[this.joinItems("</p><p>")]</p> // <-- don't remove this last line, it uses the special "$output" property to join and format your description as HTML paragraphs :)
+
+
+$output = [monster]
+
+// initial credit goes to: https://github.com/dariusk/corpora/blob/master/data/mythology/monsters.json
+
+monster
+  alkonost
+  alien
+  angel
+  amphiptere
+  amphisbaena
+  banshee
+  boggart
+  barghest
+  black shuck
+  buggane
+  brownie
+  bugbear
+  bigfoot
+  bonnacon
+  basilisk
+  behemoth
+  baku
+  centaur
+  chimera
+  chupacabra
+  cockatrice
+  cyclops
+  cerberus
+  cu sith
+  cait sith
+  drop bear^0.5
+  demon
+  djinn
+  drow
+  dullahan
+  duergar
+  dragon
+  draugr
+  dryad
+  dwarf
+  elemental
+  elf
+  fairy
+  fae
+  flatwoods monster
+  faun
+  frost giant
+  fenghuang
+  gargoyle
+  genie
+  ghast
+  ghost
+  ghoul
+  giant
+  gnome
+  goblin
+  golem
+  gorgon
+  gremlin
+  {gryphon|griffon|griffin}
+  grindylow
+  hag
+  harpy
+  hodag
+  hidebehind
+  hippocampus
+  hippogriff
+  hopping vampire
+  hobgoblin
+  homonculus
+  hellhound
+  hoop snake
+  hydra
+  imp
+  ichthyocentaur
+  incubus
+  jack-o'-lantern
+  jersey devil
+  jorōgumo
+  jackalope
+  kappa
+  kelpie
+  kobold
+  kamaitachi
+  knucker
+  kraken
+  kitsune
+  kumiho
+  lamassu
+  leprechaun
+  lich
+  lindworm
+  leviathan
+  leucrota
+  lavellan
+  loch ness monster
+  lamia
+  manticore
+  mermaid
+  merman
+  minotaur
+  melusine
+  mothman
+  mummy
+  myrmecoleon
+  naga
+  naiad
+  ningen
+  nue
+  nuckelavee
+  nix
+  nymph
+  nereid
+  oozlum bird
+  oread
+  ogre
+  oni
+  owlman
+  opinicus
+  orc
+  ouroboros
+  {qilin|kirin}
+  peryton
+  pooka
+  pegasus
+  phoenix
+  pixie
+  poltergeist
+  roc
+  revenant
+  rusalka
+  redcap
+  sasquatch
+  sidhe
+  salamander
+  satyr
+  selkie
+  siren
+  spectre
+  squonk
+  skeleton
+  sphinx
+  sirin
+  sprite
+  succubus
+  sylph
+  swanmay
+  troll
+  tomte
+  tengu
+  tailypo
+  tiefling
+  tsuchinoko
+  tikbalang
+  tsuchigumo
+  telchine
+  unicorn
+  undead
+  undine
+  vodyanoy
+  vampire
+  vampire watermelon^0.2
+  valkyrie
+  will-o'-the-wisp
+  warg
+  werewolf
+  werebear
+  wereboar
+  werecat
+  werehyena
+  wight
+  witch
+  wizard
+  warlock
+  wraith
+  wolpertinger
+  wyvern
+  wyrm
+  yeti
+  youkai
+  yaoguai
+  yurei
+  zombie
+  ziz
+  yuki-onna

@@ -1,0 +1,287 @@
+// https://perchance.org/archaic-word
+// Fetched at: 2025-11-13T01:13:03.448878+00:00
+
+title = Random Archaic Word Generator
+subtitle = Simply generates a random archaic word at each click :)
+fontSize = 200
+fontColor = black
+buttonText = randomize
+numberOfItems = 1
+itemSeperator = <hr style\="opacity:0;margin: 0.15em;"/>
+description
+	{import:simple-gen-footer}
+	$output = <p>[this.joinItems("</p><p>")]</p> // <-- don't remove this last line, it uses the special "$output" property to join and format your description as HTML paragraphs :)
+
+
+$output = [word]
+output = [w=word.selectOne]<p style\="opacity:0.5;font-size:60%;margin:0;">([w.def])</p>
+
+word
+	abaft
+		def = toward or at the stern of a ship; further aft
+	afore
+		def = before
+	agone
+		def = ago
+	alack
+		def = expression of sorrow or regret
+	alee
+		def = on or toward the lee
+	alow
+		def = below
+	amain
+		def = to a high degree; exceedingly; at full speed
+	an
+		def = if
+	anent
+		def = about; concerning
+	anon
+		def = at once; immediately
+	aright
+		def = right; correctly
+	aroint
+		def = begone
+	athwart
+		def = across; in opposition to; sideways; transversely
+	aught
+		def = anything at all; something
+	avaunt
+		def = away; hence
+	aye
+		def = yes
+	beforetime
+		def = formerly
+	belike
+		def = most likely; probably
+	betimes
+		def = in short time; speedily
+	betwixt
+		def = between
+	certes
+		def = in truth; certainly
+	clepe
+		def = to name; to call
+	eft
+		def = again; afterwards
+	eftsoons
+		def = soon after
+	egad
+		def = mild oath
+	eke
+		def = in addition; also; likewise
+	endlong
+		def = lengthwise
+	enow
+		def = enough
+	ere
+		def = before
+	erelong
+		def = before long; soon
+	erewhile
+		def = until now
+	eyne
+		def = eyes
+	fain
+		def = happy; inclined; pleased
+	fie
+		def = expression of disgust or disapproval
+	forby
+		def = past; near
+	fore
+		def = at an earlier time or period
+	forsooth
+		def = in truth; indeed
+	forthwith
+		def = immediately
+	froward
+		def = turned away; self-willed; unreasonable; perverse; adverse
+	gadzooks
+		def = mild oath
+	gar
+		def = mild oath
+	gardyloo
+		def = warning cry
+	gramercy
+		def = expression of gratitude or surprise
+	hark
+		def = to pay close attention; to listen
+	heretofore
+		def = until now
+	heyday
+		def = expression of elation or wonder
+	hight
+		def = named; called; to command or call
+	hist
+		def = expression used to attract attention
+	hither
+		def = to this place
+	howbeit
+		def = although
+	ifsoever
+		def = if ever
+	ilke
+		def = kind or nature
+	inly
+		def = inwardly; thoroughly
+	iwis
+		def = surely; certainly
+	lackaday
+		def = expression of regret or deprecation
+	lief
+		def = soon; gladly
+	marry
+		def = expression of surprised agreement
+	maugre
+		def = in spite of
+	mayhap
+		def = perhaps
+	meet
+		def = fitting; proper
+	meseems
+		def = it seems to me
+	methinks
+		def = I believe; I think
+	nary
+		def = not a one; not at all
+	natheless
+		def = nevertheless; notwithstanding
+	needs
+		def = of necessity; necessarily
+	nigh
+		def = nearly; almost
+	nowise
+		def = not at all
+	od
+		def = mild oath
+	or
+		def = before
+	parcel
+		def = partly
+	pardie
+		def = mild oath; certainly or truly
+	parfay
+		def = by my faith; verily
+	peradventure
+		def = perhaps; possibly; by adventure; by chance
+	prithee
+		def = expression of wish or request
+	puissant
+		def = powerful; mighty
+	quotha
+		def = expression of surprise or contempt
+	rede
+		def = to counsel or advise
+	ruth
+		def = pity; remorse; sorrow
+	semovedly
+		def = separately
+	siege
+		def = seat or throne
+	sith
+		def = since
+	somedeal
+		def = somewhat
+	somewhither
+		def = to some place; somewhere
+	sooth
+		def = truth; reality; in truth
+	soothfast
+		def = truthful; honest; faithful
+	soothly
+		def = in truth; truly
+	speed
+		def = prosperity; success
+	strait
+		def = strict; rigorous; constricted
+	sweven
+		def = vision seen in sleep; a dream
+	swink
+		def = to toil; to labour
+	swith
+		def = instantly; quickly
+	swoopstake
+		def = in an indiscriminate manner
+	teen
+		def = injury; grief
+	thereinto
+		def = into that or it
+	thereon
+		def = thereupon
+	therewith
+		def = thereupon; forthwith
+	therewithal
+		def = besides
+	thither
+		def = to that place
+	thole
+		def = to endure; to suffer
+	thro
+		def = through
+	tother
+		def = the other
+	twain
+		def = two
+	twixt
+		def = between
+	usward
+		def = toward us
+	verily
+		def = truly; certainly; confidently
+	wanion
+		def = ill luck; misfortune
+	weed
+		def = garment or outfit worn during mourning
+	wellaway
+		def = expression of sorrow or lamentation; alas
+	whenas
+		def = when
+	whencesoever
+		def = from whatsoever place or source
+	whereagainst
+		def = against which
+	whereinsoever
+		def = in whatsoever respect or place
+	whereinto
+		def = into which; into what
+	whereof
+		def = of what
+	whereon
+		def = on what
+	whereout
+		def = out of which
+	wherethrough
+		def = through which; through the agency of
+	whereuntil
+		def = to what
+	wherewith
+		def = with what
+	whichsoever
+		def = every one that
+	whilom
+		def = formerly; once; former
+	whither
+		def = to what place
+	whithersoever
+		def = to any place whatsoever
+	whitherward
+		def = toward what or which place
+	whosoever
+		def = every one who
+	wist
+		def = to know
+	withal
+		def = besides; therewith; nevertheless; with
+	wood
+		def = mad; insane; wild
+	yare
+		def = marked by quickness and agility; nimble; prepared; easily handled
+	yede
+		def = to go
+	yoicks
+		def = expression of surprise or excitement
+	yon
+		def = yonder; that over there; those over there
+	yonside
+		def = on the farther side of
+	zounds
+		def = mild oath

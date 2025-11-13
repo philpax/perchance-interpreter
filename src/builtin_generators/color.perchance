@@ -1,0 +1,31 @@
+// https://perchance.org/color
+// Fetched at: 2025-11-13T01:13:03.448878+00:00
+
+$output = [color]
+output = [color]
+
+color
+	red
+	orange
+	yellow
+	green
+	blue
+	purple
+	brown
+	magenta
+	tan
+	cyan
+	olive
+	maroon
+	navy
+	turquoise
+	silver
+	lime
+	teal
+	indigo
+	violet
+	pink
+	black
+	white
+	grey
+	

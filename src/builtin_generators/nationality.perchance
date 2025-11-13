@@ -1,0 +1,174 @@
+// https://perchance.org/nationality
+// Fetched at: 2025-11-13T01:18:54.882085+00:00
+
+title = Random Nationality Generator
+subtitle = Simply generates a random nationality at each click :)
+fontSize = 200
+fontColor = black
+buttonText = randomize
+numberOfItems = 1
+itemSeperator = <br/>
+description
+	{import:simple-gen-footer}
+	$output = <p>[this.joinItems("</p><p>")]</p> // <-- don't remove this last line, it uses the special "$output" property to join and format your description as HTML paragraphs :)
+
+// thanks to: http://www.esldesk.com/vocabulary/countries
+$output = [nationality]
+
+nationality
+	Afghan
+	Albanian
+	Algerian
+	Andorran
+	Angolan
+	Argentinian
+	Armenian
+	Australian
+	Austrian
+	Azerbaijani
+	Bahamian
+	Bangladeshi
+	Barbadian
+	Belorussian
+	Belgian
+	Beninese
+	Bhutanese
+	Bolivian
+	Bosnian
+	Brazilian
+	British
+	Bruneian
+	Bulgarian
+	Burmese
+	Burundian
+	Cambodian
+	Cameroonian
+	Canadian
+	Chadian
+	Chilean
+	Chinese
+	Colombian
+	Congolese
+	Croatian
+	Cuban
+	Cypriot
+	Czech
+	Danish
+	Dominican
+	Ecuadorean
+	Egyptian
+	Salvadorean
+	English
+	Eritrean
+	Estonian
+	Ethiopian
+	Fijian
+	Finnish
+	French
+	Gabonese
+	Gambian
+	Georgian
+	German
+	Ghanaian
+	Greek
+	Grenadian
+	Guatemalan
+	Guinean
+	Guyanese
+	Haitian
+	Dutch
+	Honduran
+	Hungarian
+	Icelander
+	Indian
+	Indonesian
+	Iranian
+	Iraqi
+	Irish
+	Israeli
+	Italian
+	Jamaican
+	Japanese
+	Jordanian
+	Kazakh
+	Kenyan
+	Korean
+	Kuwaiti
+	Laotian
+	Latvian
+	Lebanese
+	Liberian
+	Libyan
+	Liechtensteiner
+	Lithuanian
+	Luxembourger
+	Macedonian
+	Madagascan
+	Malawian
+	Malaysian
+	Maldivian
+	Malian
+	Maltese
+	Mauritanian
+	Mauritian
+	Mexican
+	Moldovan
+	Monacan
+	Mongolian
+	Montenegrin
+	Moroccan
+	Mozambican
+	Namibian
+	Nepalese
+	Nicaraguan
+	Nigerien
+	Nigerian
+	Norwegian
+	Pakistani
+	Panamanian
+	Paraguayan
+	Peruvian
+	Filipino
+	Polish
+	Portuguese
+	Qatari
+	Romanian
+	Russian
+	Rwandan
+	Saudi
+	Scottish
+	Senegalese
+	Serbian
+	Singaporean
+	Slovakian
+	Slovenian
+	Somali
+	Spanish
+	SriLankan
+	Sudanese
+	Surinamese
+	Swazi
+	Swedish
+	Swiss
+	Syrian
+	Taiwanese
+	Tadzhik
+	Tanzanian
+	Thai
+	Togolese
+	Trinidadian
+	Tunisian
+	Turkish
+	Ugandan
+	Ukrainian
+	British
+	American
+	Uruguayan
+	Uzbek
+	Venezuelan
+	Vietnamese
+	Welsh
+	Yemeni
+	Zambian
+	Zimbabwean
+	

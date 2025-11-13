@@ -1,0 +1,471 @@
+// https://perchance.org/nautical-term
+// Fetched at: 2025-11-13T01:13:03.448878+00:00
+
+title = Random Nautical Term Generator
+subtitle = Simply generates a random nautical term at each click :)
+fontSize = 200
+fontColor = black
+buttonText = randomize
+numberOfItems = 1
+itemSeperator = <hr style\="opacity:0;margin: 0.15em;"/>
+description
+	{import:simple-gen-footer}
+	$output = <p>[this.joinItems("</p><p>")]</p> // <-- don't remove this last line, it uses the special "$output" property to join and format your description as HTML paragraphs :)
+
+
+$output = [word]
+output = [w=word.selectOne]<p style\="opacity:0.5;font-size:60%;margin:0;">([w.def])</p>
+
+// Credit goes to: http://phrontistery.info/nautical.html
+
+word
+	abaft
+		def = toward or at the stern of a ship; further aft
+	affreightment
+		def = hiring of a vessel
+	afterdeck
+		def = deck behind a ship's bridge
+	afterguard
+		def = men who work the aft sails on the quarterdeck and poop deck
+	ahull
+		def = with sails furled and helm lashed to the lee-side
+	amidships
+		def = midway between the bow and stern of a ship
+	astern
+		def = at the stern of a ship
+	backstay
+		def = stay extending from ship's mastheads to the side of the ship
+	ballaster
+		def = one who supplies ships with ballast
+	bargemaster
+		def = owner of a barge
+	bee
+		def = hardwood on either side of bowsprit through which forestays are reeved
+	belay
+		def = to secure a rope by winding on a pin or cleat
+	bilge
+		def = lower point of inner hull of a ship
+	binnacle
+		def = case in which a ship's compass is kept
+	bitts
+		def = posts mounted on a ship for fastening ropes
+	bluepeter
+		def = blue flag with white square in centre used as ship's signal
+	boatswain
+		def = ship's crewmember in charge of equipment and maintenance
+	bobstay
+		def = rope used on ships to steady the bowsprit
+	bollard
+		def = short post on a wharf or ship to which ropes are tied
+	boltrope
+		def = strong rope stitched to edges of a sail
+	bosun
+		def = boatswain
+	bottomry
+		def = using the ship as collateral to finance a sea voyage
+	bow
+		def = front of a ship
+	bower
+		def = anchor carried at bow of a ship
+	bowline
+		def = rope used to keep weather edge of a sail taut
+	bowsprit
+		def = spar that extends at bows of a ship
+	brails
+		def = ropes on edge of sail for hauling up
+	bream
+		def = to clean a ship's bottom by burning off seaweed
+	bulwark
+		def = the side of a ship above the deck
+	bumpkin
+		def = spar projecting from stern of ship
+	bunt
+		def = middle of sail, fish-net or cloth when slack
+	buntline
+		def = rope attached to middle of square sail to haul it up to the yard
+	burgee
+		def = small ship's flag used for identification or signalling
+	cable
+		def = heavy rope or chain for mooring a ship
+	cabotage
+		def = shipping and sailing between points in the same country
+	camber
+		def = slight arch or convexity to a beam or deck of a ship
+	capstan
+		def = upright device for winding in heavy ropes or cables
+	careen
+		def = to turn a ship on its side in order to clean or repair it
+	cathead
+		def = projection near the bow of a ship to which anchor is secured
+	chine
+		def = the intersection of the middle and sides of a boat
+	chock
+		def = metal casting with curved arms for passing ropes for mooring ship
+	clew
+		def = corner of sail with hole to attach ropes
+	coaming
+		def = raised edge around ship's hatches to keep water out
+	cocket
+		def = official shipping seal; customs clearance form
+	cofferdam
+		def = narrow vacant space between two bulkheads of a ship
+	cog
+		def = single-masted, square-sailed ship with raised stern
+	companionway
+		def = stairs from upper deck of ship to lower deck
+	cordage
+		def = ropes in the rigging of a ship
+	cringle
+		def = loop at corner of sail to which a line is attached
+	crosstrees
+		def = horizontal crosspieces at a masthead used to support ship's mast
+	davit
+		def = device for hoisting and lowering a boat
+	deadeye
+		def = rounded wooden block with hole used to set up ship's stays
+	deadwood
+		def = timbers built into ends of ship when too narrow to permit framing
+	demurrage
+		def = delay of vessel's departure or loading with cargo
+	dodger
+		def = shield against rain or spray on a ship's bridge
+	dogwatch
+		def = a short, evening period of watch duty on a ship
+	downhaul
+		def = rope for holding down or hauling down a sail or spar
+	dromond
+		def = large single-sailed ship powered by rowers
+	dyogram
+		def = ship's chart indicating compass deflection due to ship's iron
+	earing
+		def = line for fastening corner of a sail to the gaff or yard
+	ensign
+		def = large naval flag
+	escutcheon
+		def = part of ship's stern where name is displayed
+	fairlead
+		def = ring through which rope is led to change its direction without friction
+	fardage
+		def = wood placed in bottom of ship to keep cargo dry
+	fiddley
+		def = iron framework around hatchway opening
+	figurehead
+		def = ornament or (usually female) bust attached to the bow of a ship
+	flagstaff
+		def = flag pole at stern of a ship
+	fluke
+		def = part of an anchor that fastens in the ground
+	forebitt
+		def = post for fastening cables at a ship's foremast
+	forecabin
+		def = cabin in fore part of ship
+	forecastle
+		def = short raised deck at fore end of ship; fore of ship under main deck
+	forefoot
+		def = foremost end of ship's keel
+	foremast
+		def = mast nearest the bow of a ship
+	foresail
+		def = lowest sail set on the foremast of square-rigged ship
+	forestay
+		def = stay leading from the foremast to the bow of a ship
+	frap
+		def = to draw a sail tight with ropes or cables
+	freeboard
+		def = distance between waterline and main deck of a ship
+	futtock
+		def = rib of a ship
+	gaff
+		def = spar on which head of fore-and-aft sail is extended
+	gaff-topsail
+		def = triangular topsail with its foot extended upon the gaff
+	gangway
+		def = either of the sides of the upper deck of a ship
+	garboard
+		def = plank on a ship’s bottom next to the keel
+	genoa
+		def = large jib that overlaps the mainsail
+	grapnel
+		def = small anchor used for dragging or grappling
+	groundage
+		def = a charge on a ship in port
+	gudgeon
+		def = metal socket into which the pintle of a boat's rudder fits
+	gunnage
+		def = number of guns carried on a warship
+	gunwale
+		def = upper edge of the side of a ship
+	gybe
+		def = to swing a sail from one side to another
+	halyard
+		def = rope or tackle for hoisting and lowering sails
+	hank
+		def = series of rings or clips for attaching a jib or staysail to a stay
+	hawse
+		def = distance between ship's bow and its anchor
+	hawsehole
+		def = hole for ship's cable
+	hawser
+		def = large rope for mooring or towing a ship
+	headsail
+		def = sail set forward of the foremast of a ship
+	helm
+		def = ship's steering wheel
+	holystone
+		def = sandstone material used to scrape ships' decks
+	inboard
+		def = inside the line of a ship's bulwarks or hull
+	jack
+		def = ship's flag flown from jack-staff at bow of vessel
+	jack-block
+		def = pulley system for raising topgallant masts
+	jack-cross-tree
+		def = single iron cross-tree at head of a topgallant mast
+	jackstaff
+		def = short staff at ship's bow from which the jack is hoisted
+	jackstay
+		def = iron or wooden bar running along yard of ship to which sails fastened
+	jackyard
+		def = spar used to spread the foot of a gaff-topsail
+	jib
+		def = small triangular sail extending from the head of the foremast
+	jibboom
+		def = spar forming an extension of the bowsprit
+	jibe
+		def = to change a ship's course to make the boom shift sides
+	jurymast
+		def = mast erected on ship in place of one lost
+	kedge
+		def = small anchor to keep a ship steady
+	keelhaul
+		def = to punish by dragging under keel of ship
+	keelson
+		def = lengthwise wooden or steel beam in ship for bearing stress
+	kentledge
+		def = pig-iron used as ballast in ship's hold
+	lagan
+		def = cargo jettisoned from ship but marked by buoys for recovery
+	lanyard
+		def = rope or line for fastening something in a ship
+	larboard
+		def = left side of a ship
+	lastage
+		def = room for stowing goods in a ship
+	lateen
+		def = triangular sail rigged on ship's spar
+	laveer
+		def = to sail against the wind
+	lazaret
+		def = space in ship between decks used for storage
+	leeboard
+		def = wood or metal planes attached to hull to prevent leeway
+	leech
+		def = a vertical edge of a square sail
+	loxodograph
+		def = device used to record ship's travels
+	luff
+		def = windward side of a ship; forward edge of fore-and-aft sail
+	lugsail
+		def = four-sided sail bent to an obliquely hanging yard
+	lutchet
+		def = fitting on ship's deck to allow mast to pivot to pass under bridges
+	mainmast
+		def = sailing ship's principal mast
+	mainsail
+		def = principal sail on a ship's mainmast
+	mainsheet
+		def = rope by which mainsail is trimmed and secured
+	mainstay
+		def = stay that extends from the main-top to the foot of the foremast
+	manrope
+		def = rope used as a handrail on a ship
+	martingale
+		def = lower stay of rope used to sustain strain of the forestays
+	mizzen
+		def = three-masted vessel; aft sail of such a vessel
+	mizzenmast
+		def = mast aft or next aft of the mainmast in a ship
+	moonraker
+		def = topmost sail of a ship, above the skyscraper
+	oakum
+		def = old ropes untwisted for caulking the seams of ships
+	orlop
+		def = lowest deck in a ship having four or more decks
+	outhaul
+		def = rope used to haul a sail taut along a spar
+	outrigger
+		def = spar extended from side of ship to help secure mast
+	painter
+		def = rope attached to bow of a boat to attach it to a ship or a post
+	pallograph
+		def = instrument measuring ship's vibration
+	parrel
+		def = band by which a yard is fastened to a mast
+	patroon
+		def = captain of a ship; coxswain of a longboat
+	poop
+		def = enclosed structure at stern of ship above main deck
+	port
+		def = when facing forward, the left side of a ship
+	primage
+		def = fee paid to loaders for loading ship
+	purser
+		def = ship's officer in charge of finances and passengers
+	quarterdeck
+		def = part of ship's deck set aside by captain for ceremonial functions
+	quartering
+		def = sailing nearly before the wind
+	rake
+		def = the inclination of a mast or another part of a ship
+	ratline
+		def = small rope forming a rung of a rope ladder on a ship
+	reef
+		def = to reduce area of a sail by rolling or folding part of it
+	reeve
+		def = to pass a rope through a ring
+	roach
+		def = curved cut in edge of sail for preventing chafing
+	roband
+		def = piece of yarn used to fasten a sail to a spar
+	rostrum
+		def = spike on prow of warship for ramming
+	rowlock
+		def = contrivance serving as a fulcrum for an oar
+	royal
+		def = small sail on royal mast just above topgallant sail
+	scud
+		def = to sail swiftly before a gale
+	scupper
+		def = hole allowing water to drain from ship’s deck
+	scuttlebutt
+		def = cask of drinking water aboard a ship; rumour, idle gossip
+	scuttles
+		def = portholes on a ship
+	sheer
+		def = fore-and-aft curvature of a ship from bow to stern
+	shrouds
+		def = ropes supporting the mast of a ship
+	sidelight
+		def = coloured lights on side of a ship under way at night
+	skeg
+		def = part of ship connecting the keel with the bottom of the rudderpost
+	skysail
+		def = sail above the royal sail
+	skyscraper
+		def = triangular sail on a ship above the royal
+	slipway
+		def = ramp sloping into water for supporting a ship
+	snotty
+		def = naval midshipman
+	spanker
+		def = sail on the mast nearest the stern of a square-rigged ship
+	spar
+		def = any ship's mast, boom, yard, or gaff
+	spinnaker
+		def = large triangular sail opposite the mainsail
+	spirketting
+		def = inside planking between ports and waterways of a ship
+	sponson
+		def = platform jutting from ship’s deck for gun or wheel
+	sprit
+		def = spar crossing a fore-and-aft sail diagonally
+	spritsail
+		def = sail extended by a sprit
+	starboard
+		def = when facing forward, the right side of a ship
+	starbolins
+		def = sailors of the starboard watch
+	stay
+		def = large rope used to support a mast
+	staysail
+		def = fore-and-aft sail hoisted on a stay
+	steeve
+		def = to set a ship's bowsprit at an upward inclination
+	stemson
+		def = supporting timber of a ship
+	stern
+		def = back part of a ship
+	sternpost
+		def = main member at stern of a ship extending from keel to deck
+	sternway
+		def = movement of a ship backwards
+	stevedore
+		def = dock worker who loads and unloads ships
+	stokehold
+		def = ship’s furnace chamber
+	strake
+		def = continuous band of plates on side of a ship
+	stunsail
+		def = light auxiliary sail to the side of principal sails
+	supercargo
+		def = ship's official in charge of business affairs
+	taffrail
+		def = rail round the stern of a ship
+	thole
+		def = pin in the side of a boat to keep oar in place
+	tiller
+		def = handle or lever for turning a ship's rudder
+	timberhead
+		def = top end of ship's timber used above the gunwale
+	timenoguy
+		def = rope stretched from place to place in a ship
+	topgallant
+		def = mast or sail above the topmast and below the royal mast
+	topmast
+		def = ship's mast above the lower mast
+	topsail
+		def = ship's sail above the lowermost sail
+	tranship
+		def = to transfer from one ship to another
+	transire
+		def = ship's customs warrant for clearing goods
+	transom
+		def = transverse timbers attached to ship's sternpost
+	treenail
+		def = long wooden pin used to fix planks of ship to the timbers
+	trice
+		def = to haul in and lash secure a sail with a small rope
+	trunnel
+		def = wooden shipbuilding peg used for fastening timbers
+	trysail
+		def = ship's sail bent to a gaff and hoisted on a lower mast
+	tuck
+		def = part of ship where ends of lower planks meet under the stern
+	turtleback
+		def = structure over ship’s bows or stern
+	unreeve
+		def = to withdraw a rope from an opening
+	walty
+		def = inclined to tip over or lean
+	wardroom
+		def = quarters for ship's officers
+	washboard
+		def = broad thin plank along ship's gunwale to keep out sea water
+	watching
+		def = fully afloat
+	waveson
+		def = goods floating on the sea after a shipwreck
+	wear
+		def = to turn a ship's stern to windward to alter its course
+	weatherboard
+		def = weather side of a ship
+	weatherly
+		def = able to sail close to the wind with little leeway
+	wheelhouse
+		def = shelter where ship’s steering wheel kept
+	whipstaff
+		def = vertical lever controlling ship’s rudder
+	windbound
+		def = hindered from sailing by contrary winds
+	windlass
+		def = winch used to raise a ship's anchor
+	xebec
+		def = small three-masted pirate ship
+	yard
+		def = tapering spar attached to ship's mast to spread the head of a square sail
+	yardarm
+		def = either end of the yard of a square-rigged ship
+	yawl
+		def = ship’s small boat; sailboat carrying mainsail and one or more jibs
+	zabra
+		def = small Spanish sailing vessel

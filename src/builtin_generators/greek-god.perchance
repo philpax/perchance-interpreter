@@ -1,0 +1,52 @@
+// https://perchance.org/greek-god
+// Fetched at: 2025-11-13T01:13:03.448878+00:00
+
+title = Random Greek God Generator
+subtitle = Simply generates a random Greek god at each click :)
+fontSize = 200
+fontColor = black
+buttonText = randomize
+numberOfItems = 1
+itemSeperator = <hr style\="opacity:0;margin: 0.15em;"/>
+description
+	{import:simple-gen-footer}
+	$output = <p>[this.joinItems("</p><p>")]</p> // <-- don't remove this last line, it uses the special "$output" property to join and format your description as HTML paragraphs :)
+
+
+$output = [god]
+output = [c=god.selectOne]<p style\="opacity:0.5;font-size:60%;margin:0;">(<a href\="https://www.google.com/search?ie=UTF-8&oe=UTF-8&sourceid=navclient&gfns=1&q=[c] greek mythology site:wikipedia.org">wikipeida</a>)</p>
+
+// Credit goes to: https://github.com/dariusk/corpora/blob/master/data/mythology/greek_gods.json
+
+god
+	Aphrodite
+	Apollo
+	Ares
+	Artemis
+	Athena
+	Demeter
+	Dionysus
+	Hades
+	Hephaestus
+	Hera
+	Hermes
+	Hestia
+	Poseidon
+	Zeus
+	Aether
+	Ananke
+	Chaos
+	Chronos
+	Erebus
+	Eros
+	Hypnos
+	Uranus
+	Gaia
+	Phanes
+	Pontus
+	Tartarus
+	Thalassa
+	Thanatos
+	Hemera
+	Nyx
+	Nemesis

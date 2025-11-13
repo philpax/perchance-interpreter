@@ -84,6 +84,9 @@ pub enum Expression {
 
     // Binary operations: ==, !=, <, >, <=, >=, &&, ||
     BinaryOp(Box<Expression>, BinaryOperator, Box<Expression>),
+
+    // Import: {import:generator-name}
+    Import(String),
 }
 
 #[derive(Debug, Clone, PartialEq)]

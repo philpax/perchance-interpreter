@@ -1,0 +1,31 @@
+// https://perchance.org/planet-name
+// Fetched at: 2025-11-13T01:13:03.448878+00:00
+
+title = Random Planet Generator
+subtitle = Simply generates a random planet from our own solar system at each click :)
+fontSize = 200
+fontColor = black
+buttonText = randomize
+numberOfItems = 1
+itemSeperator = <hr style\="opacity:0;margin: 0.15em;"/>
+description
+	{import:simple-gen-footer}
+	$output = <p>[this.joinItems("</p><p>")]</p> // <-- don't remove this last line, it uses the special "$output" property to join and format your description as HTML paragraphs :)
+
+
+$output = [planet]
+
+planet
+	Mercury
+	Venus
+	Earth
+	Mars
+	Ceres (dwarf)
+	Jupiter
+	Saturn
+	Uranus
+	Neptune
+	Pluto (dwarf)
+	Haumea (dwarf)
+	Makemake (dwarf)
+	Eris (dwarf)

@@ -1,0 +1,68 @@
+// https://perchance.org/emotion
+// Fetched at: 2025-11-13T01:13:03.448878+00:00
+
+title = Random Emotion Generator
+subtitle = Simply generates a random emotion at the click of a button.
+fontSize = 230
+fontColor = black
+buttonText = randomize 
+numberOfItems = 1
+itemSeperator = <br/>
+description
+	{import:simple-gen-footer}
+	$output = <p>[this.joinItems("</p><p>")]</p> // <-- don't remove this last line, it uses the special "$output" property to join and format your description as HTML paragraphs :)
+
+
+$output = [emotion]
+
+// Credit goes to: https://raw.githubusercontent.com/RantLang/Rantionary/master/emotions.dic
+	
+emotion
+	anger
+	anticipation
+	awe
+	bewilderment
+	bliss
+	boredom
+	confusion
+	contempt
+	contentment
+	despair
+	disappointment
+	ecstasy
+	envy
+	excitement
+	fright
+	fury
+	gratitude
+	guilt
+	happiness
+	hatred
+	horror
+	humility
+	hunger
+	interest
+	irritation
+	joy
+	longing
+	love
+	lust
+	madness
+	melancholy
+	optimism
+	pain
+	passion
+	pity
+	pleasure
+	pride
+	rage
+	remorse
+	sadness
+	satisfaction
+	shame
+	shock
+	smugness
+	sorrow
+	surprise
+	terror
+	torment
