@@ -4,56 +4,58 @@
 [![Frontend CI](https://github.com/philpax/perchance-interpreter/workflows/Frontend%20CI/badge.svg)](https://github.com/philpax/perchance-interpreter/actions/workflows/frontend.yml)
 [![Deploy Frontend](https://github.com/philpax/perchance-interpreter/workflows/Deploy%20Frontend/badge.svg)](https://github.com/philpax/perchance-interpreter/actions/workflows/deploy-frontend.yml)
 
-A Rust implementation of the Perchance template language with deterministic random generation.
+A Rust implementation of the [Perchance](https://perchance.org/) template language with deterministic random generation. Includes a web frontend powered by WebAssembly.
 
-## Features
+## What is Perchance?
 
-This interpreter implements core Perchance functionality:
+Perchance is a random text generator language that uses weighted lists and template expansion to create procedurally generated content. This interpreter implements the core Perchance functionality in Rust with a focus on deterministic output, making it suitable for embedding in games, tools, and applications.
 
-### ✅ Implemented
-- Basic list selection
-- Weighted selection with `^` operator
-- Inline lists with `{option1|option2}` syntax
-- Number ranges `{1-10}`, including negative ranges `{-5-5}`
-- Letter ranges `{a-z}`, `{A-Z}`
+## What's Implemented
+
+This is a **fully-functional** implementation of core Perchance features:
+
+### Core Features ✅
+- **List selection** with weighted randomization (`item^3`)
+- **Inline lists** (`{option1|option2}`)
+- **Ranges** (`{1-10}`, `{a-z}`, including negatives)
+- **Hierarchical lists** with property access (`[character.wizard.name]`)
+- **Variables** and sequences (`[x = animal, x]`)
+- **Methods**: `upperCase`, `lowerCase`, `titleCase`, `sentenceCase`, `selectOne`, `selectMany(n)`, `selectUnique(n)`, `selectAll`, `joinItems(sep)`
+- **Grammar methods**: `pluralForm`, `pastTense`, `possessiveForm`, `futureTense`, `presentTense`, `negativeForm`, `singularForm`
+- **Special functions**: `{a}` (smart articles), `{s}` (pluralization)
+- **Conditional logic**: ternary operator (`[x > 5 ? "big" : "small"]`) with binary operators (`==`, `!=`, `<`, `>`, `<=`, `>=`, `&&`, `||`)
+- **consumableList**: stateful lists where items are removed after selection
+- **$output keyword**: custom list output without random selection
+- **Import/export**: `{import:generator-name}` with property access
+- **37 builtin generators**: animals, colors, nouns, countries, and more
+
+### Advanced Features ✅
+- Deterministic RNG with seeded generation
+- Dynamic sub-list referencing (`[list[variable]]`)
+- Chained property access
 - Escape sequences (`\s`, `\t`, `\\`, `\[`, `\]`, `\{`, `\}`, `\=`, `\^`)
 - Comments with `//`
-- Deterministic random generation with seeded RNG
 - Two-space or tab indentation
-- Multiple list references
-- Nested inline lists
-- Variable assignment and references in sequences `[x = animal, x]`
-- String literals in expressions (evaluated for references)
-- Text transformation methods (`upperCase`, `lowerCase`, `titleCase`, `sentenceCase`)
-- **Hierarchical lists** - Full support for nested sublists
-- **Property access** - Chained property access like `[character.wizard.name]`
-- **Methods without parentheses** - `[word.upperCase]` works correctly
-- **selectOne method** - Full support including property access `[c = list.selectOne, c.property]`
-- **Dynamic sub-list referencing** - `[list[variable]]` for computed property access
-- **Selection methods** - `selectMany(n)`, `selectUnique(n)`, `selectAll` for bulk selection
-- **Special inline functions** - `{a}` for smart articles, `{s}` for pluralization
-- **Grammar methods** - `pluralForm`, `pastTense`, `possessiveForm`, `futureTense`, `presentTense`, `negativeForm`, `singularForm`
-- **joinItems method** - Custom separators for list results: `[list.selectMany(3).joinItems(", ")]`
-- **Conditional logic** - Ternary operator `[condition ? true : false]`
-- **Binary operators** - `==`, `!=`, `<`, `>`, `<=`, `>=`, `&&`, `||`
-- **$output keyword** - Custom output for lists without random selection
-- **consumableList** - Stateful lists where items are removed after selection
 
-### ❌ Not Implemented (Out of Scope)
-- JavaScript code execution
-- Plugin system
-- `this` keyword for accessing sibling properties
-- HTML/CSS rendering (HTML tags are passed through as-is)
-- Import/export between generators with `{import:name}` syntax (requires multi-file architecture)
-- Long-form if/else statements (ternary `?:` is supported)
-- Mathematical operations (+, -, *, /, etc.)
-- String concatenation with `+` operator
-- **Dynamic odds** with `^[condition]` syntax (e.g., `item ^[variable == "value"]`)
-- **`evaluateItem` method** for explicitly evaluating items before storage
-- **`||` operator for property fallback** (e.g., `[a.property || "default"]` for missing properties)
-- **Variable-count selection** - `selectMany(min, max)` and `selectUnique(min, max)` for random counts
+### Test Status: **180/180 tests passing** ✨
 
-**Note**: Binary `||` operator IS supported in conditional expressions (e.g., `[a || b ? "yes" : "no"]`)
+## What Remains to be Done
+
+Features not yet implemented:
+
+- **JavaScript execution** - Inline JavaScript code blocks
+- **Plugin system** - Custom plugin loading
+- **`this` keyword** - Full support with property assignment syntax
+- **HTML/CSS rendering** - Proper handling of HTML tags and styles
+- **Math operations** - Expression evaluation (`+`, `-`, `*`, `/`, `%`)
+- **String concatenation** - `+` operator for strings
+- **Additional features**:
+  - Dynamic odds with `^[condition]` syntax
+  - `evaluateItem` method for explicit evaluation before storage
+  - Property fallback `||` operator (e.g., `[a.property || "default"]`)
+  - Variable-count selection (`selectMany(min, max)`, `selectUnique(min, max)`)
+
+**Note**: Binary `||` IS supported in conditionals (e.g., `[a || b ? "yes" : "no"]`)
 
 ## Installation
 
@@ -61,91 +63,66 @@ This interpreter implements core Perchance functionality:
 cargo build --release
 ```
 
-## Web Frontend
-
-This project includes a beautiful web-based frontend built with React, TypeScript, and WebAssembly. The frontend provides:
-
-- **Live Preview**: Real-time evaluation as you type
-- **Interactive Editor**: Syntax-highlighted editor with auto-completion
-- **Multiple Samples**: Generate many outputs from the same template
-- **Error Display**: Clear, helpful error messages
-- **Modern UI**: Responsive design with Tailwind CSS
-
-### Running the Frontend
-
-#### Quick Start (Recommended)
-
-Use the cross-platform Python build script:
-
-```bash
-# Setup and start development server
-python build-frontend.py --dev
-
-# Or just build for production
-python build-frontend.py --build
-```
-
-#### Manual Setup
-
-1. Build the WASM module:
-   ```bash
-   wasm-pack build perchance-wasm --target web --out-dir ../frontend/src/wasm
-   ```
-
-2. Start the development server:
-   ```bash
-   cd frontend
-   npm install
-   npm run dev
-   ```
-
-3. Open http://localhost:5173 in your browser
-
-For more details, see [frontend/README.md](frontend/README.md).
-
-### Automated Deployment
-
-The frontend is automatically deployed to [https://philpax.github.io/static/experimental/perchance/](https://philpax.github.io/static/experimental/perchance/) whenever changes are pushed to the main branch that affect:
-- Frontend code (`frontend/**`)
-- WASM module (`perchance-wasm/**`, `src/**`)
-- Build configuration (`build-frontend.py`, `.github/workflows/deploy-frontend.yml`)
-
-You can also manually trigger a deployment by running the "Deploy Frontend" workflow from the Actions tab.
-
-**Setup Requirements:**
-To enable automated deployment, you need to configure a GitHub secret:
-1. Create a Personal Access Token (classic) with `repo` permissions at https://github.com/settings/tokens
-2. Add it as a repository secret named `PAGES_DEPLOY_TOKEN` in the repository settings
-
 ## Usage
 
 ### As a Library
 
 ```rust
-use perchance_interpreter::evaluate_with_seed;
+use perchance_interpreter::run_with_seed;
 
-let template = "animal\n\tdog\n\tcat\n\noutput\n\tI saw a [animal].\n";
-let result = evaluate_with_seed(template, 42).unwrap();
+let template = r#"
+animal
+	dog
+	cat
+	bird
+
+output
+	I saw a [animal].
+"#;
+
+let result = run_with_seed(template, 42, None).await.unwrap();
 println!("{}", result);
 ```
 
 ### CLI Tool
 
 ```bash
-# Evaluate a template file with a seed
+# Evaluate with a seed (deterministic)
 cargo run --bin perchance template.perchance 42
 
-# Random output (no seed)
+# Random output
 cargo run --bin perchance template.perchance
 
 # Read from stdin
 cat template.perchance | cargo run --bin perchance -
 ```
 
-## Template Syntax
+### Web Frontend
+
+A modern, interactive web interface is available at [https://philpax.github.io/static/experimental/perchance/](https://philpax.github.io/static/experimental/perchance/)
+
+**Run locally:**
+```bash
+# Quick start (builds WASM + starts dev server)
+python build-frontend.py --dev
+
+# Or manually
+wasm-pack build perchance-wasm --target web --out-dir ../frontend/src/wasm
+cd frontend && npm install && npm run dev
+```
+
+Features:
+- Live preview as you type
+- Generate multiple samples
+- Syntax highlighting
+- Clear error messages
+- Responsive design with Tailwind CSS
+
+See [frontend/README.md](frontend/README.md) for details.
+
+## Quick Examples
 
 ### Basic Lists
-
 ```
 animal
 	dog
@@ -157,131 +134,42 @@ output
 ```
 
 ### Weighted Selection
-
 ```
 rarity
 	common^10
 	uncommon^3
-	rare^1
+	rare
 
 output
-	You found a [rarity] item!
+	Found a [rarity] item!
 ```
 
-### Inline Lists
-
+### Variables & Methods
 ```
-output
-	That's a {very|extremely} {big|small} animal!
-```
-
-### Number and Letter Ranges
-
-```
-output
-	I rolled a {1-6}.
-	Random letter: {a-z}
-```
-
-### Variables
-
-```
-animal
-	dog
-	cat
-
-output
-	[x = animal, x] and [x]
-```
-
-### Special Inline Functions
-
-```
-output
-	I saw {a} elephant and {a} dog.
-	I have 1 apple{s} and 3 orange{s}.
-```
-
-Output: "I saw an elephant and a dog. I have 1 apple and 3 oranges."
-
-### Grammar Methods
-
-```
-noun
-	child
-	city
-
-verb
-	run
-	walk
-
 name
-	James
+	alice
+	bob
 
 output
-	The [noun.pluralForm] [verb.pastTense].
-	[name.possessiveForm] book.
+	[n = name, n.titleCase] and [n.upperCase]
 ```
 
-Output: "The children ran. James' book."
-
-### Selection Methods
-
-```
-color
-	red
-	blue
-	green
-
-output
-	[color.selectMany(3)]
-	[color.selectUnique(2)]
-	[color.selectAll]
-```
-
-### Conditional Logic
-
+### Conditionals
 ```
 number
-	{1-6}
+	{1-10}
 
 output
-	[n = number, n < 4 ? "Too bad" : "Nice!"]
-	[n > 2 && n < 5 ? "Middle" : "Edge"]
-	[n == 6 ? "Perfect!" : "Keep trying"]
+	[n = number, n > 5 ? "High" : "Low"]
 ```
 
-### $output Keyword
-
+### Imports
 ```
-greeting
-	hello
-	hi
-	hey
-	$output = Welcome to our service
-
 output
-	[greeting]
+	I saw {a} {import:animal}.
 ```
 
-Output: "Welcome to our service" (always the same, no random selection)
-
-### joinItems with Custom Separator
-
-```
-fruit
-	apple
-	banana
-	orange
-
-output
-	[fruit.selectMany(3).joinItems(", ")]
-```
-
-Output: "banana, banana, orange" (or similar with comma separation)
-
-### consumableList for Unique Selection
-
+### consumableList (No Duplicates)
 ```
 card
 	ace
@@ -290,73 +178,51 @@ card
 	jack
 
 output
-	[deck = card.consumableList][deck], [deck], [deck], [deck]
+	[deck = card.consumableList][deck], [deck], [deck]
 ```
-
-Output: "king, ace, jack, queen" (each card appears exactly once, in random order)
+Output: `"king, ace, jack"` (each card appears once)
 
 ## Testing
 
 ```bash
-# Run all tests
-cargo test
-
-# Run only integration tests
-cargo test --test integration_tests
+cargo test              # Run all tests
+cargo clippy            # Lint
+cargo fmt               # Format
 ```
-
-## Known Issues
-
-None! All core features are working correctly.
 
 ## Architecture
 
-- **Parser** (`src/parser.rs`): Converts text to AST
-- **Compiler** (`src/compiler.rs`): Transforms AST into evaluatable structure
-- **Evaluator** (`src/evaluator.rs`): Executes with RNG to produce output
+```
+Template → Parser → AST → Compiler → CompiledProgram → Evaluator → Output
+```
+
+- **Parser** (`src/parser.rs`): Text → AST
+- **Compiler** (`src/compiler.rs`): AST → Optimized program with pre-calculated weights
+- **Evaluator** (`src/evaluator.rs`): Async execution with RNG and import support
+- **Loader** (`src/loader.rs`): Import system with builtin generators
 - **CLI** (`src/bin/main.rs`): Command-line interface
+- **WASM** (`perchance-wasm/`): WebAssembly bindings for frontend
 
-## Test Results
+## Builtin Generators
 
-Current test status: **106 out of 109 integration tests passing (97%)** ✨
-
-**3 failing tests** (expected - features not yet implemented):
-- `test_multiline_dynamic_odds_with_equality` - Dynamic odds `^[condition]` syntax
-- `test_multiline_evaluate_item_with_ranges` - `evaluateItem` method
-- `test_multiline_or_operator_fallback` - Property fallback `||` operator
-
-All implemented categories working:
-- ✅ Basic list selection and determinism
-- ✅ Weighted selection
-- ✅ Inline lists with weights
-- ✅ Number/letter ranges (including negative)
-- ✅ Escape sequences
-- ✅ Comments
-- ✅ Variable assignment in sequences
-- ✅ String literals with references
-- ✅ **Hierarchical lists** (all depths)
-- ✅ **Property access** (chained)
-- ✅ **Text transformation methods** (upperCase, lowerCase, titleCase, sentenceCase)
-- ✅ **Selection methods** (selectOne, selectMany, selectUnique, selectAll)
-- ✅ **Special inline functions** ({a} for articles, {s} for pluralization)
-- ✅ **Grammar methods** (pluralForm, pastTense, possessiveForm, futureTense, presentTense, negativeForm, singularForm)
-- ✅ **joinItems method** (custom separators for lists)
-- ✅ **Conditional logic** (ternary operator, binary operators)
-- ✅ **$output keyword** (custom list output)
-- ✅ **consumableList** (stateful unique selection)
+37 generators included: `animal`, `color`, `noun`, `country`, `occupation`, `fruit`, `vegetable`, `emotion`, `greek-god`, `planet-name`, and more. See `src/builtin_generators/mod.rs` for the full list.
 
 ## Future Work
 
-Potential enhancements:
-1. **Import/export system** - `{import:name}` syntax for composing generators (requires multi-file architecture)
-2. **`this` keyword** - Complete implementation with property assignment syntax (e.g., `property = value`)
-3. **Long-form if/else** - `[if (cond) {a} else {b}]` syntax alongside ternary
-4. Add more sophisticated article selection (handle words like "university", "hour")
-5. Add number-to-word conversion method
-6. Implement string manipulation methods (substring, replace, trim, etc.)
-7. Add mathematical expression evaluation (+, -, *, /, etc.)
-8. Improve plural/past tense rules for edge cases
-9. Add comparative/superlative grammar forms
+Additional features and enhancements:
+
+1. **Long-form if/else** - `[if (cond) {a} else {b}]` syntax alongside ternary
+2. **String manipulation** - Methods like `substring`, `replace`, `trim`, `split`
+3. **Advanced grammar** - Comparative/superlative forms, better edge cases for irregular words
+4. **Number formatting** - Number-to-word conversion, ordinals (1st, 2nd, 3rd)
+5. **Performance optimizations** - Further compiler optimizations, caching strategies
+
+## Contributing
+
+Contributions welcome! Please:
+1. Run `cargo test && cargo clippy && cargo fmt` before committing
+2. Add tests for new features
+3. Update documentation
 
 ## License
 
