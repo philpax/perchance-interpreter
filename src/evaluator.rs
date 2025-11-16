@@ -59,9 +59,10 @@ pub struct Evaluator<'a, R: Rng> {
     variables: HashMap<String, Value>,
     last_number: Option<i64>, // Track last number for {s} pluralization
     current_item: Option<CompiledItem>, // Track current item for `this` keyword
+    dynamic_properties: HashMap<String, Value>, // Track dynamic properties assigned via `this.property = value`
     consumable_lists: HashMap<String, ConsumableListState>, // Track consumable lists
-    consumable_list_counter: usize, // Counter for generating unique IDs
-    loader: Option<Arc<dyn GeneratorLoader>>, // Generator loader for imports
+    consumable_list_counter: usize,             // Counter for generating unique IDs
+    loader: Option<Arc<dyn GeneratorLoader>>,   // Generator loader for imports
     import_cache: HashMap<String, CompiledProgram>, // Cache for imported generators
 }
 
@@ -73,6 +74,7 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
             variables: HashMap::new(),
             last_number: None,
             current_item: None,
+            dynamic_properties: HashMap::new(),
             consumable_lists: HashMap::new(),
             consumable_list_counter: 0,
             loader: None,
@@ -165,6 +167,8 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
         if let Some(output_content) = &list.output {
             // Set current_item for `this` keyword access
             let old_item = self.current_item.take();
+            let old_dynamic_properties = std::mem::take(&mut self.dynamic_properties);
+
             if let Some(ref selected_item) = item {
                 self.current_item = Some(selected_item.clone());
             }
@@ -173,6 +177,7 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
 
             // Restore previous context
             self.current_item = old_item;
+            self.dynamic_properties = old_dynamic_properties;
 
             return result;
         }
@@ -504,22 +509,43 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                 // Special handling for "this" keyword
                 if let Expression::Simple(ident) = base.as_ref() {
                     if ident.name == "this" {
-                        // Access property from current_item and evaluate it
-                        if let Some(ref item) = self.current_item {
-                            if let Some(sublist) = item.sublists.get(&prop.name) {
-                                let sublist_clone = sublist.clone();
-                                return self.evaluate_list(&sublist_clone).await;
-                            } else {
-                                return Err(EvalError::UndefinedProperty(
-                                    "this".to_string(),
-                                    prop.name.clone(),
-                                ));
-                            }
-                        } else {
+                        if self.current_item.is_none() {
                             return Err(EvalError::TypeError(
                                 "'this' keyword can only be used within $output".to_string(),
                             ));
                         }
+
+                        // Check dynamic_properties first (for assigned properties)
+                        if let Some(value) = self.dynamic_properties.get(&prop.name) {
+                            return self.value_to_string(value.clone()).await;
+                        }
+
+                        // Then check the current_item's sublists
+                        if let Some(ref item) = self.current_item {
+                            // Direct property access
+                            if let Some(sublist) = item.sublists.get(&prop.name) {
+                                let sublist_clone = sublist.clone();
+                                return self.evaluate_list(&sublist_clone).await;
+                            }
+
+                            // If the item has exactly one sublist, delegate to it
+                            if item.sublists.len() == 1 {
+                                let single_sublist = item.sublists.values().next().unwrap();
+                                // Search through items in the single sublist for the property
+                                for subitem in &single_sublist.items {
+                                    if let Some(target_sublist) = subitem.sublists.get(&prop.name) {
+                                        let target_clone = target_sublist.clone();
+                                        return self.evaluate_list(&target_clone).await;
+                                    }
+                                }
+                            }
+                        }
+
+                        // Property not found
+                        return Err(EvalError::UndefinedProperty(
+                            "this".to_string(),
+                            prop.name.clone(),
+                        ));
                     }
                 }
 
@@ -627,18 +653,26 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
 
             Expression::Number(n) => Ok(self.format_number(*n)),
 
-            Expression::PropertyAssignment(base, _prop, value) => {
+            Expression::PropertyAssignment(base, prop, value) => {
                 // Handle property assignment like [this.property = value]
                 // Currently only supported for 'this' keyword
                 if let Expression::Simple(ident) = base.as_ref() {
                     if ident.name == "this" {
-                        // Evaluate the value
-                        let val = self.evaluate_expression(value).await?;
+                        if self.current_item.is_none() {
+                            return Err(EvalError::TypeError(
+                                "'this' keyword can only be used within $output".to_string(),
+                            ));
+                        }
 
-                        // For now, we'll return the value
-                        // Note: In a full implementation, this would modify the current item's properties
-                        // but that requires mutable access to the compiled item
-                        return Ok(val);
+                        // Evaluate the value and store it
+                        let val_str = self.evaluate_expression(value).await?;
+                        let val = Value::Text(val_str.clone());
+
+                        // Store in dynamic_properties for later access
+                        self.dynamic_properties.insert(prop.name.clone(), val);
+
+                        // Return the assigned value
+                        return Ok(val_str);
                     }
                 }
 

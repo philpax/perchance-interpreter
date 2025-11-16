@@ -233,38 +233,54 @@ output
     assert_eq!(parts[0], parts[1]);
 }
 
-// Note: Full `this` keyword property assignment would require mutable item properties
-// which needs architectural changes. The PropertyAssignment expression is implemented
-// but doesn't persist across evaluations. These tests are commented out for now.
-//
-// #[tokio::test]
-// async fn test_this_keyword_with_sublists() {
-//     let template = r#"
-// description
-// 	cute
-// 	fluffy
-// 	$output = [this.joinItems(" and ")]
-//
-// output
-// 	[description]
-// "#;
-//     let output = run(template, 42).await.unwrap();
-//     assert!(output.contains(" and "));
-// }
-//
-// #[tokio::test]
-// async fn test_this_keyword_property_assignment() {
-//     let template = r#"
-// test
-// 	item
-// 	$output = [this.custom = "value", "Result: ", this.custom]
-//
-// output
-// 	[test]
-// "#;
-//     let output = run(template, 42).await.unwrap();
-//     assert_eq!(output.trim(), "Result: value");
-// }
+#[tokio::test]
+async fn test_this_keyword_with_property() {
+    let template = r#"
+animal
+	dog
+		sound = woof
+	cat
+		sound = meow
+	$output = [this.sound]
+
+output
+	[animal]
+"#;
+    let output = run(template, 42).await.unwrap();
+    // Should access the sound property of the selected animal
+    assert!(output.trim() == "woof" || output.trim() == "meow");
+}
+
+#[tokio::test]
+async fn test_this_keyword_property_assignment() {
+    let template = r#"
+test
+	item1
+	item2
+	$output = [this.custom = "value", this.custom]
+
+output
+	[test]
+"#;
+    let output = run(template, 42).await.unwrap();
+    // The sequence assigns "value" to custom, then outputs it
+    assert_eq!(output.trim(), "value");
+}
+
+#[tokio::test]
+async fn test_this_keyword_multiple_properties() {
+    let template = r#"
+test
+	data
+	$output = [this.a = "A", this.b = "B", this.c = "C"][this.a]-[this.b]-[this.c]
+
+output
+	[test]
+"#;
+    let output = run(template, 42).await.unwrap();
+    // The sequence assigns all three, outputting only the last one ("C"), then outputs A-B-C
+    assert_eq!(output.trim(), "CA-B-C");
+}
 
 #[tokio::test]
 async fn test_math_in_conditionals() {
