@@ -2,7 +2,7 @@
 use crate::ast::*;
 use crate::span::Span;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub enum ParseError {
     UnexpectedEof,
     InvalidIndentation { span: Span },
@@ -34,34 +34,32 @@ impl ParseError {
 impl std::fmt::Display for ParseError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ParseError::UnexpectedEof => write!(f, "Unexpected end of file"),
+            ParseError::UnexpectedEof => {
+                write!(f, "Unexpected end of file")
+            }
             ParseError::InvalidIndentation { span } => {
-                write!(f, "Invalid indentation at position {}", span.start)
+                write!(f, "Invalid indentation at {}..{}", span.start, span.end)
             }
             ParseError::InvalidSyntax { message, span } => {
-                write!(f, "{} at position {}", message, span.start)
+                write!(f, "Syntax error: {} at {}..{}", message, span.start, span.end)
             }
             ParseError::UnterminatedReference { span } => {
-                write!(f, "Unterminated reference at position {}", span.start)
+                write!(f, "Unterminated reference at {}..{}", span.start, span.end)
             }
             ParseError::UnterminatedInline { span } => {
-                write!(f, "Unterminated inline list at position {}", span.start)
+                write!(f, "Unterminated inline list at {}..{}", span.start, span.end)
             }
             ParseError::UnterminatedString { span } => {
-                write!(f, "Unterminated string at position {}", span.start)
+                write!(f, "Unterminated string at {}..{}", span.start, span.end)
             }
             ParseError::InvalidEscape { ch, span } => {
-                write!(
-                    f,
-                    "Invalid escape sequence '\\{}' at position {}",
-                    ch, span.start
-                )
+                write!(f, "Invalid escape sequence '\\{}' at {}..{}", ch, span.start, span.end)
             }
             ParseError::InvalidNumberRange { span } => {
-                write!(f, "Invalid number range at position {}", span.start)
+                write!(f, "Invalid number range at {}..{}", span.start, span.end)
             }
             ParseError::EmptyListName { span } => {
-                write!(f, "Empty list name at position {}", span.start)
+                write!(f, "Empty list name at {}..{}", span.start, span.end)
             }
         }
     }
