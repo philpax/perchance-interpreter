@@ -192,7 +192,7 @@ output
 "#;
     let output = run(template, 42).await.unwrap();
     let count = output.trim().split(", ").count();
-    assert!(count >= 2 && count <= 4);
+    assert!((2..=4).contains(&count));
 }
 
 #[tokio::test]
@@ -211,7 +211,7 @@ output
     let output = run(template, 42).await.unwrap();
     let parts: Vec<&str> = output.trim().split(", ").collect();
     let count = parts.len();
-    assert!(count >= 2 && count <= 4);
+    assert!((2..=4).contains(&count));
 
     // Check uniqueness
     let unique_count = parts.iter().collect::<std::collections::HashSet<_>>().len();
