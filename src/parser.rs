@@ -41,19 +41,31 @@ impl std::fmt::Display for ParseError {
                 write!(f, "Invalid indentation at {}..{}", span.start, span.end)
             }
             ParseError::InvalidSyntax { message, span } => {
-                write!(f, "Syntax error: {} at {}..{}", message, span.start, span.end)
+                write!(
+                    f,
+                    "Syntax error: {} at {}..{}",
+                    message, span.start, span.end
+                )
             }
             ParseError::UnterminatedReference { span } => {
                 write!(f, "Unterminated reference at {}..{}", span.start, span.end)
             }
             ParseError::UnterminatedInline { span } => {
-                write!(f, "Unterminated inline list at {}..{}", span.start, span.end)
+                write!(
+                    f,
+                    "Unterminated inline list at {}..{}",
+                    span.start, span.end
+                )
             }
             ParseError::UnterminatedString { span } => {
                 write!(f, "Unterminated string at {}..{}", span.start, span.end)
             }
             ParseError::InvalidEscape { ch, span } => {
-                write!(f, "Invalid escape sequence '\\{}' at {}..{}", ch, span.start, span.end)
+                write!(
+                    f,
+                    "Invalid escape sequence '\\{}' at {}..{}",
+                    ch, span.start, span.end
+                )
             }
             ParseError::InvalidNumberRange { span } => {
                 write!(f, "Invalid number range at {}..{}", span.start, span.end)
