@@ -1453,30 +1453,61 @@ mod tests {
     #[test]
     fn test_inline_list() {
         let input = "output\n\t{big|small} animal\n";
-        let program = parse(input).unwrap();
-        assert_eq!(program.lists.len(), 1);
-        assert_eq!(program.lists[0].name, "output");
-        assert_eq!(program.lists[0].items.len(), 1);
+        // Breakdown of positions:
+        // 0-5: "output"
+        // 6: "\n"
+        // 7: "\t"
+        // 8-18: "{big|small}"
+        // 19-25: " animal"
+        // 26: "\n"
 
-        // Check the content structure without checking spans
-        let content = &program.lists[0].items[0].content;
-        assert_eq!(content.len(), 2);
-
-        // First part should be an inline list
-        match &content[0] {
-            ContentPart::Inline(inline, _) => {
-                assert_eq!(inline.choices.len(), 2);
+        assert_eq!(
+            parse(input).unwrap(),
+            Program {
+                lists: vec![List {
+                    name: "output".into(),
+                    items: vec![Item {
+                        content: vec![
+                            ContentPart::Inline(
+                                InlineList {
+                                    choices: vec![
+                                        InlineChoice {
+                                            content: vec![
+                                                ContentPart::Text("b".into(), Span::new(9, 10)),
+                                                ContentPart::Text("i".into(), Span::new(10, 11)),
+                                                ContentPart::Text("g".into(), Span::new(11, 12)),
+                                            ],
+                                            weight: None,
+                                            span: Span::new(9, 12),
+                                        },
+                                        InlineChoice {
+                                            content: vec![
+                                                ContentPart::Text("s".into(), Span::new(13, 14)),
+                                                ContentPart::Text("m".into(), Span::new(14, 15)),
+                                                ContentPart::Text("a".into(), Span::new(15, 16)),
+                                                ContentPart::Text("l".into(), Span::new(16, 17)),
+                                                ContentPart::Text("l".into(), Span::new(17, 18)),
+                                            ],
+                                            weight: None,
+                                            span: Span::new(13, 18),
+                                        }
+                                    ],
+                                    span: Span::new(8, 19),
+                                },
+                                Span::new(8, 19),
+                            ),
+                            ContentPart::Text(" animal".into(), Span::new(19, 26))
+                        ],
+                        weight: None,
+                        sublists: vec![],
+                        span: Span::new(8, 27),
+                    }],
+                    output: None,
+                    span: Span::new(0, 27),
+                }],
+                span: Span::new(0, 27),
             }
-            _ => panic!("Expected Inline"),
-        }
-
-        // Second part should be text
-        match &content[1] {
-            ContentPart::Text(text, _) => {
-                assert_eq!(text, " animal");
-            }
-            _ => panic!("Expected Text"),
-        }
+        );
     }
 
     #[test]

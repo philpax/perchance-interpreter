@@ -181,10 +181,93 @@ pub fn report_compile_error(source_name: &str, source: &str, error: &CompileErro
     String::from_utf8(output).expect("Invalid UTF-8 in diagnostic output")
 }
 
-/// Report an evaluation error
-/// Note: Evaluation errors don't have span information yet since they occur at runtime
-pub fn report_eval_error(error: &EvalError) -> String {
-    format!("Evaluation error: {}", error)
+/// Report an evaluation error with beautiful formatting
+pub fn report_eval_error(source_name: &str, source: &str, error: &EvalError) -> String {
+    let mut output = Vec::new();
+
+    let report = match error {
+        EvalError::UndefinedList { name, span } => {
+            Report::build(ReportKind::Error, source_name, span.start)
+                .with_message(format!("Undefined list: '{}'", name))
+                .with_label(
+                    Label::new((source_name, span_to_range(*span)))
+                        .with_message(format!("list '{}' is not defined", name))
+                        .with_color(Color::Red),
+                )
+                .with_help(format!("Define the '{}' list before using it, or check for typos", name))
+                .finish()
+        }
+        EvalError::UndefinedVariable { name, span } => {
+            Report::build(ReportKind::Error, source_name, span.start)
+                .with_message(format!("Undefined variable: '{}'", name))
+                .with_label(
+                    Label::new((source_name, span_to_range(*span)))
+                        .with_message(format!("variable '{}' is not defined", name))
+                        .with_color(Color::Red),
+                )
+                .with_help(format!("Assign a value to '{}' before using it", name))
+                .finish()
+        }
+        EvalError::UndefinedProperty { list, prop, span } => {
+            Report::build(ReportKind::Error, source_name, span.start)
+                .with_message(format!("Undefined property: '{}.{}'", list, prop))
+                .with_label(
+                    Label::new((source_name, span_to_range(*span)))
+                        .with_message(format!("property '{}' does not exist on '{}'", prop, list))
+                        .with_color(Color::Red),
+                )
+                .with_help(format!("Check that '{}' has a '{}' property or sublist", list, prop))
+                .finish()
+        }
+        EvalError::InvalidMethodCall { message, span } => {
+            Report::build(ReportKind::Error, source_name, span.start)
+                .with_message("Invalid method call".to_string())
+                .with_label(
+                    Label::new((source_name, span_to_range(*span)))
+                        .with_message(message)
+                        .with_color(Color::Red),
+                )
+                .finish()
+        }
+        EvalError::EmptyList { name, span } => {
+            Report::build(ReportKind::Error, source_name, span.start)
+                .with_message(format!("Cannot select from empty list: '{}'", name))
+                .with_label(
+                    Label::new((source_name, span_to_range(*span)))
+                        .with_message(format!("list '{}' has no items to select from", name))
+                        .with_color(Color::Red),
+                )
+                .with_help(format!("Add items to the '{}' list", name))
+                .finish()
+        }
+        EvalError::TypeError { message, span } => {
+            Report::build(ReportKind::Error, source_name, span.start)
+                .with_message("Type error")
+                .with_label(
+                    Label::new((source_name, span_to_range(*span)))
+                        .with_message(message)
+                        .with_color(Color::Red),
+                )
+                .finish()
+        }
+        EvalError::ImportError { message, span } => {
+            Report::build(ReportKind::Error, source_name, span.start)
+                .with_message("Import error")
+                .with_label(
+                    Label::new((source_name, span_to_range(*span)))
+                        .with_message(message)
+                        .with_color(Color::Red),
+                )
+                .with_help("Check that the generator name is correct and available")
+                .finish()
+        }
+    };
+
+    report
+        .write((source_name, Source::from(source)), &mut output)
+        .expect("Failed to write diagnostic");
+
+    String::from_utf8(output).expect("Invalid UTF-8 in diagnostic output")
 }
 
 /// Combined error reporting for any interpreter error
@@ -196,7 +279,7 @@ pub fn report_interpreter_error(
     match error {
         crate::InterpreterError::Parse(e) => report_parse_error(source_name, source, e),
         crate::InterpreterError::Compile(e) => report_compile_error(source_name, source, e),
-        crate::InterpreterError::Eval(e) => report_eval_error(e),
+        crate::InterpreterError::Eval(e) => report_eval_error(source_name, source, e),
     }
 }
 

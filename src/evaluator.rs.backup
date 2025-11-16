@@ -1105,7 +1105,7 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
             }
             Value::ImportedGenerator(generator_name) => {
                 // Evaluate the imported generator
-                let imported_program = self.load_import(&generator_name, Span::dummy()).await?.clone();
+                let imported_program = self.load_import(&generator_name).await?.clone();
 
                 // Create a new evaluator for the imported program with its own context
                 let mut imported_evaluator = Evaluator::new(&imported_program, self.rng);
@@ -1136,7 +1136,7 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                             &inline.choices[0].content[0]
                         {
                             // Load the import to ensure it's cached
-                            let _ = self.load_import(name, Span::dummy()).await?;
+                            let _ = self.load_import(name).await?;
                             return Ok(Value::ImportedGenerator(name.clone()));
                         }
                     }
@@ -1459,7 +1459,7 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                         let list = self
                             .program
                             .get_list(name)
-                            .ok_or_else(|| EvalError::UndefinedList { name: name.clone(), span: method.span })?;
+                            .ok_or_else(|| EvalError::UndefinedList(name.clone()))?;
 
                         let mut results = Vec::new();
                         for item in &list.items {
@@ -1504,11 +1504,15 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                     }
                     Value::ConsumableList(_) => {
                         // selectAll is not meaningful for consumable lists
-                        Err(EvalError::InvalidMethodCall { message: "selectAll cannot be called on consumable lists".to_string(), span: method.span })
+                        Err(EvalError::InvalidMethodCall(
+                            "selectAll cannot be called on consumable lists".to_string(),
+                        ))
                     }
                     Value::ImportedGenerator(_) => {
                         // selectAll is not meaningful for imported generators
-                        Err(EvalError::InvalidMethodCall { message: "selectAll cannot be called on imported generators".to_string(), span: method.span })
+                        Err(EvalError::InvalidMethodCall(
+                            "selectAll cannot be called on imported generators".to_string(),
+                        ))
                     }
                 }
             }
@@ -1517,33 +1521,45 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                 // Select n items with repetition
                 // Supports selectMany(n) or selectMany(min, max)
                 let n = if method.args.is_empty() {
-                    return Err(EvalError::InvalidMethodCall { message: "selectMany requires at least one argument".to_string(), span: method.span });
+                    return Err(EvalError::InvalidMethodCall(
+                        "selectMany requires at least one argument".to_string(),
+                    ));
                 } else if method.args.len() == 1 {
                     // Single argument: exact count
                     let arg_str = self.evaluate_expression(&method.args[0]).await?;
                     arg_str.parse::<usize>().map_err(|_| {
-                        EvalError::InvalidMethodCall { message: format!("selectMany argument must be a number, got: {}", arg_str
-                        ), span: method.span }
+                        EvalError::InvalidMethodCall(format!(
+                            "selectMany argument must be a number, got: {}",
+                            arg_str
+                        ))
                     })?
                 } else if method.args.len() == 2 {
                     // Two arguments: random count between min and max
                     let min_str = self.evaluate_expression(&method.args[0]).await?;
                     let max_str = self.evaluate_expression(&method.args[1]).await?;
                     let min = min_str.parse::<usize>().map_err(|_| {
-                        EvalError::InvalidMethodCall { message: format!("selectMany min argument must be a number, got: {}", min_str
-                        ), span: method.span }
+                        EvalError::InvalidMethodCall(format!(
+                            "selectMany min argument must be a number, got: {}",
+                            min_str
+                        ))
                     })?;
                     let max = max_str.parse::<usize>().map_err(|_| {
-                        EvalError::InvalidMethodCall { message: format!("selectMany max argument must be a number, got: {}", max_str
-                        ), span: method.span }
+                        EvalError::InvalidMethodCall(format!(
+                            "selectMany max argument must be a number, got: {}",
+                            max_str
+                        ))
                     })?;
                     if min > max {
-                        return Err(EvalError::InvalidMethodCall { message: format!("selectMany min ({}) cannot be greater than max ({})", min, max
-                        ), span: method.span });
+                        return Err(EvalError::InvalidMethodCall(format!(
+                            "selectMany min ({}) cannot be greater than max ({})",
+                            min, max
+                        )));
                     }
                     self.rng.gen_range(min..=max)
                 } else {
-                    return Err(EvalError::InvalidMethodCall { message: "selectMany accepts 1 or 2 arguments".to_string(), span: method.span });
+                    return Err(EvalError::InvalidMethodCall(
+                        "selectMany accepts 1 or 2 arguments".to_string(),
+                    ));
                 };
 
                 match value {
@@ -1551,7 +1567,7 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                         let list = self
                             .program
                             .get_list(name)
-                            .ok_or_else(|| EvalError::UndefinedList { name: name.clone(), span: method.span })?;
+                            .ok_or_else(|| EvalError::UndefinedList(name.clone()))?;
 
                         let mut results = Vec::new();
                         for _ in 0..n {
@@ -1615,11 +1631,15 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                     }
                     Value::ConsumableList(_) => {
                         // selectMany with repetition doesn't make sense for consumable lists
-                        Err(EvalError::InvalidMethodCall { message: "selectMany cannot be called on consumable lists (use selectUnique instead)".to_string(), span: method.span })
+                        Err(EvalError::InvalidMethodCall(
+                            "selectMany cannot be called on consumable lists (use selectUnique instead)".to_string(),
+                        ))
                     }
                     Value::ImportedGenerator(_) => {
                         // selectMany is not meaningful for imported generators
-                        Err(EvalError::InvalidMethodCall { message: "selectMany cannot be called on imported generators".to_string(), span: method.span })
+                        Err(EvalError::InvalidMethodCall(
+                            "selectMany cannot be called on imported generators".to_string(),
+                        ))
                     }
                 }
             }
@@ -1628,33 +1648,45 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                 // Select n unique items without repetition
                 // Supports selectUnique(n) or selectUnique(min, max)
                 let n = if method.args.is_empty() {
-                    return Err(EvalError::InvalidMethodCall { message: "selectUnique requires at least one argument".to_string(), span: method.span });
+                    return Err(EvalError::InvalidMethodCall(
+                        "selectUnique requires at least one argument".to_string(),
+                    ));
                 } else if method.args.len() == 1 {
                     // Single argument: exact count
                     let arg_str = self.evaluate_expression(&method.args[0]).await?;
                     arg_str.parse::<usize>().map_err(|_| {
-                        EvalError::InvalidMethodCall { message: format!("selectUnique argument must be a number, got: {}", arg_str
-                        ), span: method.span }
+                        EvalError::InvalidMethodCall(format!(
+                            "selectUnique argument must be a number, got: {}",
+                            arg_str
+                        ))
                     })?
                 } else if method.args.len() == 2 {
                     // Two arguments: random count between min and max
                     let min_str = self.evaluate_expression(&method.args[0]).await?;
                     let max_str = self.evaluate_expression(&method.args[1]).await?;
                     let min = min_str.parse::<usize>().map_err(|_| {
-                        EvalError::InvalidMethodCall { message: format!("selectUnique min argument must be a number, got: {}", min_str
-                        ), span: method.span }
+                        EvalError::InvalidMethodCall(format!(
+                            "selectUnique min argument must be a number, got: {}",
+                            min_str
+                        ))
                     })?;
                     let max = max_str.parse::<usize>().map_err(|_| {
-                        EvalError::InvalidMethodCall { message: format!("selectUnique max argument must be a number, got: {}", max_str
-                        ), span: method.span }
+                        EvalError::InvalidMethodCall(format!(
+                            "selectUnique max argument must be a number, got: {}",
+                            max_str
+                        ))
                     })?;
                     if min > max {
-                        return Err(EvalError::InvalidMethodCall { message: format!("selectUnique min ({}) cannot be greater than max ({})", min, max
-                        ), span: method.span });
+                        return Err(EvalError::InvalidMethodCall(format!(
+                            "selectUnique min ({}) cannot be greater than max ({})",
+                            min, max
+                        )));
                     }
                     self.rng.gen_range(min..=max)
                 } else {
-                    return Err(EvalError::InvalidMethodCall { message: "selectUnique accepts 1 or 2 arguments".to_string(), span: method.span });
+                    return Err(EvalError::InvalidMethodCall(
+                        "selectUnique accepts 1 or 2 arguments".to_string(),
+                    ));
                 };
 
                 match value {
@@ -1662,17 +1694,14 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                         let list = self
                             .program
                             .get_list(name)
-                            .ok_or_else(|| EvalError::UndefinedList { name: name.clone(), span: method.span })?;
+                            .ok_or_else(|| EvalError::UndefinedList(name.clone()))?;
 
                         if n > list.items.len() {
-                            return Err(EvalError::InvalidMethodCall {
-                                message: format!(
-                                    "Cannot select {} unique items from list with {} items",
-                                    n,
-                                    list.items.len()
-                                ),
-                                span: method.span,
-                            });
+                            return Err(EvalError::InvalidMethodCall(format!(
+                                "Cannot select {} unique items from list with {} items",
+                                n,
+                                list.items.len()
+                            )));
                         }
 
                         let mut available_indices: Vec<usize> = (0..list.items.len()).collect();
@@ -1698,14 +1727,11 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                     }
                     Value::ListInstance(list) => {
                         if n > list.items.len() {
-                            return Err(EvalError::InvalidMethodCall {
-                                message: format!(
-                                    "Cannot select {} unique items from list with {} items",
-                                    n,
-                                    list.items.len()
-                                ),
-                                span: method.span,
-                            });
+                            return Err(EvalError::InvalidMethodCall(format!(
+                                "Cannot select {} unique items from list with {} items",
+                                n,
+                                list.items.len()
+                            )));
                         }
 
                         let mut available_indices: Vec<usize> = (0..list.items.len()).collect();
@@ -1732,11 +1758,10 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                     Value::ItemInstance(item) => {
                         // Can't select unique items from a single item
                         if n > 1 {
-                            return Err(EvalError::InvalidMethodCall {
-                                message: "Cannot select multiple unique items from a single item"
+                            return Err(EvalError::InvalidMethodCall(
+                                "Cannot select multiple unique items from a single item"
                                     .to_string(),
-                                span: method.span,
-                            });
+                            ));
                         }
                         let result = self.evaluate_content(&item.content).await?;
                         Ok(Value::Array(vec![result]))
@@ -1745,14 +1770,11 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                     Value::Array(items) => {
                         // selectUnique on an array
                         if n > items.len() {
-                            return Err(EvalError::InvalidMethodCall {
-                                message: format!(
-                                    "Cannot select {} unique items from array with {} items",
-                                    n,
-                                    items.len()
-                                ),
-                                span: method.span,
-                            });
+                            return Err(EvalError::InvalidMethodCall(format!(
+                                "Cannot select {} unique items from array with {} items",
+                                n,
+                                items.len()
+                            )));
                         }
 
                         let mut available_indices: Vec<usize> = (0..items.len()).collect();
@@ -1776,7 +1798,9 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                     }
                     Value::ImportedGenerator(_) => {
                         // selectUnique is not meaningful for imported generators
-                        Err(EvalError::InvalidMethodCall { message: "selectUnique cannot be called on imported generators".to_string(), span: method.span })
+                        Err(EvalError::InvalidMethodCall(
+                            "selectUnique cannot be called on imported generators".to_string(),
+                        ))
                     }
                 }
             }
@@ -1842,7 +1866,7 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                         let list = self
                             .program
                             .get_list(name)
-                            .ok_or_else(|| EvalError::UndefinedList { name: name.clone(), span: method.span })?
+                            .ok_or_else(|| EvalError::UndefinedList(name.clone()))?
                             .clone();
 
                         // Check if the list has $output that evaluates to an ImportedGenerator
@@ -1899,7 +1923,7 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                     }
                     Value::ImportedGenerator(generator_name) => {
                         // For imported generators, get the output list and create a consumable version
-                        let imported_program = self.load_import(generator_name, method.span).await?;
+                        let imported_program = self.load_import(generator_name).await?;
 
                         // Find the output list (check $output, then output, then last list)
                         let mut output_list = if let Some(list) =
@@ -1912,23 +1936,17 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                             imported_program
                                 .get_list(last_list_name)
                                 .ok_or_else(|| {
-                                    EvalError::ImportError {
-                                        message: format!(
-                                            "Cannot find output list in imported generator '{}'",
-                                            generator_name
-                                        ),
-                                        span: method.span,
-                                    }
+                                    EvalError::ImportError(format!(
+                                        "Cannot find output list in imported generator '{}'",
+                                        generator_name
+                                    ))
                                 })?
                                 .clone()
                         } else {
-                            return Err(EvalError::ImportError {
-                                message: format!(
-                                    "Imported generator '{}' has no lists",
-                                    generator_name
-                                ),
-                                span: method.span,
-                            });
+                            return Err(EvalError::ImportError(format!(
+                                "Imported generator '{}' has no lists",
+                                generator_name
+                            )));
                         };
 
                         // If the output list has no items but has an output property,
@@ -1971,7 +1989,9 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                         // Return reference to consumable list
                         Ok(Value::ConsumableList(id))
                     }
-                    _ => Err(EvalError::InvalidMethodCall { message: "consumableList can only be called on lists".to_string(), span: method.span }),
+                    _ => Err(EvalError::InvalidMethodCall(
+                        "consumableList can only be called on lists".to_string(),
+                    )),
                 }
             }
 
@@ -1980,7 +2000,9 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                 // This is a built-in function that mimics the join-lists-plugin
 
                 if method.args.is_empty() {
-                    return Err(EvalError::InvalidMethodCall { message: "joinLists requires at least one argument".to_string(), span: method.span });
+                    return Err(EvalError::InvalidMethodCall(
+                        "joinLists requires at least one argument".to_string(),
+                    ));
                 }
 
                 // Collect all items from all list arguments
@@ -1996,7 +2018,7 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                             let list = self
                                 .program
                                 .get_list(&name)
-                                .ok_or_else(|| EvalError::UndefinedList { name: name.clone(), span: method.span })?;
+                                .ok_or_else(|| EvalError::UndefinedList(name.clone()))?;
                             combined_items.extend(list.items.clone());
                         }
                         Value::ListInstance(list) => {
@@ -2007,13 +2029,10 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                         | Value::ItemInstance(_)
                         | Value::ConsumableList(_)
                         | Value::ImportedGenerator(_) => {
-                            return Err(EvalError::TypeError {
-                                message: format!(
-                                    "joinLists arguments must be lists, got {:?}",
-                                    list_value
-                                ),
-                                span: method.span,
-                            });
+                            return Err(EvalError::TypeError(format!(
+                                "joinLists arguments must be lists, got {:?}",
+                                list_value
+                            )));
                         }
                     }
                 }
@@ -2029,8 +2048,10 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                 Ok(Value::ListInstance(combined_list))
             }
 
-            _ => Err(EvalError::InvalidMethodCall { message: format!("Unknown method: {}", method.name
-            ), span: method.span }),
+            _ => Err(EvalError::InvalidMethodCall(format!(
+                "Unknown method: {}",
+                method.name
+            ))),
         }
     }
 }
