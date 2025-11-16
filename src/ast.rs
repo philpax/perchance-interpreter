@@ -67,11 +67,17 @@ pub enum Expression {
     // Assignment: [x = animal]
     Assignment(Identifier, Box<Expression>),
 
+    // Property assignment: [this.property = value]
+    PropertyAssignment(Box<Expression>, Identifier, Box<Expression>),
+
     // Multiple statements with comma: [x = animal, y = color, "result"]
     Sequence(Vec<Expression>, Option<Box<Expression>>),
 
     // String literal: "hello"
     Literal(String),
+
+    // Number literal: 42 or 3.14
+    Number(f64),
 
     // Number range: {1-10}
     NumberRange(i64, i64),
@@ -91,14 +97,22 @@ pub enum Expression {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum BinaryOperator {
+    // Comparison operators
     Equal,        // ==
     NotEqual,     // !=
     LessThan,     // <
     GreaterThan,  // >
     LessEqual,    // <=
     GreaterEqual, // >=
-    And,          // &&
-    Or,           // ||
+    // Logical operators
+    And, // &&
+    Or,  // ||
+    // Math operators
+    Add,      // +
+    Subtract, // -
+    Multiply, // *
+    Divide,   // /
+    Modulo,   // %
 }
 
 #[derive(Debug, Clone, PartialEq)]

@@ -613,6 +613,28 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                 }
             }
 
+            Expression::Number(n) => Ok(self.format_number(*n)),
+
+            Expression::PropertyAssignment(base, _prop, value) => {
+                // Handle property assignment like [this.property = value]
+                // Currently only supported for 'this' keyword
+                if let Expression::Simple(ident) = base.as_ref() {
+                    if ident.name == "this" {
+                        // Evaluate the value
+                        let val = self.evaluate_expression(value).await?;
+
+                        // For now, we'll return the value
+                        // Note: In a full implementation, this would modify the current item's properties
+                        // but that requires mutable access to the compiled item
+                        return Ok(val);
+                    }
+                }
+
+                Err(EvalError::TypeError(
+                    "Property assignment is only supported for 'this' keyword".to_string(),
+                ))
+            }
+
             Expression::NumberRange(start, end) => {
                 let num = self.rng.gen_range(*start..=*end);
                 Ok(num.to_string())
@@ -638,23 +660,88 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
             }
 
             Expression::BinaryOp(left, op, right) => {
-                let left_val = self.evaluate_expression(left).await?;
-                let right_val = self.evaluate_expression(right).await?;
+                use BinaryOperator::*;
 
-                let result = match op {
-                    BinaryOperator::Equal => left_val == right_val,
-                    BinaryOperator::NotEqual => left_val != right_val,
-                    BinaryOperator::LessThan => self.compare_values(&left_val, &right_val)? < 0,
-                    BinaryOperator::GreaterThan => self.compare_values(&left_val, &right_val)? > 0,
-                    BinaryOperator::LessEqual => self.compare_values(&left_val, &right_val)? <= 0,
-                    BinaryOperator::GreaterEqual => {
-                        self.compare_values(&left_val, &right_val)? >= 0
+                match op {
+                    // Math operations
+                    Add | Subtract | Multiply | Divide | Modulo => {
+                        let left_val = self.evaluate_expression(left).await?;
+                        let right_val = self.evaluate_expression(right).await?;
+
+                        // For addition, check if either value is non-numeric (string concatenation)
+                        if matches!(op, Add) {
+                            let left_num = left_val.parse::<f64>();
+                            let right_num = right_val.parse::<f64>();
+
+                            if left_num.is_ok() && right_num.is_ok() {
+                                // Both are numbers, do numeric addition
+                                let result = left_num.unwrap() + right_num.unwrap();
+                                Ok(self.format_number(result))
+                            } else {
+                                // String concatenation
+                                Ok(format!("{}{}", left_val, right_val))
+                            }
+                        } else {
+                            // Other math operations require numbers
+                            let left_num = left_val.parse::<f64>().map_err(|_| {
+                                EvalError::TypeError(format!(
+                                    "Left operand is not a number: {}",
+                                    left_val
+                                ))
+                            })?;
+                            let right_num = right_val.parse::<f64>().map_err(|_| {
+                                EvalError::TypeError(format!(
+                                    "Right operand is not a number: {}",
+                                    right_val
+                                ))
+                            })?;
+
+                            let result = match op {
+                                Subtract => left_num - right_num,
+                                Multiply => left_num * right_num,
+                                Divide => {
+                                    if right_num == 0.0 {
+                                        return Err(EvalError::TypeError(
+                                            "Division by zero".to_string(),
+                                        ));
+                                    }
+                                    left_num / right_num
+                                }
+                                Modulo => {
+                                    if right_num == 0.0 {
+                                        return Err(EvalError::TypeError(
+                                            "Modulo by zero".to_string(),
+                                        ));
+                                    }
+                                    left_num % right_num
+                                }
+                                _ => unreachable!(),
+                            };
+
+                            Ok(self.format_number(result))
+                        }
                     }
-                    BinaryOperator::And => self.is_truthy(&left_val) && self.is_truthy(&right_val),
-                    BinaryOperator::Or => self.is_truthy(&left_val) || self.is_truthy(&right_val),
-                };
 
-                Ok(if result { "true" } else { "false" }.to_string())
+                    // Comparison and logical operations
+                    _ => {
+                        let left_val = self.evaluate_expression(left).await?;
+                        let right_val = self.evaluate_expression(right).await?;
+
+                        let result = match op {
+                            Equal => left_val == right_val,
+                            NotEqual => left_val != right_val,
+                            LessThan => self.compare_values(&left_val, &right_val)? < 0,
+                            GreaterThan => self.compare_values(&left_val, &right_val)? > 0,
+                            LessEqual => self.compare_values(&left_val, &right_val)? <= 0,
+                            GreaterEqual => self.compare_values(&left_val, &right_val)? >= 0,
+                            And => self.is_truthy(&left_val) && self.is_truthy(&right_val),
+                            Or => self.is_truthy(&left_val) || self.is_truthy(&right_val),
+                            _ => unreachable!(),
+                        };
+
+                        Ok(if result { "true" } else { "false" }.to_string())
+                    }
+                }
             }
 
             Expression::Import(generator_name) => {
@@ -696,6 +783,17 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
         } else {
             // String comparison
             Ok(left.cmp(right) as i32)
+        }
+    }
+
+    fn format_number(&self, num: f64) -> String {
+        // Format number without unnecessary decimal points
+        if num.fract() == 0.0 && num.abs() < 1e15 {
+            // It's an integer (or very close to one)
+            format!("{}", num as i64)
+        } else {
+            // It's a float, format with precision
+            format!("{}", num)
         }
     }
 
@@ -1279,12 +1377,13 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
 
             "selectMany" => {
                 // Select n items with repetition
+                // Supports selectMany(n) or selectMany(min, max)
                 let n = if method.args.is_empty() {
                     return Err(EvalError::InvalidMethodCall(
-                        "selectMany requires an argument".to_string(),
+                        "selectMany requires at least one argument".to_string(),
                     ));
-                } else {
-                    // Evaluate the argument to get the number
+                } else if method.args.len() == 1 {
+                    // Single argument: exact count
                     let arg_str = self.evaluate_expression(&method.args[0]).await?;
                     arg_str.parse::<usize>().map_err(|_| {
                         EvalError::InvalidMethodCall(format!(
@@ -1292,6 +1391,33 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                             arg_str
                         ))
                     })?
+                } else if method.args.len() == 2 {
+                    // Two arguments: random count between min and max
+                    let min_str = self.evaluate_expression(&method.args[0]).await?;
+                    let max_str = self.evaluate_expression(&method.args[1]).await?;
+                    let min = min_str.parse::<usize>().map_err(|_| {
+                        EvalError::InvalidMethodCall(format!(
+                            "selectMany min argument must be a number, got: {}",
+                            min_str
+                        ))
+                    })?;
+                    let max = max_str.parse::<usize>().map_err(|_| {
+                        EvalError::InvalidMethodCall(format!(
+                            "selectMany max argument must be a number, got: {}",
+                            max_str
+                        ))
+                    })?;
+                    if min > max {
+                        return Err(EvalError::InvalidMethodCall(format!(
+                            "selectMany min ({}) cannot be greater than max ({})",
+                            min, max
+                        )));
+                    }
+                    self.rng.gen_range(min..=max)
+                } else {
+                    return Err(EvalError::InvalidMethodCall(
+                        "selectMany accepts 1 or 2 arguments".to_string(),
+                    ));
                 };
 
                 match value {
@@ -1378,11 +1504,13 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
 
             "selectUnique" => {
                 // Select n unique items without repetition
+                // Supports selectUnique(n) or selectUnique(min, max)
                 let n = if method.args.is_empty() {
                     return Err(EvalError::InvalidMethodCall(
-                        "selectUnique requires an argument".to_string(),
+                        "selectUnique requires at least one argument".to_string(),
                     ));
-                } else {
+                } else if method.args.len() == 1 {
+                    // Single argument: exact count
                     let arg_str = self.evaluate_expression(&method.args[0]).await?;
                     arg_str.parse::<usize>().map_err(|_| {
                         EvalError::InvalidMethodCall(format!(
@@ -1390,6 +1518,33 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                             arg_str
                         ))
                     })?
+                } else if method.args.len() == 2 {
+                    // Two arguments: random count between min and max
+                    let min_str = self.evaluate_expression(&method.args[0]).await?;
+                    let max_str = self.evaluate_expression(&method.args[1]).await?;
+                    let min = min_str.parse::<usize>().map_err(|_| {
+                        EvalError::InvalidMethodCall(format!(
+                            "selectUnique min argument must be a number, got: {}",
+                            min_str
+                        ))
+                    })?;
+                    let max = max_str.parse::<usize>().map_err(|_| {
+                        EvalError::InvalidMethodCall(format!(
+                            "selectUnique max argument must be a number, got: {}",
+                            max_str
+                        ))
+                    })?;
+                    if min > max {
+                        return Err(EvalError::InvalidMethodCall(format!(
+                            "selectUnique min ({}) cannot be greater than max ({})",
+                            min, max
+                        )));
+                    }
+                    self.rng.gen_range(min..=max)
+                } else {
+                    return Err(EvalError::InvalidMethodCall(
+                        "selectUnique accepts 1 or 2 arguments".to_string(),
+                    ));
                 };
 
                 match value {
