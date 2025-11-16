@@ -259,15 +259,15 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
 
         for (i, part) in content.iter().enumerate() {
             match part {
-                ContentPart::Text(text) => {
+                ContentPart::Text(text, _) => {
                     result.push_str(text);
                     // Track numbers for {s} pluralization
                     if let Some(num) = self.extract_number(text) {
                         self.last_number = Some(num);
                     }
                 }
-                ContentPart::Escape(ch) => result.push(*ch),
-                ContentPart::Reference(expr) => {
+                ContentPart::Escape(ch, _) => result.push(*ch),
+                ContentPart::Reference(expr, _) => {
                     let value = self.evaluate_expression(expr).await?;
                     // Track numbers for {s} pluralization
                     if let Ok(num) = value.parse::<i64>() {
@@ -275,11 +275,11 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                     }
                     result.push_str(&value);
                 }
-                ContentPart::Inline(inline) => {
+                ContentPart::Inline(inline, _) => {
                     // Check if this is a special inline: {a} or {s}
                     if inline.choices.len() == 1 && inline.choices[0].content.len() == 1 {
                         match &inline.choices[0].content[0] {
-                            ContentPart::Article => {
+                            ContentPart::Article(_) => {
                                 // {a} - choose "a" or "an" based on next word
                                 let next_word = self.peek_next_word(content, i + 1).await?;
                                 if self.starts_with_vowel_sound(&next_word) {
@@ -289,7 +289,7 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                                 }
                                 continue;
                             }
-                            ContentPart::Pluralize => {
+                            ContentPart::Pluralize(_) => {
                                 // {s} - add "s" if last number != 1
                                 if let Some(num) = self.last_number {
                                     if num != 1 && num != -1 {
@@ -313,7 +313,7 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                     }
                     result.push_str(&value);
                 }
-                ContentPart::Article => {
+                ContentPart::Article(_) => {
                     // {a} - choose "a" or "an" based on next word
                     let next_word = self.peek_next_word(content, i + 1).await?;
                     if self.starts_with_vowel_sound(&next_word) {
@@ -322,7 +322,7 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                         result.push('a');
                     }
                 }
-                ContentPart::Pluralize => {
+                ContentPart::Pluralize(_) => {
                     // {s} - add "s" if last number != 1
                     if let Some(num) = self.last_number {
                         if num != 1 && num != -1 {
@@ -347,13 +347,13 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
 
         // Check if this is a special case (number range, letter range)
         if inline.choices.len() == 1 {
-            if let Some(ContentPart::Reference(expr)) = inline.choices[0].content.first() {
+            if let Some(ContentPart::Reference(expr, _)) = inline.choices[0].content.first() {
                 match expr {
-                    Expression::NumberRange(start, end) => {
+                    Expression::NumberRange(start, end, _) => {
                         let num = self.rng.gen_range(*start..=*end);
                         return Ok(num.to_string());
                     }
-                    Expression::LetterRange(start, end) => {
+                    Expression::LetterRange(start, end, _) => {
                         let start_byte = *start as u8;
                         let end_byte = *end as u8;
                         let random_byte = self.rng.gen_range(start_byte..=end_byte);
@@ -436,7 +436,7 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
     ) -> Result<String, EvalError> {
         for part in &content[start_idx..] {
             match part {
-                ContentPart::Text(text) => {
+                ContentPart::Text(text, _) => {
                     // Get the first word from the text
                     if let Some(word) = text.split_whitespace().next() {
                         if !word.is_empty() {
@@ -444,7 +444,7 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                         }
                     }
                 }
-                ContentPart::Reference(expr) => {
+                ContentPart::Reference(expr, _) => {
                     // Evaluate the reference to get the word
                     let value = self.evaluate_expression(expr).await?;
                     if let Some(word) = value.split_whitespace().next() {
@@ -453,7 +453,7 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                         }
                     }
                 }
-                ContentPart::Inline(inline) => {
+                ContentPart::Inline(inline, _) => {
                     // Evaluate the inline to get the word
                     let value = self.evaluate_inline(inline).await?;
                     if let Some(word) = value.split_whitespace().next() {
@@ -485,7 +485,7 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
     #[async_recursion]
     async fn evaluate_expression(&mut self, expr: &Expression) -> Result<String, EvalError> {
         match expr {
-            Expression::Simple(ident) => {
+            Expression::Simple(ident, _) => {
                 // Check for "this" keyword
                 if ident.name == "this" {
                     return Err(EvalError::TypeError(
@@ -505,9 +505,9 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                 }
             }
 
-            Expression::Property(base, prop) => {
+            Expression::Property(base, prop, _) => {
                 // Special handling for "this" keyword
-                if let Expression::Simple(ident) = base.as_ref() {
+                if let Expression::Simple(ident, _) = base.as_ref() {
                     if ident.name == "this" {
                         if self.current_item.is_none() {
                             return Err(EvalError::TypeError(
@@ -562,7 +562,7 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                 }
             }
 
-            Expression::PropertyWithFallback(base, prop, fallback) => {
+            Expression::PropertyWithFallback(base, prop, fallback, _) => {
                 // Try to access the property, fall back to the fallback expression if it doesn't exist
                 let base_value = self.evaluate_to_value(base).await?;
                 match self.get_property(&base_value, &prop.name).await {
@@ -575,16 +575,16 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                 }
             }
 
-            Expression::Dynamic(base, index) => {
+            Expression::Dynamic(base, index, _) => {
                 let base_value = self.evaluate_to_value(base).await?;
                 let index_str = self.evaluate_expression(index).await?;
                 self.get_property(&base_value, &index_str).await
             }
 
-            Expression::Method(base, method) => {
+            Expression::Method(base, method, _) => {
                 // Check if this is a direct function call (e.g., joinLists(args))
                 // where the base is a Simple identifier that matches the method name
-                if let Expression::Simple(ident) = base.as_ref() {
+                if let Expression::Simple(ident, _) = base.as_ref() {
                     if ident.name == method.name && method.name == "joinLists" {
                         // Handle as a built-in function call
                         // We create a dummy value to pass to call_method_value
@@ -611,7 +611,7 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                 self.call_method(&base_value, method).await
             }
 
-            Expression::Assignment(ident, value) => {
+            Expression::Assignment(ident, value, _) => {
                 let mut val = self.evaluate_to_value(value).await?;
 
                 // If assigning a list reference (but not a consumable list), select one item from it
@@ -627,7 +627,7 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                 self.value_to_string(val).await
             }
 
-            Expression::Sequence(exprs, output) => {
+            Expression::Sequence(exprs, output, _) => {
                 // Evaluate all expressions in sequence
                 for expr in exprs {
                     self.evaluate_expression(expr).await?;
@@ -641,7 +641,7 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                 }
             }
 
-            Expression::Literal(s) => {
+            Expression::Literal(s, _) => {
                 // Evaluate the literal string (it may contain references)
                 // We need to parse and evaluate the string content
                 // For now, we'll use a simple approach: re-parse the string as content
@@ -651,12 +651,12 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                 }
             }
 
-            Expression::Number(n) => Ok(self.format_number(*n)),
+            Expression::Number(n, _) => Ok(self.format_number(*n)),
 
-            Expression::PropertyAssignment(base, prop, value) => {
+            Expression::PropertyAssignment(base, prop, value, _) => {
                 // Handle property assignment like [this.property = value]
                 // Currently only supported for 'this' keyword
-                if let Expression::Simple(ident) = base.as_ref() {
+                if let Expression::Simple(ident, _) = base.as_ref() {
                     if ident.name == "this" {
                         if self.current_item.is_none() {
                             return Err(EvalError::TypeError(
@@ -681,19 +681,19 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                 ))
             }
 
-            Expression::NumberRange(start, end) => {
+            Expression::NumberRange(start, end, _) => {
                 let num = self.rng.gen_range(*start..=*end);
                 Ok(num.to_string())
             }
 
-            Expression::LetterRange(start, end) => {
+            Expression::LetterRange(start, end, _) => {
                 let start_byte = *start as u8;
                 let end_byte = *end as u8;
                 let random_byte = self.rng.gen_range(start_byte..=end_byte);
                 Ok((random_byte as char).to_string())
             }
 
-            Expression::Conditional(cond, true_expr, false_expr) => {
+            Expression::Conditional(cond, true_expr, false_expr, _) => {
                 // Evaluate condition
                 let cond_result = self.evaluate_expression(cond).await?;
 
@@ -705,7 +705,7 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                 }
             }
 
-            Expression::BinaryOp(left, op, right) => {
+            Expression::BinaryOp(left, op, right, _) => {
                 use BinaryOperator::*;
 
                 match op {
@@ -790,7 +790,7 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                 }
             }
 
-            Expression::Import(generator_name) => {
+            Expression::Import(generator_name, _) => {
                 // Load the imported generator
                 let imported_program = self.load_import(generator_name).await?.clone();
 
@@ -846,7 +846,7 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
     #[async_recursion]
     async fn evaluate_to_value(&mut self, expr: &Expression) -> Result<Value, EvalError> {
         match expr {
-            Expression::Simple(ident) => {
+            Expression::Simple(ident, _) => {
                 // Handle "this" keyword
                 if ident.name == "this" {
                     return Err(EvalError::TypeError(
@@ -867,9 +867,9 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                 Err(EvalError::UndefinedList(ident.name.clone()))
             }
 
-            Expression::Property(base, prop) => {
+            Expression::Property(base, prop, _) => {
                 // Special handling for "this" keyword
-                if let Expression::Simple(ident) = base.as_ref() {
+                if let Expression::Simple(ident, _) = base.as_ref() {
                     if ident.name == "this" {
                         // Access property from current_item
                         if let Some(ref item) = self.current_item {
@@ -902,7 +902,7 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                 }
             }
 
-            Expression::PropertyWithFallback(base, prop, fallback) => {
+            Expression::PropertyWithFallback(base, prop, fallback, _) => {
                 // Try to access the property, fall back to the fallback expression if it doesn't exist
                 let base_value = self.evaluate_to_value(base).await?;
                 match self.get_property_value(&base_value, &prop.name).await {
@@ -915,9 +915,9 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                 }
             }
 
-            Expression::Method(base, method) => {
+            Expression::Method(base, method, _) => {
                 // Check if this is a direct function call (e.g., joinLists(args))
-                if let Expression::Simple(ident) = base.as_ref() {
+                if let Expression::Simple(ident, _) = base.as_ref() {
                     if ident.name == method.name && method.name == "joinLists" {
                         // Handle as a built-in function call
                         return self
@@ -930,7 +930,7 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                 self.call_method_value(&base_value, method).await
             }
 
-            Expression::Import(generator_name) => {
+            Expression::Import(generator_name, _) => {
                 // Load the imported generator to ensure it exists and is cached
                 let _ = self.load_import(generator_name).await?;
                 // Return a reference to the imported generator
@@ -1055,9 +1055,9 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
         if let Some(output_content) = &list.output {
             // Check if the output is a simple import expression
             if output_content.len() == 1 {
-                if let ContentPart::Inline(inline) = &output_content[0] {
+                if let ContentPart::Inline(inline, _) = &output_content[0] {
                     if inline.choices.len() == 1 && inline.choices[0].content.len() == 1 {
-                        if let ContentPart::Reference(Expression::Import(name)) =
+                        if let ContentPart::Reference(Expression::Import(name, _), _) =
                             &inline.choices[0].content[0]
                         {
                             // Load the import to ensure it's cached
@@ -1214,13 +1214,13 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
         // Check if content is exactly one reference
         if content.len() == 1 {
             // Case 1: Direct reference like in $output = [color]
-            if let ContentPart::Reference(Expression::Simple(ident)) = &content[0] {
+            if let ContentPart::Reference(Expression::Simple(ident, _), _) = &content[0] {
                 return Some(ident.name.clone());
             }
             // Case 2: Inline expression with one choice containing one reference
-            if let ContentPart::Inline(inline) = &content[0] {
+            if let ContentPart::Inline(inline, _) = &content[0] {
                 if inline.choices.len() == 1 && inline.choices[0].content.len() == 1 {
-                    if let ContentPart::Reference(Expression::Simple(ident)) =
+                    if let ContentPart::Reference(Expression::Simple(ident, _), _) =
                         &inline.choices[0].content[0]
                     {
                         return Some(ident.name.clone());
