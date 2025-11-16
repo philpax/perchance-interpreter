@@ -99,7 +99,7 @@ cat template.perchance | cargo run --bin perchance -
 
 ### Web Frontend
 
-A modern, interactive web interface is available at [https://philpax.github.io/static/experimental/perchance/](https://philpax.github.io/static/experimental/perchance/)
+A modern, interactive web interface is available at [https://philpax.me/experimental/perchance/](https://philpax.me/experimental/perchance/)
 
 **Run locally:**
 ```bash
