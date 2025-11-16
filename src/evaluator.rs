@@ -10,27 +10,73 @@ use std::sync::Arc;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum EvalError {
-    UndefinedList { name: String, span: Span },
-    UndefinedVariable { name: String, span: Span },
-    UndefinedProperty { list: String, prop: String, span: Span },
-    InvalidMethodCall { message: String, span: Span },
-    EmptyList { name: String, span: Span },
-    TypeError { message: String, span: Span },
-    ImportError { message: String, span: Span },
+    UndefinedList {
+        name: String,
+        span: Span,
+    },
+    UndefinedVariable {
+        name: String,
+        span: Span,
+    },
+    UndefinedProperty {
+        list: String,
+        prop: String,
+        span: Span,
+    },
+    InvalidMethodCall {
+        message: String,
+        span: Span,
+    },
+    EmptyList {
+        name: String,
+        span: Span,
+    },
+    TypeError {
+        message: String,
+        span: Span,
+    },
+    ImportError {
+        message: String,
+        span: Span,
+    },
 }
 
 impl std::fmt::Display for EvalError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            EvalError::UndefinedList { name, .. } => write!(f, "Undefined list: {}", name),
-            EvalError::UndefinedVariable { name, .. } => write!(f, "Undefined variable: {}", name),
-            EvalError::UndefinedProperty { list, prop, .. } => {
-                write!(f, "Undefined property '{}' on list '{}'", prop, list)
+            EvalError::UndefinedList { name, span } => {
+                write!(f, "Undefined list: {} at position {}", name, span.start)
             }
-            EvalError::InvalidMethodCall { message, .. } => write!(f, "Invalid method call: {}", message),
-            EvalError::EmptyList { name, .. } => write!(f, "Cannot select from empty list: {}", name),
-            EvalError::TypeError { message, .. } => write!(f, "Type error: {}", message),
-            EvalError::ImportError { message, .. } => write!(f, "Import error: {}", message),
+            EvalError::UndefinedVariable { name, span } => {
+                write!(f, "Undefined variable: {} at position {}", name, span.start)
+            }
+            EvalError::UndefinedProperty { list, prop, span } => {
+                write!(
+                    f,
+                    "Undefined property '{}' on list '{}' at position {}",
+                    prop, list, span.start
+                )
+            }
+            EvalError::InvalidMethodCall { message, span } => {
+                write!(
+                    f,
+                    "Invalid method call: {} at position {}",
+                    message, span.start
+                )
+            }
+            EvalError::EmptyList { name, span } => {
+                write!(
+                    f,
+                    "Cannot select from empty list: {} at position {}",
+                    name, span.start
+                )
+            }
+            EvalError::TypeError { message, span } => {
+                write!(f, "Type error: {} at position {}", message, span.start)
+            }
+            EvalError::ImportError { message, span } => {
+                write!(f, "Import error: {} at position {}", message, span.start)
+            }
         }
     }
 }
@@ -112,35 +158,29 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
         }
 
         // Check if loader is available
-        let loader = self
-            .loader
-            .as_ref()
-            .ok_or_else(|| EvalError::ImportError {
-                message: "No loader available for imports".to_string(),
+        let loader = self.loader.as_ref().ok_or_else(|| EvalError::ImportError {
+            message: "No loader available for imports".to_string(),
+            span,
+        })?;
+
+        // Load the generator source
+        let source = loader
+            .load(name)
+            .await
+            .map_err(|e| EvalError::ImportError {
+                message: format!("Failed to load generator '{}': {}", name, e),
                 span,
             })?;
 
-        // Load the generator source
-        let source = loader.load(name).await.map_err(|e| {
-            EvalError::ImportError {
-                message: format!("Failed to load generator '{}': {}", name, e),
-                span,
-            }
-        })?;
-
         // Parse and compile the generator
-        let program = crate::parser::parse(&source).map_err(|e| {
-            EvalError::ImportError {
-                message: format!("Failed to parse generator '{}': {}", name, e),
-                span,
-            }
+        let program = crate::parser::parse(&source).map_err(|e| EvalError::ImportError {
+            message: format!("Failed to parse generator '{}': {}", name, e),
+            span,
         })?;
 
-        let compiled = crate::compiler::compile(&program).map_err(|e| {
-            EvalError::ImportError {
-                message: format!("Failed to compile generator '{}': {}", name, e),
-                span,
-            }
+        let compiled = crate::compiler::compile(&program).map_err(|e| EvalError::ImportError {
+            message: format!("Failed to compile generator '{}': {}", name, e),
+            span,
         })?;
 
         // Cache it
@@ -529,7 +569,8 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                 // Check for "this" keyword
                 if ident.name == "this" {
                     return Err(EvalError::TypeError {
-                        message: "Cannot use 'this' without property access (use this.property)".to_string(),
+                        message: "Cannot use 'this' without property access (use this.property)"
+                            .to_string(),
                         span: *span,
                     });
                 }
@@ -555,7 +596,8 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                     if ident.name == "this" {
                         if self.current_item.is_none() {
                             return Err(EvalError::TypeError {
-                                message: "'this' keyword can only be used within $output".to_string(),
+                                message: "'this' keyword can only be used within $output"
+                                    .to_string(),
                                 span: *span,
                             });
                         }
@@ -647,7 +689,8 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                             return self.call_method(&value, method).await;
                         } else {
                             return Err(EvalError::TypeError {
-                                message: "'this' keyword can only be used within $output".to_string(),
+                                message: "'this' keyword can only be used within $output"
+                                    .to_string(),
                                 span: *span,
                             });
                         }
@@ -707,7 +750,8 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                     if ident.name == "this" {
                         if self.current_item.is_none() {
                             return Err(EvalError::TypeError {
-                                message: "'this' keyword can only be used within $output".to_string(),
+                                message: "'this' keyword can only be used within $output"
+                                    .to_string(),
                                 span: *span,
                             });
                         }
@@ -778,24 +822,19 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                             }
                         } else {
                             // Other math operations require numbers
-                            let left_num = left_val.parse::<f64>().map_err(|_| {
-                                EvalError::TypeError {
-                                    message: format!(
-                                        "Left operand is not a number: {}",
-                                        left_val
-                                    ),
+                            let left_num =
+                                left_val.parse::<f64>().map_err(|_| EvalError::TypeError {
+                                    message: format!("Left operand is not a number: {}", left_val),
                                     span: *span,
-                                }
-                            })?;
-                            let right_num = right_val.parse::<f64>().map_err(|_| {
-                                EvalError::TypeError {
+                                })?;
+                            let right_num =
+                                right_val.parse::<f64>().map_err(|_| EvalError::TypeError {
                                     message: format!(
                                         "Right operand is not a number: {}",
                                         right_val
                                     ),
                                     span: *span,
-                                }
-                            })?;
+                                })?;
 
                             let result = match op {
                                 Subtract => left_num - right_num,
@@ -907,7 +946,8 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                 // Handle "this" keyword
                 if ident.name == "this" {
                     return Err(EvalError::TypeError {
-                        message: "Cannot use 'this' without property access (use this.property)".to_string(),
+                        message: "Cannot use 'this' without property access (use this.property)"
+                            .to_string(),
                         span: *span,
                     });
                 }
@@ -945,7 +985,8 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                             }
                         } else {
                             return Err(EvalError::TypeError {
-                                message: "'this' keyword can only be used within $output".to_string(),
+                                message: "'this' keyword can only be used within $output"
+                                    .to_string(),
                                 span: *span,
                             });
                         }
@@ -954,7 +995,10 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
 
                 let base_value = self.evaluate_to_value(base).await?;
                 // Try as property first, then as a zero-argument method
-                match self.get_property_value(&base_value, &prop.name, *span).await {
+                match self
+                    .get_property_value(&base_value, &prop.name, *span)
+                    .await
+                {
                     Ok(value) => Ok(value),
                     Err(EvalError::UndefinedProperty { .. }) | Err(EvalError::TypeError { .. }) => {
                         // Try as a method call with no arguments
@@ -968,7 +1012,10 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
             Expression::PropertyWithFallback(base, prop, fallback, span) => {
                 // Try to access the property, fall back to the fallback expression if it doesn't exist
                 let base_value = self.evaluate_to_value(base).await?;
-                match self.get_property_value(&base_value, &prop.name, *span).await {
+                match self
+                    .get_property_value(&base_value, &prop.name, *span)
+                    .await
+                {
                     Ok(value) => Ok(value),
                     Err(EvalError::UndefinedProperty { .. }) | Err(EvalError::TypeError { .. }) => {
                         // Property doesn't exist, evaluate fallback
@@ -1012,13 +1059,13 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
         match value {
             Value::Text(s) => Ok(s),
             Value::List(name) => {
-                let list = self
-                    .program
-                    .get_list(&name)
-                    .ok_or_else(|| EvalError::UndefinedList {
-                        name: name.clone(),
-                        span: Span::dummy(),
-                    })?;
+                let list =
+                    self.program
+                        .get_list(&name)
+                        .ok_or_else(|| EvalError::UndefinedList {
+                            name: name.clone(),
+                            span: Span::dummy(),
+                        })?;
                 self.evaluate_list(list).await
             }
             Value::ListInstance(list) => self.evaluate_list(&list).await,
@@ -1038,12 +1085,13 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
             Value::Array(items) => Ok(items.join(" ")), // Default: space-separated
             Value::ConsumableList(id) => {
                 // Get the consumable list state
-                let state = self.consumable_lists.get(&id).ok_or_else(|| {
-                    EvalError::UndefinedList {
-                        name: format!("Consumable list not found: {}", id),
-                        span: Span::dummy(),
-                    }
-                })?;
+                let state =
+                    self.consumable_lists
+                        .get(&id)
+                        .ok_or_else(|| EvalError::UndefinedList {
+                            name: format!("Consumable list not found: {}", id),
+                            span: Span::dummy(),
+                        })?;
 
                 // Check if there are any items left
                 if state.remaining_indices.is_empty() {
@@ -1068,14 +1116,9 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                 let item = source_list
                     .items
                     .get(item_idx)
-                    .ok_or_else(|| {
-                        EvalError::EmptyList {
-                            name: format!(
-                                "Invalid index {} in consumable list",
-                                item_idx
-                            ),
-                            span: Span::dummy(),
-                        }
+                    .ok_or_else(|| EvalError::EmptyList {
+                        name: format!("Invalid index {} in consumable list", item_idx),
+                        span: Span::dummy(),
                     })?
                     .clone();
 
@@ -1105,7 +1148,10 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
             }
             Value::ImportedGenerator(generator_name) => {
                 // Evaluate the imported generator
-                let imported_program = self.load_import(&generator_name, Span::dummy()).await?.clone();
+                let imported_program = self
+                    .load_import(&generator_name, Span::dummy())
+                    .await?
+                    .clone();
 
                 // Create a new evaluator for the imported program with its own context
                 let mut imported_evaluator = Evaluator::new(&imported_program, self.rng);
@@ -1159,13 +1205,13 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
         match value {
             Value::List(list_name) => {
                 // Look up the list
-                let list = self
-                    .program
-                    .get_list(list_name)
-                    .ok_or_else(|| EvalError::UndefinedList {
-                        name: list_name.clone(),
-                        span,
-                    })?;
+                let list =
+                    self.program
+                        .get_list(list_name)
+                        .ok_or_else(|| EvalError::UndefinedList {
+                            name: list_name.clone(),
+                            span,
+                        })?;
 
                 // Search through all items to find one with this property as a sublist
                 for item in &list.items {
@@ -1181,7 +1227,9 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                     let result_value = self.evaluate_list_to_value(list).await?;
                     if matches!(result_value, Value::ImportedGenerator(_)) {
                         // Delegate property access to the imported generator
-                        return self.get_property_value(&result_value, prop_name, span).await;
+                        return self
+                            .get_property_value(&result_value, prop_name, span)
+                            .await;
                     }
                 }
 
@@ -1238,18 +1286,12 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                     return self.call_method_value(value, &method).await;
                 }
                 Err(EvalError::TypeError {
-                    message: format!(
-                        "Cannot access property '{}' on text value",
-                        prop_name
-                    ),
+                    message: format!("Cannot access property '{}' on text value", prop_name),
                     span,
                 })
             }
             Value::Array(_) => Err(EvalError::TypeError {
-                message: format!(
-                    "Cannot access property '{}' on array value",
-                    prop_name
-                ),
+                message: format!("Cannot access property '{}' on array value", prop_name),
                 span,
             }),
             Value::ConsumableList(_) => {
@@ -1259,10 +1301,7 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                     return self.call_method_value(value, &method).await;
                 }
                 Err(EvalError::TypeError {
-                    message: format!(
-                        "Cannot access property '{}' on consumable list",
-                        prop_name
-                    ),
+                    message: format!("Cannot access property '{}' on consumable list", prop_name),
                     span,
                 })
             }
@@ -1325,7 +1364,12 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
     }
 
     #[async_recursion]
-    async fn get_property(&mut self, value: &Value, prop_name: &str, span: Span) -> Result<String, EvalError> {
+    async fn get_property(
+        &mut self,
+        value: &Value,
+        prop_name: &str,
+        span: Span,
+    ) -> Result<String, EvalError> {
         let prop_value = self.get_property_value(value, prop_name, span).await?;
         self.value_to_string(prop_value).await
     }
@@ -1351,13 +1395,12 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                 // Select one item from the list and return it as a Value
                 match value {
                     Value::List(name) => {
-                        let list = self
-                            .program
-                            .get_list(name)
-                            .ok_or_else(|| EvalError::UndefinedList {
+                        let list = self.program.get_list(name).ok_or_else(|| {
+                            EvalError::UndefinedList {
                                 name: name.clone(),
                                 span: method.span,
-                            })?;
+                            }
+                        })?;
 
                         let item = self
                             .select_weighted_item(&list.items, list.total_weight)
@@ -1456,10 +1499,12 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                 // Return all items as a joined string
                 match value {
                     Value::List(name) => {
-                        let list = self
-                            .program
-                            .get_list(name)
-                            .ok_or_else(|| EvalError::UndefinedList { name: name.clone(), span: method.span })?;
+                        let list = self.program.get_list(name).ok_or_else(|| {
+                            EvalError::UndefinedList {
+                                name: name.clone(),
+                                span: method.span,
+                            }
+                        })?;
 
                         let mut results = Vec::new();
                         for item in &list.items {
@@ -1504,11 +1549,18 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                     }
                     Value::ConsumableList(_) => {
                         // selectAll is not meaningful for consumable lists
-                        Err(EvalError::InvalidMethodCall { message: "selectAll cannot be called on consumable lists".to_string(), span: method.span })
+                        Err(EvalError::InvalidMethodCall {
+                            message: "selectAll cannot be called on consumable lists".to_string(),
+                            span: method.span,
+                        })
                     }
                     Value::ImportedGenerator(_) => {
                         // selectAll is not meaningful for imported generators
-                        Err(EvalError::InvalidMethodCall { message: "selectAll cannot be called on imported generators".to_string(), span: method.span })
+                        Err(EvalError::InvalidMethodCall {
+                            message: "selectAll cannot be called on imported generators"
+                                .to_string(),
+                            span: method.span,
+                        })
                     }
                 }
             }
@@ -1517,41 +1569,71 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                 // Select n items with repetition
                 // Supports selectMany(n) or selectMany(min, max)
                 let n = if method.args.is_empty() {
-                    return Err(EvalError::InvalidMethodCall { message: "selectMany requires at least one argument".to_string(), span: method.span });
+                    return Err(EvalError::InvalidMethodCall {
+                        message: "selectMany requires at least one argument".to_string(),
+                        span: method.span,
+                    });
                 } else if method.args.len() == 1 {
                     // Single argument: exact count
                     let arg_str = self.evaluate_expression(&method.args[0]).await?;
-                    arg_str.parse::<usize>().map_err(|_| {
-                        EvalError::InvalidMethodCall { message: format!("selectMany argument must be a number, got: {}", arg_str
-                        ), span: method.span }
-                    })?
+                    arg_str
+                        .parse::<usize>()
+                        .map_err(|_| EvalError::InvalidMethodCall {
+                            message: format!(
+                                "selectMany argument must be a number, got: {}",
+                                arg_str
+                            ),
+                            span: method.span,
+                        })?
                 } else if method.args.len() == 2 {
                     // Two arguments: random count between min and max
                     let min_str = self.evaluate_expression(&method.args[0]).await?;
                     let max_str = self.evaluate_expression(&method.args[1]).await?;
-                    let min = min_str.parse::<usize>().map_err(|_| {
-                        EvalError::InvalidMethodCall { message: format!("selectMany min argument must be a number, got: {}", min_str
-                        ), span: method.span }
-                    })?;
-                    let max = max_str.parse::<usize>().map_err(|_| {
-                        EvalError::InvalidMethodCall { message: format!("selectMany max argument must be a number, got: {}", max_str
-                        ), span: method.span }
-                    })?;
+                    let min =
+                        min_str
+                            .parse::<usize>()
+                            .map_err(|_| EvalError::InvalidMethodCall {
+                                message: format!(
+                                    "selectMany min argument must be a number, got: {}",
+                                    min_str
+                                ),
+                                span: method.span,
+                            })?;
+                    let max =
+                        max_str
+                            .parse::<usize>()
+                            .map_err(|_| EvalError::InvalidMethodCall {
+                                message: format!(
+                                    "selectMany max argument must be a number, got: {}",
+                                    max_str
+                                ),
+                                span: method.span,
+                            })?;
                     if min > max {
-                        return Err(EvalError::InvalidMethodCall { message: format!("selectMany min ({}) cannot be greater than max ({})", min, max
-                        ), span: method.span });
+                        return Err(EvalError::InvalidMethodCall {
+                            message: format!(
+                                "selectMany min ({}) cannot be greater than max ({})",
+                                min, max
+                            ),
+                            span: method.span,
+                        });
                     }
                     self.rng.gen_range(min..=max)
                 } else {
-                    return Err(EvalError::InvalidMethodCall { message: "selectMany accepts 1 or 2 arguments".to_string(), span: method.span });
+                    return Err(EvalError::InvalidMethodCall {
+                        message: "selectMany accepts 1 or 2 arguments".to_string(),
+                        span: method.span,
+                    });
                 };
 
                 match value {
                     Value::List(name) => {
-                        let list = self
-                            .program
-                            .get_list(name)
-                            .ok_or_else(|| EvalError::UndefinedList { name: name.clone(), span: method.span })?;
+                        let list = self.program.get_list(name).ok_or_else(|| {
+                            EvalError::UndefinedList {
+                                name: name.clone(),
+                                span: method.span,
+                            }
+                        })?;
 
                         let mut results = Vec::new();
                         for _ in 0..n {
@@ -1619,7 +1701,11 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                     }
                     Value::ImportedGenerator(_) => {
                         // selectMany is not meaningful for imported generators
-                        Err(EvalError::InvalidMethodCall { message: "selectMany cannot be called on imported generators".to_string(), span: method.span })
+                        Err(EvalError::InvalidMethodCall {
+                            message: "selectMany cannot be called on imported generators"
+                                .to_string(),
+                            span: method.span,
+                        })
                     }
                 }
             }
@@ -1628,41 +1714,71 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                 // Select n unique items without repetition
                 // Supports selectUnique(n) or selectUnique(min, max)
                 let n = if method.args.is_empty() {
-                    return Err(EvalError::InvalidMethodCall { message: "selectUnique requires at least one argument".to_string(), span: method.span });
+                    return Err(EvalError::InvalidMethodCall {
+                        message: "selectUnique requires at least one argument".to_string(),
+                        span: method.span,
+                    });
                 } else if method.args.len() == 1 {
                     // Single argument: exact count
                     let arg_str = self.evaluate_expression(&method.args[0]).await?;
-                    arg_str.parse::<usize>().map_err(|_| {
-                        EvalError::InvalidMethodCall { message: format!("selectUnique argument must be a number, got: {}", arg_str
-                        ), span: method.span }
-                    })?
+                    arg_str
+                        .parse::<usize>()
+                        .map_err(|_| EvalError::InvalidMethodCall {
+                            message: format!(
+                                "selectUnique argument must be a number, got: {}",
+                                arg_str
+                            ),
+                            span: method.span,
+                        })?
                 } else if method.args.len() == 2 {
                     // Two arguments: random count between min and max
                     let min_str = self.evaluate_expression(&method.args[0]).await?;
                     let max_str = self.evaluate_expression(&method.args[1]).await?;
-                    let min = min_str.parse::<usize>().map_err(|_| {
-                        EvalError::InvalidMethodCall { message: format!("selectUnique min argument must be a number, got: {}", min_str
-                        ), span: method.span }
-                    })?;
-                    let max = max_str.parse::<usize>().map_err(|_| {
-                        EvalError::InvalidMethodCall { message: format!("selectUnique max argument must be a number, got: {}", max_str
-                        ), span: method.span }
-                    })?;
+                    let min =
+                        min_str
+                            .parse::<usize>()
+                            .map_err(|_| EvalError::InvalidMethodCall {
+                                message: format!(
+                                    "selectUnique min argument must be a number, got: {}",
+                                    min_str
+                                ),
+                                span: method.span,
+                            })?;
+                    let max =
+                        max_str
+                            .parse::<usize>()
+                            .map_err(|_| EvalError::InvalidMethodCall {
+                                message: format!(
+                                    "selectUnique max argument must be a number, got: {}",
+                                    max_str
+                                ),
+                                span: method.span,
+                            })?;
                     if min > max {
-                        return Err(EvalError::InvalidMethodCall { message: format!("selectUnique min ({}) cannot be greater than max ({})", min, max
-                        ), span: method.span });
+                        return Err(EvalError::InvalidMethodCall {
+                            message: format!(
+                                "selectUnique min ({}) cannot be greater than max ({})",
+                                min, max
+                            ),
+                            span: method.span,
+                        });
                     }
                     self.rng.gen_range(min..=max)
                 } else {
-                    return Err(EvalError::InvalidMethodCall { message: "selectUnique accepts 1 or 2 arguments".to_string(), span: method.span });
+                    return Err(EvalError::InvalidMethodCall {
+                        message: "selectUnique accepts 1 or 2 arguments".to_string(),
+                        span: method.span,
+                    });
                 };
 
                 match value {
                     Value::List(name) => {
-                        let list = self
-                            .program
-                            .get_list(name)
-                            .ok_or_else(|| EvalError::UndefinedList { name: name.clone(), span: method.span })?;
+                        let list = self.program.get_list(name).ok_or_else(|| {
+                            EvalError::UndefinedList {
+                                name: name.clone(),
+                                span: method.span,
+                            }
+                        })?;
 
                         if n > list.items.len() {
                             return Err(EvalError::InvalidMethodCall {
@@ -1776,7 +1892,11 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                     }
                     Value::ImportedGenerator(_) => {
                         // selectUnique is not meaningful for imported generators
-                        Err(EvalError::InvalidMethodCall { message: "selectUnique cannot be called on imported generators".to_string(), span: method.span })
+                        Err(EvalError::InvalidMethodCall {
+                            message: "selectUnique cannot be called on imported generators"
+                                .to_string(),
+                            span: method.span,
+                        })
                     }
                 }
             }
@@ -1842,7 +1962,10 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                         let list = self
                             .program
                             .get_list(name)
-                            .ok_or_else(|| EvalError::UndefinedList { name: name.clone(), span: method.span })?
+                            .ok_or_else(|| EvalError::UndefinedList {
+                                name: name.clone(),
+                                span: method.span,
+                            })?
                             .clone();
 
                         // Check if the list has $output that evaluates to an ImportedGenerator
@@ -1899,7 +2022,8 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                     }
                     Value::ImportedGenerator(generator_name) => {
                         // For imported generators, get the output list and create a consumable version
-                        let imported_program = self.load_import(generator_name, method.span).await?;
+                        let imported_program =
+                            self.load_import(generator_name, method.span).await?;
 
                         // Find the output list (check $output, then output, then last list)
                         let mut output_list = if let Some(list) =
@@ -1911,14 +2035,12 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                         } else if let Some(last_list_name) = imported_program.list_order.last() {
                             imported_program
                                 .get_list(last_list_name)
-                                .ok_or_else(|| {
-                                    EvalError::ImportError {
-                                        message: format!(
-                                            "Cannot find output list in imported generator '{}'",
-                                            generator_name
-                                        ),
-                                        span: method.span,
-                                    }
+                                .ok_or_else(|| EvalError::ImportError {
+                                    message: format!(
+                                        "Cannot find output list in imported generator '{}'",
+                                        generator_name
+                                    ),
+                                    span: method.span,
                                 })?
                                 .clone()
                         } else {
@@ -1971,7 +2093,10 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                         // Return reference to consumable list
                         Ok(Value::ConsumableList(id))
                     }
-                    _ => Err(EvalError::InvalidMethodCall { message: "consumableList can only be called on lists".to_string(), span: method.span }),
+                    _ => Err(EvalError::InvalidMethodCall {
+                        message: "consumableList can only be called on lists".to_string(),
+                        span: method.span,
+                    }),
                 }
             }
 
@@ -1980,7 +2105,10 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                 // This is a built-in function that mimics the join-lists-plugin
 
                 if method.args.is_empty() {
-                    return Err(EvalError::InvalidMethodCall { message: "joinLists requires at least one argument".to_string(), span: method.span });
+                    return Err(EvalError::InvalidMethodCall {
+                        message: "joinLists requires at least one argument".to_string(),
+                        span: method.span,
+                    });
                 }
 
                 // Collect all items from all list arguments
@@ -1993,10 +2121,12 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                     // Get the items from the list
                     match list_value {
                         Value::List(name) => {
-                            let list = self
-                                .program
-                                .get_list(&name)
-                                .ok_or_else(|| EvalError::UndefinedList { name: name.clone(), span: method.span })?;
+                            let list = self.program.get_list(&name).ok_or_else(|| {
+                                EvalError::UndefinedList {
+                                    name: name.clone(),
+                                    span: method.span,
+                                }
+                            })?;
                             combined_items.extend(list.items.clone());
                         }
                         Value::ListInstance(list) => {
@@ -2029,8 +2159,10 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                 Ok(Value::ListInstance(combined_list))
             }
 
-            _ => Err(EvalError::InvalidMethodCall { message: format!("Unknown method: {}", method.name
-            ), span: method.span }),
+            _ => Err(EvalError::InvalidMethodCall {
+                message: format!("Unknown method: {}", method.name),
+                span: method.span,
+            }),
         }
     }
 }

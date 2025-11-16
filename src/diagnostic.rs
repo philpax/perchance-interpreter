@@ -158,7 +158,10 @@ pub fn report_compile_error(source_name: &str, source: &str, error: &CompileErro
                         .with_message(format!("list '{}' is already defined", name))
                         .with_color(Color::Red),
                 )
-                .with_help(format!("Rename this list or remove the duplicate definition of '{}'", name))
+                .with_help(format!(
+                    "Rename this list or remove the duplicate definition of '{}'",
+                    name
+                ))
                 .finish()
         }
         CompileError::InvalidWeight { message, span } => {
@@ -194,7 +197,10 @@ pub fn report_eval_error(source_name: &str, source: &str, error: &EvalError) -> 
                         .with_message(format!("list '{}' is not defined", name))
                         .with_color(Color::Red),
                 )
-                .with_help(format!("Define the '{}' list before using it, or check for typos", name))
+                .with_help(format!(
+                    "Define the '{}' list before using it, or check for typos",
+                    name
+                ))
                 .finish()
         }
         EvalError::UndefinedVariable { name, span } => {
@@ -216,7 +222,10 @@ pub fn report_eval_error(source_name: &str, source: &str, error: &EvalError) -> 
                         .with_message(format!("property '{}' does not exist on '{}'", prop, list))
                         .with_color(Color::Red),
                 )
-                .with_help(format!("Check that '{}' has a '{}' property or sublist", list, prop))
+                .with_help(format!(
+                    "Check that '{}' has a '{}' property or sublist",
+                    list, prop
+                ))
                 .finish()
         }
         EvalError::InvalidMethodCall { message, span } => {

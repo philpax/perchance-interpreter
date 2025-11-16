@@ -47,10 +47,22 @@ impl CompileError {
 impl std::fmt::Display for CompileError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            CompileError::UndefinedList { name, .. } => write!(f, "Undefined list: {}", name),
-            CompileError::EmptyList { name, .. } => write!(f, "Empty list: {}", name),
-            CompileError::DuplicateList { name, .. } => write!(f, "Duplicate list name: {}", name),
-            CompileError::InvalidWeight { message, .. } => write!(f, "Invalid weight: {}", message),
+            CompileError::UndefinedList { name, span } => {
+                write!(f, "Undefined list: {} at position {}", name, span.start)
+            }
+            CompileError::EmptyList { name, span } => {
+                write!(f, "Empty list: {} at position {}", name, span.start)
+            }
+            CompileError::DuplicateList { name, span } => {
+                write!(
+                    f,
+                    "Duplicate list name: {} at position {}",
+                    name, span.start
+                )
+            }
+            CompileError::InvalidWeight { message, span } => {
+                write!(f, "Invalid weight: {} at position {}", message, span.start)
+            }
         }
     }
 }

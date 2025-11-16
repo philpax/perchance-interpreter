@@ -35,26 +35,34 @@ impl std::fmt::Display for ParseError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             ParseError::UnexpectedEof => write!(f, "Unexpected end of file"),
-            ParseError::InvalidIndentation { .. } => {
-                write!(f, "Invalid indentation")
+            ParseError::InvalidIndentation { span } => {
+                write!(f, "Invalid indentation at position {}", span.start)
             }
-            ParseError::InvalidSyntax { message, .. } => write!(f, "{}", message),
-            ParseError::UnterminatedReference { .. } => {
-                write!(f, "Unterminated reference")
+            ParseError::InvalidSyntax { message, span } => {
+                write!(f, "{} at position {}", message, span.start)
             }
-            ParseError::UnterminatedInline { .. } => {
-                write!(f, "Unterminated inline list")
+            ParseError::UnterminatedReference { span } => {
+                write!(f, "Unterminated reference at position {}", span.start)
             }
-            ParseError::UnterminatedString { .. } => {
-                write!(f, "Unterminated string")
+            ParseError::UnterminatedInline { span } => {
+                write!(f, "Unterminated inline list at position {}", span.start)
             }
-            ParseError::InvalidEscape { ch, .. } => {
-                write!(f, "Invalid escape sequence '\\{}'", ch)
+            ParseError::UnterminatedString { span } => {
+                write!(f, "Unterminated string at position {}", span.start)
             }
-            ParseError::InvalidNumberRange { .. } => {
-                write!(f, "Invalid number range")
+            ParseError::InvalidEscape { ch, span } => {
+                write!(
+                    f,
+                    "Invalid escape sequence '\\{}' at position {}",
+                    ch, span.start
+                )
             }
-            ParseError::EmptyListName { .. } => write!(f, "Empty list name"),
+            ParseError::InvalidNumberRange { span } => {
+                write!(f, "Invalid number range at position {}", span.start)
+            }
+            ParseError::EmptyListName { span } => {
+                write!(f, "Empty list name at position {}", span.start)
+            }
         }
     }
 }
@@ -312,7 +320,8 @@ impl Parser {
 
                                 // Create a sublist for this property
                                 let prop_list_span = self.span_from(prop_list_start);
-                                let mut prop_list = List::new_with_span(prop_name_str.clone(), prop_list_span);
+                                let mut prop_list =
+                                    List::new_with_span(prop_name_str.clone(), prop_list_span);
                                 let prop_item = Item::new(value_content);
                                 prop_list.add_item(prop_item);
 
@@ -517,8 +526,12 @@ impl Parser {
                     // Otherwise, it's a logical OR
                     let right = self.parse_and_expression()?;
                     let span = self.span_from(start);
-                    left =
-                        Expression::BinaryOp(Box::new(left), BinaryOperator::Or, Box::new(right), span);
+                    left = Expression::BinaryOp(
+                        Box::new(left),
+                        BinaryOperator::Or,
+                        Box::new(right),
+                        span,
+                    );
                 }
             } else {
                 break;
@@ -540,7 +553,12 @@ impl Parser {
                 self.skip_spaces();
                 let right = self.parse_comparison_expression()?;
                 let span = self.span_from(start);
-                left = Expression::BinaryOp(Box::new(left), BinaryOperator::And, Box::new(right), span);
+                left = Expression::BinaryOp(
+                    Box::new(left),
+                    BinaryOperator::And,
+                    Box::new(right),
+                    span,
+                );
             } else {
                 break;
             }
@@ -782,7 +800,12 @@ impl Parser {
                             // Parse full expression to allow math operations, etc.
                             let value = self.parse_ternary_expression()?;
                             let span = self.span_from(start);
-                            return Ok(Expression::PropertyAssignment(base, prop, Box::new(value), span));
+                            return Ok(Expression::PropertyAssignment(
+                                base,
+                                prop,
+                                Box::new(value),
+                                span,
+                            ));
                         }
                         _ => {
                             let span = self.span_from(start);
@@ -882,9 +905,16 @@ impl Parser {
                         let inline_span = self.span_from(start);
                         let choice_span = self.span_from(start);
                         // Return the import as an inline list with a single choice containing an Import expression
-                        return Ok(InlineList::new_with_span(vec![InlineChoice::new_with_span(vec![
-                            ContentPart::Reference(Expression::Import(generator_name, import_span), ref_span),
-                        ], choice_span)], inline_span));
+                        return Ok(InlineList::new_with_span(
+                            vec![InlineChoice::new_with_span(
+                                vec![ContentPart::Reference(
+                                    Expression::Import(generator_name, import_span),
+                                    ref_span,
+                                )],
+                                choice_span,
+                            )],
+                            inline_span,
+                        ));
                     }
                     generator_name.push(ch);
                     self.advance();
@@ -907,9 +937,13 @@ impl Parser {
                 let choice_span = self.span_from(start);
                 let inline_span = self.span_from(start);
                 // Return a special inline that's handled differently in evaluator
-                return Ok(InlineList::new_with_span(vec![InlineChoice::new_with_span(vec![
-                    ContentPart::Article(article_span),
-                ], choice_span)], inline_span));
+                return Ok(InlineList::new_with_span(
+                    vec![InlineChoice::new_with_span(
+                        vec![ContentPart::Article(article_span)],
+                        choice_span,
+                    )],
+                    inline_span,
+                ));
             }
         }
 
@@ -921,9 +955,13 @@ impl Parser {
                 let pluralize_span = self.span_from(start);
                 let choice_span = self.span_from(start);
                 let inline_span = self.span_from(start);
-                return Ok(InlineList::new_with_span(vec![InlineChoice::new_with_span(vec![
-                    ContentPart::Pluralize(pluralize_span),
-                ], choice_span)], inline_span));
+                return Ok(InlineList::new_with_span(
+                    vec![InlineChoice::new_with_span(
+                        vec![ContentPart::Pluralize(pluralize_span)],
+                        choice_span,
+                    )],
+                    inline_span,
+                ));
             }
         }
 
@@ -947,7 +985,10 @@ impl Parser {
                 '}' => {
                     if !content_buffer.is_empty() || choices.is_empty() {
                         let choice_span = self.span_from(choice_start);
-                        choices.push(InlineChoice::new_with_span(content_buffer.clone(), choice_span));
+                        choices.push(InlineChoice::new_with_span(
+                            content_buffer.clone(),
+                            choice_span,
+                        ));
                     }
                     self.consume_char('}');
                     let inline_span = self.span_from(start);
@@ -955,7 +996,10 @@ impl Parser {
                 }
                 '|' => {
                     let choice_span = self.span_from(choice_start);
-                    choices.push(InlineChoice::new_with_span(content_buffer.clone(), choice_span));
+                    choices.push(InlineChoice::new_with_span(
+                        content_buffer.clone(),
+                        choice_span,
+                    ));
                     content_buffer = Vec::new();
                     self.consume_char('|');
                     choice_start = self.current_pos();
@@ -998,7 +1042,8 @@ impl Parser {
                         ItemWeight::Static(self.parse_number()?)
                     };
                     let choice_span = self.span_from(choice_start);
-                    let mut choice = InlineChoice::new_with_span(content_buffer.clone(), choice_span);
+                    let mut choice =
+                        InlineChoice::new_with_span(content_buffer.clone(), choice_span);
                     choice = choice.with_weight(weight);
                     choices.push(choice);
                     content_buffer = Vec::new();
@@ -1011,7 +1056,10 @@ impl Parser {
                 }
                 _ => {
                     let text_start = self.current_pos();
-                    content_buffer.push(ContentPart::Text(ch.to_string(), self.make_span(text_start, text_start + 1)));
+                    content_buffer.push(ContentPart::Text(
+                        ch.to_string(),
+                        self.make_span(text_start, text_start + 1),
+                    ));
                     self.advance();
                 }
             }
@@ -1081,9 +1129,13 @@ impl Parser {
         let choice_span = self.span_from(start);
         let inline_span = self.span_from(start);
         let expr = Expression::NumberRange(start_num, end_num, expr_span);
-        Ok(InlineList::new_with_span(vec![InlineChoice::new_with_span(vec![
-            ContentPart::Reference(expr, ref_span),
-        ], choice_span)], inline_span))
+        Ok(InlineList::new_with_span(
+            vec![InlineChoice::new_with_span(
+                vec![ContentPart::Reference(expr, ref_span)],
+                choice_span,
+            )],
+            inline_span,
+        ))
     }
 
     fn parse_inline_letter_range(&mut self) -> Result<InlineList, ParseError> {
@@ -1101,9 +1153,13 @@ impl Parser {
         let choice_span = self.span_from(start);
         let inline_span = self.span_from(start);
         let expr = Expression::LetterRange(start_char, end_char, expr_span);
-        Ok(InlineList::new_with_span(vec![InlineChoice::new_with_span(vec![
-            ContentPart::Reference(expr, ref_span),
-        ], choice_span)], inline_span))
+        Ok(InlineList::new_with_span(
+            vec![InlineChoice::new_with_span(
+                vec![ContentPart::Reference(expr, ref_span)],
+                choice_span,
+            )],
+            inline_span,
+        ))
     }
 
     fn parse_escape(&mut self) -> Result<char, ParseError> {

@@ -55,11 +55,7 @@ async fn main() {
     };
 
     // Determine source name for diagnostics
-    let source_name = if args[1] == "-" {
-        "<stdin>"
-    } else {
-        &args[1]
-    };
+    let source_name = if args[1] == "-" { "<stdin>" } else { &args[1] };
 
     // Parse seed if provided
     let result = if args.len() > 2 {
