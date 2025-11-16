@@ -134,49 +134,48 @@ output
     let _err = run(template, 42).await.unwrap_err();
 }
 
-// Test removed - dynamic odds require more complex evaluation context
-// #[tokio::test]
-// async fn test_dynamic_odds() {
-//     let template = r#"
-// rarity
-// 	common^[value]
-// 	rare^[10 - value]
-//
-// output
-// 	[value = 8][rarity]
-// "#;
-//     let output = run(template, 42).await.unwrap();
-//     assert!(output.trim() == "common" || output.trim() == "rare");
-// }
+#[tokio::test]
+async fn test_dynamic_odds() {
+    let template = r#"
+rarity
+	common^[value]
+	rare^[10 - value]
 
-// #[tokio::test]
-// async fn test_property_fallback() {
-//     let template = r#"
-// animal
-// 	dog
-// 		type = canine
-// 	cat
-// 		type = feline
-//
-// output
-// 	[a = animal.selectOne, a.type || "Unknown"]
-// "#;
-//     let output = run(template, 42).await.unwrap();
-//     assert!(output.trim() == "canine" || output.trim() == "feline");
-// }
-//
-// #[tokio::test]
-// async fn test_property_fallback_missing() {
-//     let template = r#"
-// animal
-// 	fish
-//
-// output
-// 	[a = animal.selectOne, a.type || "Unknown"]
-// "#;
-//     let output = run(template, 42).await.unwrap();
-//     assert_eq!(output.trim(), "Unknown");
-// }
+output
+	[value = 8, rarity]
+"#;
+    let output = run(template, 42).await.unwrap();
+    assert!(output.trim() == "common" || output.trim() == "rare");
+}
+
+#[tokio::test]
+async fn test_property_fallback() {
+    let template = r#"
+animal
+	dog
+		type = canine
+	cat
+		type = feline
+
+output
+	[a = animal.selectOne, a.type || "Unknown"]
+"#;
+    let output = run(template, 42).await.unwrap();
+    assert!(output.trim() == "canine" || output.trim() == "feline");
+}
+
+#[tokio::test]
+async fn test_property_fallback_missing() {
+    let template = r#"
+animal
+	fish
+
+output
+	[a = animal.selectOne, a.type || "Unknown"]
+"#;
+    let output = run(template, 42).await.unwrap();
+    assert_eq!(output.trim(), "Unknown");
+}
 
 #[tokio::test]
 async fn test_select_many_variable_count() {
@@ -219,48 +218,52 @@ output
     assert_eq!(count, unique_count);
 }
 
-// #[tokio::test]
-// async fn test_evaluate_item() {
-//     let template = r#"
-// color
-// 	{red|blue}
-//
-// output
-// 	[c = color.selectOne.evaluateItem][c] and [c]
-// "#;
-//     let output = run(template, 42).await.unwrap();
-//     let parts: Vec<&str> = output.trim().split(" and ").collect();
-//     // Both should be the same because evaluateItem evaluated the inline choice
-//     assert_eq!(parts[0], parts[1]);
-// }
+#[tokio::test]
+async fn test_evaluate_item() {
+    let template = r#"
+color
+	{red|blue}
 
+output
+	[c = color.selectOne.evaluateItem, c] and [c]
+"#;
+    let output = run(template, 42).await.unwrap();
+    let parts: Vec<&str> = output.trim().split(" and ").collect();
+    // Both should be the same because evaluateItem evaluated the inline choice
+    assert_eq!(parts[0], parts[1]);
+}
+
+// Note: Full `this` keyword property assignment would require mutable item properties
+// which needs architectural changes. The PropertyAssignment expression is implemented
+// but doesn't persist across evaluations. These tests are commented out for now.
+//
 // #[tokio::test]
-// async fn test_this_keyword_property_access() {
+// async fn test_this_keyword_with_sublists() {
 //     let template = r#"
 // description
-// 	Some text
-// 	Another text
-// 	$output = <p>[this.joinItems("</p><p>")]</p>
+// 	cute
+// 	fluffy
+// 	$output = [this.joinItems(" and ")]
 //
 // output
 // 	[description]
 // "#;
 //     let output = run(template, 42).await.unwrap();
-//     assert!(output.contains("<p>") && output.contains("</p>"));
+//     assert!(output.contains(" and "));
 // }
 //
 // #[tokio::test]
 // async fn test_this_keyword_property_assignment() {
 //     let template = r#"
-// list
-// 	value = test
-// 	$output = [this.value = "Modified", this.value]
+// test
+// 	item
+// 	$output = [this.custom = "value", "Result: ", this.custom]
 //
 // output
-// 	[list]
+// 	[test]
 // "#;
 //     let output = run(template, 42).await.unwrap();
-//     assert_eq!(output.trim(), "Modified");
+//     assert_eq!(output.trim(), "Result: value");
 // }
 
 #[tokio::test]

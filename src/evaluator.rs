@@ -567,6 +567,18 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                             .await?;
                         return self.value_to_string(result).await;
                     }
+
+                    // Special handling for "this" keyword
+                    if ident.name == "this" {
+                        if let Some(ref item) = self.current_item {
+                            let value = Value::ItemInstance(item.clone());
+                            return self.call_method(&value, method).await;
+                        } else {
+                            return Err(EvalError::TypeError(
+                                "'this' keyword can only be used within $output".to_string(),
+                            ));
+                        }
+                    }
                 }
 
                 let base_value = self.evaluate_to_value(base).await?;

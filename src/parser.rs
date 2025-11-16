@@ -241,6 +241,44 @@ impl Parser {
                         break;
                     } else if indent == sublist_indent {
                         self.skip_indent(sublist_indent);
+
+                        // Check if this is a property assignment (name = value)
+                        let prop_name = self.peek_identifier();
+                        if !prop_name.is_empty() {
+                            let saved_pos = self.pos;
+                            let _ident = self.parse_identifier();
+                            self.skip_spaces();
+
+                            if self.peek_char() == Some('=')
+                                && self.peek_two_chars() != Some(('=', '='))
+                            {
+                                // This is a property assignment
+                                self.consume_char('=');
+                                self.skip_spaces();
+
+                                // Parse the value
+                                let value_content = self.parse_content_until_newline()?;
+                                self.skip_to_newline();
+                                if !self.is_eof() {
+                                    self.consume_char('\n');
+                                }
+
+                                // Create a sublist for this property
+                                let mut prop_list = List::new(prop_name.clone());
+                                let prop_item = Item::new(value_content);
+                                prop_list.add_item(prop_item);
+
+                                // Add this as a subitem with the property as a sublist
+                                let mut prop_subitem = Item::new(vec![]);
+                                prop_subitem.add_sublist(prop_list);
+                                sublist.add_item(prop_subitem);
+                                continue;
+                            } else {
+                                // Not a property assignment, restore position and parse normally
+                                self.pos = saved_pos;
+                            }
+                        }
+
                         let subitem = self.parse_item(sublist_indent)?;
                         sublist.add_item(subitem);
                     } else {
@@ -559,7 +597,12 @@ impl Parser {
 
         // Check for numeric literal (starts with digit or negative sign followed by digit)
         if let Some(&ch) = self.peek_char_ref() {
-            if ch.is_ascii_digit() || (ch == '-' && self.peek_two_chars().map_or(false, |(_, c2)| c2.is_ascii_digit())) {
+            if ch.is_ascii_digit()
+                || (ch == '-'
+                    && self
+                        .peek_two_chars()
+                        .is_some_and(|(_, c2)| c2.is_ascii_digit()))
+            {
                 // Parse as number
                 let num = self.parse_number()?;
                 let mut expr = Expression::Number(num);
