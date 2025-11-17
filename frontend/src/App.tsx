@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import init, { evaluate_multiple, get_available_generators } from './wasm/perchance_wasm';
 import AutocompleteDropdown from './AutocompleteDropdown';
+import AnsiRenderer from './AnsiRenderer';
 
 const DEFAULT_TEMPLATE = `animal
 \tdog
@@ -301,7 +302,7 @@ function App() {
                       </svg>
                       <div className="flex-1">
                         <h3 className="text-red-400 font-semibold mb-1">Error</h3>
-                        <pre className="text-red-300 text-sm whitespace-pre-wrap font-mono">{error}</pre>
+                        <AnsiRenderer text={error} className="text-sm whitespace-pre-wrap font-mono" />
                       </div>
                     </div>
                   </div>
