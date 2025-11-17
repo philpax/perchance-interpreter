@@ -1,5 +1,6 @@
 /// Compiler transforms AST into an evaluatable representation
 use crate::ast::*;
+use crate::span::Span;
 use std::collections::HashMap;
 
 #[derive(Debug, Clone)]
@@ -26,19 +27,42 @@ pub struct CompiledItem {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum CompileError {
-    UndefinedList(String),
-    EmptyList(String),
-    DuplicateList(String),
-    InvalidWeight(String),
+    UndefinedList { name: String, span: Span },
+    EmptyList { name: String, span: Span },
+    DuplicateList { name: String, span: Span },
+    InvalidWeight { message: String, span: Span },
+}
+
+impl CompileError {
+    pub fn span(&self) -> Span {
+        match self {
+            CompileError::UndefinedList { span, .. } => *span,
+            CompileError::EmptyList { span, .. } => *span,
+            CompileError::DuplicateList { span, .. } => *span,
+            CompileError::InvalidWeight { span, .. } => *span,
+        }
+    }
 }
 
 impl std::fmt::Display for CompileError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            CompileError::UndefinedList(name) => write!(f, "Undefined list: {}", name),
-            CompileError::EmptyList(name) => write!(f, "Empty list: {}", name),
-            CompileError::DuplicateList(name) => write!(f, "Duplicate list name: {}", name),
-            CompileError::InvalidWeight(msg) => write!(f, "Invalid weight: {}", msg),
+            CompileError::UndefinedList { name, span } => {
+                write!(f, "Undefined list: {} at position {}", name, span.start)
+            }
+            CompileError::EmptyList { name, span } => {
+                write!(f, "Empty list: {} at position {}", name, span.start)
+            }
+            CompileError::DuplicateList { name, span } => {
+                write!(
+                    f,
+                    "Duplicate list name: {} at position {}",
+                    name, span.start
+                )
+            }
+            CompileError::InvalidWeight { message, span } => {
+                write!(f, "Invalid weight: {} at position {}", message, span.start)
+            }
         }
     }
 }
@@ -119,7 +143,10 @@ pub fn compile(program: &Program) -> Result<CompiledProgram, CompileError> {
     // First pass: compile all lists
     for list in &program.lists {
         if compiled.lists.contains_key(&list.name) {
-            return Err(CompileError::DuplicateList(list.name.clone()));
+            return Err(CompileError::DuplicateList {
+                name: list.name.clone(),
+                span: list.span,
+            });
         }
 
         let compiled_list = compile_list(list)?;
@@ -131,7 +158,10 @@ pub fn compile(program: &Program) -> Result<CompiledProgram, CompileError> {
 
 fn compile_list(list: &List) -> Result<CompiledList, CompileError> {
     if list.items.is_empty() && list.output.is_none() {
-        return Err(CompileError::EmptyList(list.name.clone()));
+        return Err(CompileError::EmptyList {
+            name: list.name.clone(),
+            span: list.span,
+        });
     }
 
     let mut compiled_list = CompiledList::new(list.name.clone());
@@ -151,9 +181,10 @@ fn compile_item(item: &Item) -> Result<CompiledItem, CompileError> {
     let mut compiled_item = match &item.weight {
         Some(ItemWeight::Static(w)) => {
             if *w < 0.0 {
-                return Err(CompileError::InvalidWeight(
-                    "Weight cannot be negative".to_string(),
-                ));
+                return Err(CompileError::InvalidWeight {
+                    message: "Weight cannot be negative".to_string(),
+                    span: item.span,
+                });
             }
             CompiledItem::new(item.content.clone(), *w)
         }

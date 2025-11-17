@@ -16,9 +16,11 @@
 /// ```
 pub mod ast;
 pub mod compiler;
+pub mod diagnostic;
 pub mod evaluator;
 pub mod loader;
 pub mod parser;
+pub mod span;
 
 #[cfg(feature = "builtin-generators")]
 pub mod builtin_generators;

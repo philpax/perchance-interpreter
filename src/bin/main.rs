@@ -1,5 +1,5 @@
 /// CLI tool for Perchance interpreter
-use perchance_interpreter::{compile, evaluate, parse, run_with_seed, EvaluateOptions};
+use perchance_interpreter::{compile, diagnostic, evaluate, parse, run_with_seed, EvaluateOptions};
 use rand::rngs::StdRng;
 use rand::SeedableRng;
 use std::env;
@@ -54,6 +54,9 @@ async fn main() {
         })
     };
 
+    // Determine source name for diagnostics
+    let source_name = if args[1] == "-" { "<stdin>" } else { &args[1] };
+
     // Parse seed if provided
     let result = if args.len() > 2 {
         let seed = args[2].parse::<u64>().unwrap_or_else(|e| {
@@ -64,11 +67,13 @@ async fn main() {
     } else {
         // No seed provided, use random seed
         let program = parse(&template).unwrap_or_else(|e| {
-            eprintln!("Error: {}", e);
+            let diagnostic = diagnostic::report_parse_error(source_name, &template, &e);
+            eprint!("{}", diagnostic);
             process::exit(1);
         });
         let compiled = compile(&program).unwrap_or_else(|e| {
-            eprintln!("Error: {}", e);
+            let diagnostic = diagnostic::report_compile_error(source_name, &template, &e);
+            eprint!("{}", diagnostic);
             process::exit(1);
         });
 
@@ -82,7 +87,8 @@ async fn main() {
             println!("{}", output);
         }
         Err(e) => {
-            eprintln!("Error: {}", e);
+            let diagnostic = diagnostic::report_interpreter_error(source_name, &template, &e);
+            eprint!("{}", diagnostic);
             process::exit(1);
         }
     }
