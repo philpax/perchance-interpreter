@@ -1,6 +1,6 @@
 /// Compiler transforms AST into an evaluatable representation
 use crate::ast::*;
-use crate::span::Span;
+use crate::span::{Span, Spanned};
 use std::collections::HashMap;
 
 #[derive(Debug, Clone)]
@@ -14,14 +14,14 @@ pub struct CompiledList {
     pub name: String,
     pub items: Vec<CompiledItem>,
     pub total_weight: f64,
-    pub output: Option<Vec<ContentPart>>, // $output property
+    pub output: Option<Vec<Spanned<ContentPart>>>, // $output property
 }
 
 #[derive(Debug, Clone)]
 pub struct CompiledItem {
-    pub content: Vec<ContentPart>,
+    pub content: Vec<Spanned<ContentPart>>,
     pub weight: f64, // For static weights and as default for dynamic ones
-    pub dynamic_weight: Option<Expression>, // For dynamic weights like ^[condition]
+    pub dynamic_weight: Option<Spanned<Expression>>, // For dynamic weights like ^[condition]
     pub sublists: HashMap<String, CompiledList>,
 }
 
@@ -114,7 +114,7 @@ impl CompiledList {
 }
 
 impl CompiledItem {
-    pub fn new(content: Vec<ContentPart>, weight: f64) -> Self {
+    pub fn new(content: Vec<Spanned<ContentPart>>, weight: f64) -> Self {
         CompiledItem {
             content,
             weight,
@@ -123,7 +123,10 @@ impl CompiledItem {
         }
     }
 
-    pub fn new_with_dynamic_weight(content: Vec<ContentPart>, dynamic_weight: Expression) -> Self {
+    pub fn new_with_dynamic_weight(
+        content: Vec<Spanned<ContentPart>>,
+        dynamic_weight: Spanned<Expression>,
+    ) -> Self {
         CompiledItem {
             content,
             weight: 0.0, // Will be calculated at runtime
@@ -141,26 +144,28 @@ pub fn compile(program: &Program) -> Result<CompiledProgram, CompileError> {
     let mut compiled = CompiledProgram::new();
 
     // First pass: compile all lists
-    for list in &program.lists {
+    for list_spanned in &program.lists {
+        let list = &list_spanned.value;
         if compiled.lists.contains_key(&list.name) {
             return Err(CompileError::DuplicateList {
                 name: list.name.clone(),
-                span: list.span,
+                span: list_spanned.span,
             });
         }
 
-        let compiled_list = compile_list(list)?;
+        let compiled_list = compile_list(list_spanned)?;
         compiled.add_list(list.name.clone(), compiled_list);
     }
 
     Ok(compiled)
 }
 
-fn compile_list(list: &List) -> Result<CompiledList, CompileError> {
+fn compile_list(list_spanned: &Spanned<List>) -> Result<CompiledList, CompileError> {
+    let list = &list_spanned.value;
     if list.items.is_empty() && list.output.is_none() {
         return Err(CompileError::EmptyList {
             name: list.name.clone(),
-            span: list.span,
+            span: list_spanned.span,
         });
     }
 
@@ -177,13 +182,14 @@ fn compile_list(list: &List) -> Result<CompiledList, CompileError> {
     Ok(compiled_list)
 }
 
-fn compile_item(item: &Item) -> Result<CompiledItem, CompileError> {
+fn compile_item(item_spanned: &Spanned<Item>) -> Result<CompiledItem, CompileError> {
+    let item = &item_spanned.value;
     let mut compiled_item = match &item.weight {
         Some(ItemWeight::Static(w)) => {
             if *w < 0.0 {
                 return Err(CompileError::InvalidWeight {
                     message: "Weight cannot be negative".to_string(),
-                    span: item.span,
+                    span: item_spanned.span,
                 });
             }
             CompiledItem::new(item.content.clone(), *w)
@@ -200,7 +206,7 @@ fn compile_item(item: &Item) -> Result<CompiledItem, CompileError> {
     // Compile sublists
     for sublist in &item.sublists {
         let compiled_sublist = compile_list(sublist)?;
-        compiled_item.add_sublist(sublist.name.clone(), compiled_sublist);
+        compiled_item.add_sublist(sublist.value.name.clone(), compiled_sublist);
     }
 
     Ok(compiled_item)
@@ -234,7 +240,10 @@ mod tests {
     #[test]
     fn test_empty_list_error() {
         let mut program = Program::new();
-        program.add_list(List::new("empty".to_string()));
+        program.add_list(Spanned::new(
+            List::new("empty".to_string()),
+            Span::new(0, 0),
+        ));
         let result = compile(&program);
         result.unwrap_err();
     }

@@ -1,6 +1,6 @@
 /// Parser for Perchance language
 use crate::ast::*;
-use crate::span::Span;
+use crate::span::{Span, Spanned};
 
 #[derive(Debug, Clone)]
 pub enum ParseError {
@@ -112,7 +112,6 @@ impl Parser {
     }
 
     pub fn parse(&mut self) -> Result<Program, ParseError> {
-        let start = self.current_pos();
         let mut program = Program::new();
 
         while !self.is_eof() {
@@ -133,16 +132,15 @@ impl Parser {
             }
         }
 
-        program.span = self.span_from(start);
         Ok(program)
     }
 
-    fn parse_list(&mut self, expected_indent: usize) -> Result<List, ParseError> {
+    fn parse_list(&mut self, expected_indent: usize) -> Result<Spanned<List>, ParseError> {
         let start = self.current_pos();
 
         // Parse list name
         let name_ident = self.parse_identifier()?;
-        if name_ident.name.is_empty() {
+        if name_ident.value.name.is_empty() {
             let span = self.span_from(start);
             return Err(ParseError::EmptyListName { span });
         }
@@ -161,15 +159,15 @@ impl Parser {
 
             // Create a list with just the output property set
             let span = self.span_from(start);
-            let mut list = List::new_with_span(name_ident.name, span);
+            let mut list = List::new(name_ident.value.name);
             list.set_output(output_content);
-            return Ok(list);
+            return Ok(Spanned::new(list, span));
         }
 
         self.skip_to_newline();
         self.consume_char('\n');
 
-        let mut list = List::new(name_ident.name);
+        let mut list = List::new(name_ident.value.name);
         let item_indent = expected_indent + 1;
 
         // Parse items
@@ -224,11 +222,11 @@ impl Parser {
             }
         }
 
-        list.span = self.span_from(start);
-        Ok(list)
+        let span = self.span_from(start);
+        Ok(Spanned::new(list, span))
     }
 
-    fn parse_item(&mut self, expected_indent: usize) -> Result<Item, ParseError> {
+    fn parse_item(&mut self, expected_indent: usize) -> Result<Spanned<Item>, ParseError> {
         let start = self.current_pos();
 
         // Parse item content until newline or weight
@@ -265,7 +263,7 @@ impl Parser {
 
         // Check if content is just a simple identifier (potential sublist name)
         let simple_name = if content.len() == 1 {
-            if let ContentPart::Text(ref s, _) = content[0] {
+            if let ContentPart::Text(ref s) = content[0].value {
                 // Trim whitespace from the identifier
                 let trimmed = s.trim();
                 // Check if it's a valid identifier (letters, numbers, underscore only)
@@ -330,15 +328,17 @@ impl Parser {
 
                                 // Create a sublist for this property
                                 let prop_list_span = self.span_from(prop_list_start);
-                                let mut prop_list =
-                                    List::new_with_span(prop_name_str.clone(), prop_list_span);
-                                let prop_item = Item::new(value_content);
+                                let mut prop_list = List::new(prop_name_str.clone());
+                                let prop_item_span = self.span_from(prop_list_start);
+                                let prop_item =
+                                    Spanned::new(Item::new(value_content), prop_item_span);
                                 prop_list.add_item(prop_item);
 
                                 // Add this as a subitem with the property as a sublist
                                 let mut prop_subitem = Item::new(vec![]);
-                                prop_subitem.add_sublist(prop_list);
-                                sublist.add_item(prop_subitem);
+                                prop_subitem.add_sublist(Spanned::new(prop_list, prop_list_span));
+                                let prop_subitem_span = self.span_from(prop_list_start);
+                                sublist.add_item(Spanned::new(prop_subitem, prop_subitem_span));
                                 continue;
                             } else {
                                 // Not a property assignment, restore position and parse normally
@@ -356,16 +356,16 @@ impl Parser {
 
                 // Clear the content and add the single sublist
                 item.content.clear();
-                sublist.span = self.span_from(sublist_start);
-                item.add_sublist(sublist);
+                let sublist_span = self.span_from(sublist_start);
+                item.add_sublist(Spanned::new(sublist, sublist_span));
             }
         }
 
-        item.span = self.span_from(start);
-        Ok(item)
+        let span = self.span_from(start);
+        Ok(Spanned::new(item, span))
     }
 
-    pub fn parse_content_until_newline(&mut self) -> Result<Vec<ContentPart>, ParseError> {
+    pub fn parse_content_until_newline(&mut self) -> Result<Vec<Spanned<ContentPart>>, ParseError> {
         let mut parts = Vec::new();
         let mut text_buffer = String::new();
         let mut text_start = self.current_pos();
@@ -379,40 +379,40 @@ impl Parser {
                     // Escape sequence
                     if !text_buffer.is_empty() {
                         let span = self.make_span(text_start, self.current_pos());
-                        parts.push(ContentPart::Text(text_buffer.clone(), span));
+                        parts.push(Spanned::new(ContentPart::Text(text_buffer.clone()), span));
                         text_buffer.clear();
                     }
                     let escape_start = self.current_pos();
                     self.consume_char('\\');
                     let escaped = self.parse_escape()?;
                     let span = self.span_from(escape_start);
-                    parts.push(ContentPart::Escape(escaped, span));
+                    parts.push(Spanned::new(ContentPart::Escape(escaped), span));
                     text_start = self.current_pos();
                 }
                 '[' => {
                     // Reference
                     if !text_buffer.is_empty() {
                         let span = self.make_span(text_start, self.current_pos());
-                        parts.push(ContentPart::Text(text_buffer.clone(), span));
+                        parts.push(Spanned::new(ContentPart::Text(text_buffer.clone()), span));
                         text_buffer.clear();
                     }
                     let ref_start = self.current_pos();
                     let expr = self.parse_reference()?;
                     let span = self.span_from(ref_start);
-                    parts.push(ContentPart::Reference(expr, span));
+                    parts.push(Spanned::new(ContentPart::Reference(expr), span));
                     text_start = self.current_pos();
                 }
                 '{' => {
                     // Inline list or number range
                     if !text_buffer.is_empty() {
                         let span = self.make_span(text_start, self.current_pos());
-                        parts.push(ContentPart::Text(text_buffer.clone(), span));
+                        parts.push(Spanned::new(ContentPart::Text(text_buffer.clone()), span));
                         text_buffer.clear();
                     }
                     let inline_start = self.current_pos();
                     let inline = self.parse_inline()?;
                     let span = self.span_from(inline_start);
-                    parts.push(ContentPart::Inline(inline, span));
+                    parts.push(Spanned::new(ContentPart::Inline(inline), span));
                     text_start = self.current_pos();
                 }
                 _ => {
@@ -427,20 +427,19 @@ impl Parser {
 
         if !text_buffer.is_empty() {
             let span = self.make_span(text_start, self.current_pos());
-            parts.push(ContentPart::Text(text_buffer, span));
+            parts.push(Spanned::new(ContentPart::Text(text_buffer), span));
         }
 
         Ok(parts)
     }
 
-    fn parse_reference(&mut self) -> Result<Expression, ParseError> {
-        let start = self.current_pos();
+    fn parse_reference(&mut self) -> Result<Spanned<Expression>, ParseError> {
         self.consume_char('[');
 
         let expr = self.parse_expression()?;
 
         if self.peek_char() != Some(']') {
-            let span = self.span_from(start);
+            let span = Span::new(expr.span.start, self.current_pos());
             return Err(ParseError::UnterminatedReference { span });
         }
         self.consume_char(']');
@@ -448,12 +447,12 @@ impl Parser {
         Ok(expr)
     }
 
-    fn parse_expression_in_reference(&mut self) -> Result<Expression, ParseError> {
+    fn parse_expression_in_reference(&mut self) -> Result<Spanned<Expression>, ParseError> {
         // Similar to parse_reference but assumes '[' is already consumed
         self.parse_expression()
     }
 
-    fn parse_expression(&mut self) -> Result<Expression, ParseError> {
+    fn parse_expression(&mut self) -> Result<Spanned<Expression>, ParseError> {
         let start = self.current_pos();
         self.skip_spaces();
 
@@ -475,13 +474,16 @@ impl Parser {
             // The last expression is the output
             let output = exprs.pop();
             let span = self.span_from(start);
-            Ok(Expression::Sequence(exprs, output.map(Box::new), span))
+            Ok(Spanned::new(
+                Expression::Sequence(exprs, output.map(Box::new)),
+                span,
+            ))
         } else {
             Ok(first)
         }
     }
 
-    fn parse_ternary_expression(&mut self) -> Result<Expression, ParseError> {
+    fn parse_ternary_expression(&mut self) -> Result<Spanned<Expression>, ParseError> {
         let start = self.current_pos();
         // Parse ternary conditional: condition ? true_expr : false_expr
         let first = self.parse_or_expression()?;
@@ -505,10 +507,8 @@ impl Parser {
 
             let false_expr = self.parse_ternary_expression()?;
             let span = self.span_from(start);
-            return Ok(Expression::Conditional(
-                Box::new(first),
-                Box::new(true_expr),
-                Box::new(false_expr),
+            return Ok(Spanned::new(
+                Expression::Conditional(Box::new(first), Box::new(true_expr), Box::new(false_expr)),
                 span,
             ));
         }
@@ -516,7 +516,7 @@ impl Parser {
         Ok(first)
     }
 
-    fn parse_or_expression(&mut self) -> Result<Expression, ParseError> {
+    fn parse_or_expression(&mut self) -> Result<Spanned<Expression>, ParseError> {
         let start = self.current_pos();
         let mut left = self.parse_and_expression()?;
 
@@ -528,18 +528,19 @@ impl Parser {
                 self.skip_spaces();
 
                 // Check if left is a Property expression - if so, this is property fallback
-                if let Expression::Property(base, prop, _) = left {
+                if let Expression::Property(base, prop) = left.value {
                     let fallback = self.parse_and_expression()?;
                     let span = self.span_from(start);
-                    left = Expression::PropertyWithFallback(base, prop, Box::new(fallback), span);
+                    left = Spanned::new(
+                        Expression::PropertyWithFallback(base, prop, Box::new(fallback)),
+                        span,
+                    );
                 } else {
                     // Otherwise, it's a logical OR
                     let right = self.parse_and_expression()?;
                     let span = self.span_from(start);
-                    left = Expression::BinaryOp(
-                        Box::new(left),
-                        BinaryOperator::Or,
-                        Box::new(right),
+                    left = Spanned::new(
+                        Expression::BinaryOp(Box::new(left), BinaryOperator::Or, Box::new(right)),
                         span,
                     );
                 }
@@ -551,7 +552,7 @@ impl Parser {
         Ok(left)
     }
 
-    fn parse_and_expression(&mut self) -> Result<Expression, ParseError> {
+    fn parse_and_expression(&mut self) -> Result<Spanned<Expression>, ParseError> {
         let start = self.current_pos();
         let mut left = self.parse_comparison_expression()?;
 
@@ -563,10 +564,8 @@ impl Parser {
                 self.skip_spaces();
                 let right = self.parse_comparison_expression()?;
                 let span = self.span_from(start);
-                left = Expression::BinaryOp(
-                    Box::new(left),
-                    BinaryOperator::And,
-                    Box::new(right),
+                left = Spanned::new(
+                    Expression::BinaryOp(Box::new(left), BinaryOperator::And, Box::new(right)),
                     span,
                 );
             } else {
@@ -577,7 +576,7 @@ impl Parser {
         Ok(left)
     }
 
-    fn parse_comparison_expression(&mut self) -> Result<Expression, ParseError> {
+    fn parse_comparison_expression(&mut self) -> Result<Spanned<Expression>, ParseError> {
         let start = self.current_pos();
         let left = self.parse_additive_expression()?;
 
@@ -614,10 +613,8 @@ impl Parser {
             self.skip_spaces();
             let right = self.parse_additive_expression()?;
             let span = self.span_from(start);
-            Ok(Expression::BinaryOp(
-                Box::new(left),
-                operator,
-                Box::new(right),
+            Ok(Spanned::new(
+                Expression::BinaryOp(Box::new(left), operator, Box::new(right)),
                 span,
             ))
         } else {
@@ -625,7 +622,7 @@ impl Parser {
         }
     }
 
-    fn parse_additive_expression(&mut self) -> Result<Expression, ParseError> {
+    fn parse_additive_expression(&mut self) -> Result<Spanned<Expression>, ParseError> {
         let start = self.current_pos();
         let mut left = self.parse_multiplicative_expression()?;
 
@@ -649,7 +646,10 @@ impl Parser {
                 self.skip_spaces();
                 let right = self.parse_multiplicative_expression()?;
                 let span = self.span_from(start);
-                left = Expression::BinaryOp(Box::new(left), operator, Box::new(right), span);
+                left = Spanned::new(
+                    Expression::BinaryOp(Box::new(left), operator, Box::new(right)),
+                    span,
+                );
             } else {
                 break;
             }
@@ -658,7 +658,7 @@ impl Parser {
         Ok(left)
     }
 
-    fn parse_multiplicative_expression(&mut self) -> Result<Expression, ParseError> {
+    fn parse_multiplicative_expression(&mut self) -> Result<Spanned<Expression>, ParseError> {
         let start = self.current_pos();
         let mut left = self.parse_single_expression()?;
 
@@ -684,7 +684,10 @@ impl Parser {
                 self.skip_spaces();
                 let right = self.parse_single_expression()?;
                 let span = self.span_from(start);
-                left = Expression::BinaryOp(Box::new(left), operator, Box::new(right), span);
+                left = Spanned::new(
+                    Expression::BinaryOp(Box::new(left), operator, Box::new(right)),
+                    span,
+                );
             } else {
                 break;
             }
@@ -701,7 +704,7 @@ impl Parser {
         }
     }
 
-    fn parse_single_expression(&mut self) -> Result<Expression, ParseError> {
+    fn parse_single_expression(&mut self) -> Result<Spanned<Expression>, ParseError> {
         self.skip_spaces();
         let start = self.current_pos();
 
@@ -721,7 +724,7 @@ impl Parser {
                 // Parse as number
                 let num = self.parse_number()?;
                 let span = self.span_from(start);
-                let mut expr = Expression::Number(num, span);
+                let mut expr = Spanned::new(Expression::Number(num), span);
 
                 // Parse accessors (property, dynamic, method) if any
                 loop {
@@ -733,12 +736,17 @@ impl Parser {
 
                             // Check if this is a method call
                             if self.peek_char() == Some('(') {
-                                let method = self.parse_method_call(prop_ident.name.clone())?;
+                                let method =
+                                    self.parse_method_call(prop_ident.value.name.clone())?;
                                 let span = self.span_from(start);
-                                expr = Expression::Method(Box::new(expr), method, span);
+                                expr =
+                                    Spanned::new(Expression::Method(Box::new(expr), method), span);
                             } else {
                                 let span = self.span_from(start);
-                                expr = Expression::Property(Box::new(expr), prop_ident, span);
+                                expr = Spanned::new(
+                                    Expression::Property(Box::new(expr), prop_ident),
+                                    span,
+                                );
                             }
                         }
                         _ => break,
@@ -752,7 +760,7 @@ impl Parser {
         // Parse identifier
         let ident = self.parse_identifier()?;
         let span = self.span_from(start);
-        let mut expr = Expression::Simple(ident.clone(), span);
+        let mut expr = Spanned::new(Expression::Simple(ident), span);
 
         // Parse accessors (property, dynamic, method)
         loop {
@@ -764,12 +772,12 @@ impl Parser {
 
                     // Check if this is a method call
                     if self.peek_char() == Some('(') {
-                        let method = self.parse_method_call(prop_ident.name.clone())?;
+                        let method = self.parse_method_call(prop_ident.value.name.clone())?;
                         let span = self.span_from(start);
-                        expr = Expression::Method(Box::new(expr), method, span);
+                        expr = Spanned::new(Expression::Method(Box::new(expr), method), span);
                     } else {
                         let span = self.span_from(start);
-                        expr = Expression::Property(Box::new(expr), prop_ident, span);
+                        expr = Spanned::new(Expression::Property(Box::new(expr), prop_ident), span);
                     }
                 }
                 Some('[') => {
@@ -782,14 +790,17 @@ impl Parser {
                     }
                     self.consume_char(']');
                     let span = self.span_from(start);
-                    expr = Expression::Dynamic(Box::new(expr), Box::new(index_expr), span);
+                    expr = Spanned::new(
+                        Expression::Dynamic(Box::new(expr), Box::new(index_expr)),
+                        span,
+                    );
                 }
-                Some('(') if matches!(expr, Expression::Simple(_, _)) => {
+                Some('(') if matches!(expr.value, Expression::Simple(_)) => {
                     // Direct function call like joinLists(arg1, arg2)
-                    if let Expression::Simple(ref ident, _) = expr {
-                        let method = self.parse_method_call(ident.name.clone())?;
+                    if let Expression::Simple(ref ident) = expr.value {
+                        let method = self.parse_method_call(ident.value.name.clone())?;
                         let span = self.span_from(start);
-                        expr = Expression::Method(Box::new(expr), method, span);
+                        expr = Spanned::new(Expression::Method(Box::new(expr), method), span);
                     }
                 }
                 Some('=') if self.peek_two_chars() != Some(('=', '=')) => {
@@ -797,23 +808,24 @@ impl Parser {
                     self.consume_char('=');
                     self.skip_spaces();
 
-                    match expr {
-                        Expression::Simple(ident, _) => {
+                    match expr.value {
+                        Expression::Simple(ident) => {
                             // Simple assignment: [x = value]
                             // Parse full expression to allow math operations, etc.
                             let value = self.parse_ternary_expression()?;
                             let span = self.span_from(start);
-                            return Ok(Expression::Assignment(ident, Box::new(value), span));
+                            return Ok(Spanned::new(
+                                Expression::Assignment(ident, Box::new(value)),
+                                span,
+                            ));
                         }
-                        Expression::Property(base, prop, _) => {
+                        Expression::Property(base, prop) => {
                             // Property assignment: [this.property = value]
                             // Parse full expression to allow math operations, etc.
                             let value = self.parse_ternary_expression()?;
                             let span = self.span_from(start);
-                            return Ok(Expression::PropertyAssignment(
-                                base,
-                                prop,
-                                Box::new(value),
+                            return Ok(Spanned::new(
+                                Expression::PropertyAssignment(base, prop, Box::new(value)),
                                 span,
                             ));
                         }
@@ -833,7 +845,7 @@ impl Parser {
         Ok(expr)
     }
 
-    fn parse_method_call(&mut self, name: String) -> Result<MethodCall, ParseError> {
+    fn parse_method_call(&mut self, name: String) -> Result<Spanned<MethodCall>, ParseError> {
         let start = self.current_pos();
         self.consume_char('(');
         let mut args = Vec::new();
@@ -865,10 +877,10 @@ impl Parser {
         self.consume_char(')');
 
         let span = self.span_from(start);
-        Ok(MethodCall::new_with_span(name, span).with_args(args))
+        Ok(Spanned::new(MethodCall::new(name).with_args(args), span))
     }
 
-    fn parse_string_literal(&mut self) -> Result<Expression, ParseError> {
+    fn parse_string_literal(&mut self) -> Result<Spanned<Expression>, ParseError> {
         let start = self.current_pos();
         self.consume_char('"');
         let mut s = String::new();
@@ -877,7 +889,7 @@ impl Parser {
             if ch == '"' {
                 self.consume_char('"');
                 let span = self.span_from(start);
-                return Ok(Expression::Literal(s, span));
+                return Ok(Spanned::new(Expression::Literal(s), span));
             } else if ch == '\\' {
                 self.consume_char('\\');
                 if let Some(&escaped) = self.peek_char_ref() {
@@ -894,7 +906,7 @@ impl Parser {
         Err(ParseError::UnterminatedString { span })
     }
 
-    fn parse_inline(&mut self) -> Result<InlineList, ParseError> {
+    fn parse_inline(&mut self) -> Result<Spanned<InlineList>, ParseError> {
         let start = self.current_pos();
         self.consume_char('{');
 
@@ -902,7 +914,7 @@ impl Parser {
         if self.peek_identifier().starts_with("import") {
             let saved_pos = self.pos;
             let ident = self.parse_identifier()?;
-            if ident.name == "import" && self.peek_char() == Some(':') {
+            if ident.value.name == "import" && self.peek_char() == Some(':') {
                 self.consume_char(':');
                 let import_start = self.current_pos();
                 // Parse the generator name (everything until })
@@ -915,16 +927,10 @@ impl Parser {
                         let inline_span = self.span_from(start);
                         let choice_span = self.span_from(start);
                         // Return the import as an inline list with a single choice containing an Import expression
-                        return Ok(InlineList::new_with_span(
-                            vec![InlineChoice::new_with_span(
-                                vec![ContentPart::Reference(
-                                    Expression::Import(generator_name, import_span),
-                                    ref_span,
-                                )],
-                                choice_span,
-                            )],
-                            inline_span,
-                        ));
+                        let expr = Spanned::new(Expression::Import(generator_name), import_span);
+                        let content = Spanned::new(ContentPart::Reference(expr), ref_span);
+                        let choice = Spanned::new(InlineChoice::new(vec![content]), choice_span);
+                        return Ok(Spanned::new(InlineList::new(vec![choice]), inline_span));
                     }
                     generator_name.push(ch);
                     self.advance();
@@ -947,13 +953,9 @@ impl Parser {
                 let choice_span = self.span_from(start);
                 let inline_span = self.span_from(start);
                 // Return a special inline that's handled differently in evaluator
-                return Ok(InlineList::new_with_span(
-                    vec![InlineChoice::new_with_span(
-                        vec![ContentPart::Article(article_span)],
-                        choice_span,
-                    )],
-                    inline_span,
-                ));
+                let content = Spanned::new(ContentPart::Article, article_span);
+                let choice = Spanned::new(InlineChoice::new(vec![content]), choice_span);
+                return Ok(Spanned::new(InlineList::new(vec![choice]), inline_span));
             }
         }
 
@@ -965,13 +967,9 @@ impl Parser {
                 let pluralize_span = self.span_from(start);
                 let choice_span = self.span_from(start);
                 let inline_span = self.span_from(start);
-                return Ok(InlineList::new_with_span(
-                    vec![InlineChoice::new_with_span(
-                        vec![ContentPart::Pluralize(pluralize_span)],
-                        choice_span,
-                    )],
-                    inline_span,
-                ));
+                let content = Spanned::new(ContentPart::Pluralize, pluralize_span);
+                let choice = Spanned::new(InlineChoice::new(vec![content]), choice_span);
+                return Ok(Spanned::new(InlineList::new(vec![choice]), inline_span));
             }
         }
 
@@ -995,19 +993,19 @@ impl Parser {
                 '}' => {
                     if !content_buffer.is_empty() || choices.is_empty() {
                         let choice_span = self.span_from(choice_start);
-                        choices.push(InlineChoice::new_with_span(
-                            content_buffer.clone(),
+                        choices.push(Spanned::new(
+                            InlineChoice::new(content_buffer.clone()),
                             choice_span,
                         ));
                     }
                     self.consume_char('}');
                     let inline_span = self.span_from(start);
-                    return Ok(InlineList::new_with_span(choices, inline_span));
+                    return Ok(Spanned::new(InlineList::new(choices), inline_span));
                 }
                 '|' => {
                     let choice_span = self.span_from(choice_start);
-                    choices.push(InlineChoice::new_with_span(
-                        content_buffer.clone(),
+                    choices.push(Spanned::new(
+                        InlineChoice::new(content_buffer.clone()),
                         choice_span,
                     ));
                     content_buffer = Vec::new();
@@ -1019,19 +1017,19 @@ impl Parser {
                     self.consume_char('\\');
                     let escaped = self.parse_escape()?;
                     let span = self.span_from(escape_start);
-                    content_buffer.push(ContentPart::Escape(escaped, span));
+                    content_buffer.push(Spanned::new(ContentPart::Escape(escaped), span));
                 }
                 '[' => {
                     let ref_start = self.current_pos();
                     let expr = self.parse_reference()?;
                     let span = self.span_from(ref_start);
-                    content_buffer.push(ContentPart::Reference(expr, span));
+                    content_buffer.push(Spanned::new(ContentPart::Reference(expr), span));
                 }
                 '{' => {
                     let inline_start = self.current_pos();
                     let inline = self.parse_inline()?;
                     let span = self.span_from(inline_start);
-                    content_buffer.push(ContentPart::Inline(inline, span));
+                    content_buffer.push(Spanned::new(ContentPart::Inline(inline), span));
                 }
                 '^' => {
                     // Weight for this choice (^number or ^[expression])
@@ -1052,10 +1050,9 @@ impl Parser {
                         ItemWeight::Static(self.parse_number()?)
                     };
                     let choice_span = self.span_from(choice_start);
-                    let mut choice =
-                        InlineChoice::new_with_span(content_buffer.clone(), choice_span);
+                    let mut choice = InlineChoice::new(content_buffer.clone());
                     choice = choice.with_weight(weight);
-                    choices.push(choice);
+                    choices.push(Spanned::new(choice, choice_span));
                     content_buffer = Vec::new();
 
                     // Expect | or }
@@ -1066,8 +1063,8 @@ impl Parser {
                 }
                 _ => {
                     let text_start = self.current_pos();
-                    content_buffer.push(ContentPart::Text(
-                        ch.to_string(),
+                    content_buffer.push(Spanned::new(
+                        ContentPart::Text(ch.to_string()),
                         self.make_span(text_start, text_start + 1),
                     ));
                     self.advance();
@@ -1126,7 +1123,7 @@ impl Parser {
         c1.is_ascii_alphabetic() && c2 == '-' && c3.is_ascii_alphabetic() && c4 == '}'
     }
 
-    fn parse_inline_number_range(&mut self) -> Result<InlineList, ParseError> {
+    fn parse_inline_number_range(&mut self) -> Result<Spanned<InlineList>, ParseError> {
         let start = self.current_pos();
         let start_num = self.parse_signed_integer()?;
         self.consume_char('-');
@@ -1138,17 +1135,13 @@ impl Parser {
         let ref_span = self.span_from(start);
         let choice_span = self.span_from(start);
         let inline_span = self.span_from(start);
-        let expr = Expression::NumberRange(start_num, end_num, expr_span);
-        Ok(InlineList::new_with_span(
-            vec![InlineChoice::new_with_span(
-                vec![ContentPart::Reference(expr, ref_span)],
-                choice_span,
-            )],
-            inline_span,
-        ))
+        let expr = Spanned::new(Expression::NumberRange(start_num, end_num), expr_span);
+        let content = Spanned::new(ContentPart::Reference(expr), ref_span);
+        let choice = Spanned::new(InlineChoice::new(vec![content]), choice_span);
+        Ok(Spanned::new(InlineList::new(vec![choice]), inline_span))
     }
 
-    fn parse_inline_letter_range(&mut self) -> Result<InlineList, ParseError> {
+    fn parse_inline_letter_range(&mut self) -> Result<Spanned<InlineList>, ParseError> {
         let start = self.current_pos();
         let start_char = self.current_char().unwrap();
         self.advance();
@@ -1162,14 +1155,10 @@ impl Parser {
         let ref_span = self.span_from(start);
         let choice_span = self.span_from(start);
         let inline_span = self.span_from(start);
-        let expr = Expression::LetterRange(start_char, end_char, expr_span);
-        Ok(InlineList::new_with_span(
-            vec![InlineChoice::new_with_span(
-                vec![ContentPart::Reference(expr, ref_span)],
-                choice_span,
-            )],
-            inline_span,
-        ))
+        let expr = Spanned::new(Expression::LetterRange(start_char, end_char), expr_span);
+        let content = Spanned::new(ContentPart::Reference(expr), ref_span);
+        let choice = Spanned::new(InlineChoice::new(vec![content]), choice_span);
+        Ok(Spanned::new(InlineList::new(vec![choice]), inline_span))
     }
 
     fn parse_escape(&mut self) -> Result<char, ParseError> {
@@ -1226,7 +1215,7 @@ impl Parser {
         ident
     }
 
-    fn parse_identifier(&mut self) -> Result<Identifier, ParseError> {
+    fn parse_identifier(&mut self) -> Result<Spanned<Identifier>, ParseError> {
         let start = self.current_pos();
         let mut ident = String::new();
 
@@ -1249,7 +1238,7 @@ impl Parser {
         }
 
         let span = self.span_from(start);
-        Ok(Identifier::new_with_span(ident, span))
+        Ok(Spanned::new(Identifier::new(ident), span))
     }
 
     fn parse_number(&mut self) -> Result<f64, ParseError> {
@@ -1504,8 +1493,8 @@ mod tests {
         let result = parse(input);
         let program = result.unwrap();
         assert_eq!(program.lists.len(), 1);
-        assert_eq!(program.lists[0].name, "animal");
-        assert_eq!(program.lists[0].items.len(), 2);
+        assert_eq!(program.lists[0].value.name, "animal");
+        assert_eq!(program.lists[0].value.items.len(), 2);
     }
 
     #[test]
@@ -1530,48 +1519,84 @@ mod tests {
         assert_eq!(
             parse(input).unwrap(),
             Program {
-                lists: vec![List {
-                    name: "output".into(),
-                    items: vec![Item {
-                        content: vec![
-                            ContentPart::Inline(
-                                InlineList {
-                                    choices: vec![
-                                        InlineChoice {
-                                            content: vec![
-                                                ContentPart::Text("b".into(), Span::new(9, 10)),
-                                                ContentPart::Text("i".into(), Span::new(10, 11)),
-                                                ContentPart::Text("g".into(), Span::new(11, 12)),
-                                            ],
-                                            weight: None,
-                                            span: Span::new(9, 12),
-                                        },
-                                        InlineChoice {
-                                            content: vec![
-                                                ContentPart::Text("s".into(), Span::new(13, 14)),
-                                                ContentPart::Text("m".into(), Span::new(14, 15)),
-                                                ContentPart::Text("a".into(), Span::new(15, 16)),
-                                                ContentPart::Text("l".into(), Span::new(16, 17)),
-                                                ContentPart::Text("l".into(), Span::new(17, 18)),
-                                            ],
-                                            weight: None,
-                                            span: Span::new(13, 18),
-                                        }
-                                    ],
-                                    span: Span::new(8, 19),
-                                },
-                                Span::new(8, 19),
-                            ),
-                            ContentPart::Text(" animal".into(), Span::new(19, 26))
-                        ],
-                        weight: None,
-                        sublists: vec![],
-                        span: Span::new(8, 27),
-                    }],
-                    output: None,
-                    span: Span::new(0, 27),
-                }],
-                span: Span::new(0, 27),
+                lists: vec![Spanned::new(
+                    List {
+                        name: "output".into(),
+                        items: vec![Spanned::new(
+                            Item {
+                                content: vec![
+                                    Spanned::new(
+                                        ContentPart::Inline(Spanned::new(
+                                            InlineList {
+                                                choices: vec![
+                                                    Spanned::new(
+                                                        InlineChoice {
+                                                            content: vec![
+                                                                Spanned::new(
+                                                                    ContentPart::Text("b".into()),
+                                                                    Span::new(9, 10)
+                                                                ),
+                                                                Spanned::new(
+                                                                    ContentPart::Text("i".into()),
+                                                                    Span::new(10, 11)
+                                                                ),
+                                                                Spanned::new(
+                                                                    ContentPart::Text("g".into()),
+                                                                    Span::new(11, 12)
+                                                                ),
+                                                            ],
+                                                            weight: None,
+                                                        },
+                                                        Span::new(9, 12)
+                                                    ),
+                                                    Spanned::new(
+                                                        InlineChoice {
+                                                            content: vec![
+                                                                Spanned::new(
+                                                                    ContentPart::Text("s".into()),
+                                                                    Span::new(13, 14)
+                                                                ),
+                                                                Spanned::new(
+                                                                    ContentPart::Text("m".into()),
+                                                                    Span::new(14, 15)
+                                                                ),
+                                                                Spanned::new(
+                                                                    ContentPart::Text("a".into()),
+                                                                    Span::new(15, 16)
+                                                                ),
+                                                                Spanned::new(
+                                                                    ContentPart::Text("l".into()),
+                                                                    Span::new(16, 17)
+                                                                ),
+                                                                Spanned::new(
+                                                                    ContentPart::Text("l".into()),
+                                                                    Span::new(17, 18)
+                                                                ),
+                                                            ],
+                                                            weight: None,
+                                                        },
+                                                        Span::new(13, 18)
+                                                    )
+                                                ],
+                                            },
+                                            Span::new(8, 19)
+                                        ),),
+                                        Span::new(8, 19)
+                                    ),
+                                    Spanned::new(
+                                        ContentPart::Text(" animal".into()),
+                                        Span::new(19, 26)
+                                    )
+                                ],
+                                weight: None,
+                                sublists: vec![],
+                            },
+                            Span::new(8, 27)
+                        )],
+                        output: None,
+                    },
+                    Span::new(0, 27)
+                )],
             }
         );
     }
@@ -1581,31 +1606,34 @@ mod tests {
         let input = "output\n\tRolled {1-6}\n";
         let program = parse(input).unwrap();
         assert_eq!(program.lists.len(), 1);
-        assert_eq!(program.lists[0].name, "output");
-        assert_eq!(program.lists[0].items.len(), 1);
+        assert_eq!(program.lists[0].value.name, "output");
+        assert_eq!(program.lists[0].value.items.len(), 1);
 
         // Check the content structure without checking spans
-        let content = &program.lists[0].items[0].content;
+        let content = &program.lists[0].value.items[0].value.content;
         assert_eq!(content.len(), 2);
 
         // First part should be text
-        match &content[0] {
-            ContentPart::Text(text, _) => {
+        match &content[0].value {
+            ContentPart::Text(text) => {
                 assert_eq!(text, "Rolled ");
             }
             _ => panic!("Expected Text"),
         }
 
         // Second part should be inline with number range
-        match &content[1] {
-            ContentPart::Inline(inline, _) => {
-                assert_eq!(inline.choices.len(), 1);
-                match &inline.choices[0].content[0] {
-                    ContentPart::Reference(Expression::NumberRange(start, end, _), _) => {
-                        assert_eq!(*start, 1);
-                        assert_eq!(*end, 6);
-                    }
-                    _ => panic!("Expected NumberRange"),
+        match &content[1].value {
+            ContentPart::Inline(inline) => {
+                assert_eq!(inline.value.choices.len(), 1);
+                match &inline.value.choices[0].value.content[0].value {
+                    ContentPart::Reference(expr) => match &expr.value {
+                        Expression::NumberRange(start, end) => {
+                            assert_eq!(*start, 1);
+                            assert_eq!(*end, 6);
+                        }
+                        _ => panic!("Expected NumberRange"),
+                    },
+                    _ => panic!("Expected Reference"),
                 }
             }
             _ => panic!("Expected Inline"),
@@ -1618,13 +1646,13 @@ mod tests {
         let result = parse(input);
         let program = result.unwrap();
         assert_eq!(
-            program.lists[0].items[0].weight,
+            program.lists[0].value.items[0].value.weight,
             Some(ItemWeight::Static(2.0))
         );
         assert_eq!(
-            program.lists[0].items[1].weight,
+            program.lists[0].value.items[1].value.weight,
             Some(ItemWeight::Static(0.5))
         );
-        assert_eq!(program.lists[0].items[2].weight, None);
+        assert_eq!(program.lists[0].value.items[2].value.weight, None);
     }
 }

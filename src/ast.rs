@@ -1,104 +1,115 @@
 /// Abstract Syntax Tree definitions for Perchance language
-use crate::span::Span;
+use crate::span::Spanned;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Program {
-    pub lists: Vec<List>,
-    pub span: Span,
+    pub lists: Vec<Spanned<List>>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct List {
     pub name: String,
-    pub items: Vec<Item>,
-    pub output: Option<Vec<ContentPart>>, // $output property
-    pub span: Span,
+    pub items: Vec<Spanned<Item>>,
+    pub output: Option<Vec<Spanned<ContentPart>>>, // $output property
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ItemWeight {
     Static(f64),
-    Dynamic(Box<Expression>),
+    Dynamic(Box<Spanned<Expression>>),
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Item {
-    pub content: Vec<ContentPart>,
+    pub content: Vec<Spanned<ContentPart>>,
     pub weight: Option<ItemWeight>,
-    pub sublists: Vec<List>,
-    pub span: Span,
+    pub sublists: Vec<Spanned<List>>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ContentPart {
-    Text(String, Span),
-    Reference(Expression, Span),
-    Inline(InlineList, Span),
-    Escape(char, Span),
+    Text(String),
+    Reference(Spanned<Expression>),
+    Inline(Spanned<InlineList>),
+    Escape(char),
     // Special inline functions
-    Article(Span),   // {a} - outputs "a" or "an" based on next word
-    Pluralize(Span), // {s} - outputs "s" for plural or "" for singular based on previous number
+    Article,   // {a} - outputs "a" or "an" based on next word
+    Pluralize, // {s} - outputs "s" for plural or "" for singular based on previous number
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct InlineList {
-    pub choices: Vec<InlineChoice>,
-    pub span: Span,
+    pub choices: Vec<Spanned<InlineChoice>>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct InlineChoice {
-    pub content: Vec<ContentPart>,
+    pub content: Vec<Spanned<ContentPart>>,
     pub weight: Option<ItemWeight>,
-    pub span: Span,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Expression {
     // Simple reference: [animal]
-    Simple(Identifier, Span),
+    Simple(Spanned<Identifier>),
 
     // Property access: [animal.name]
-    Property(Box<Expression>, Identifier, Span),
+    Property(Box<Spanned<Expression>>, Spanned<Identifier>),
 
     // Property access with fallback: [animal.name || "default"]
-    PropertyWithFallback(Box<Expression>, Identifier, Box<Expression>, Span),
+    PropertyWithFallback(
+        Box<Spanned<Expression>>,
+        Spanned<Identifier>,
+        Box<Spanned<Expression>>,
+    ),
 
     // Dynamic access: [animal[x]]
-    Dynamic(Box<Expression>, Box<Expression>, Span),
+    Dynamic(Box<Spanned<Expression>>, Box<Spanned<Expression>>),
 
     // Method call: [animal.selectOne]
-    Method(Box<Expression>, MethodCall, Span),
+    Method(Box<Spanned<Expression>>, Spanned<MethodCall>),
 
     // Assignment: [x = animal]
-    Assignment(Identifier, Box<Expression>, Span),
+    Assignment(Spanned<Identifier>, Box<Spanned<Expression>>),
 
     // Property assignment: [this.property = value]
-    PropertyAssignment(Box<Expression>, Identifier, Box<Expression>, Span),
+    PropertyAssignment(
+        Box<Spanned<Expression>>,
+        Spanned<Identifier>,
+        Box<Spanned<Expression>>,
+    ),
 
     // Multiple statements with comma: [x = animal, y = color, "result"]
-    Sequence(Vec<Expression>, Option<Box<Expression>>, Span),
+    Sequence(Vec<Spanned<Expression>>, Option<Box<Spanned<Expression>>>),
 
     // String literal: "hello"
-    Literal(String, Span),
+    Literal(String),
 
     // Number literal: 42 or 3.14
-    Number(f64, Span),
+    Number(f64),
 
     // Number range: {1-10}
-    NumberRange(i64, i64, Span),
+    NumberRange(i64, i64),
 
     // Letter range: {a-z}
-    LetterRange(char, char, Span),
+    LetterRange(char, char),
 
     // Conditional: condition ? trueExpr : falseExpr
-    Conditional(Box<Expression>, Box<Expression>, Box<Expression>, Span),
+    Conditional(
+        Box<Spanned<Expression>>,
+        Box<Spanned<Expression>>,
+        Box<Spanned<Expression>>,
+    ),
 
     // Binary operations: ==, !=, <, >, <=, >=, &&, ||
-    BinaryOp(Box<Expression>, BinaryOperator, Box<Expression>, Span),
+    BinaryOp(
+        Box<Spanned<Expression>>,
+        BinaryOperator,
+        Box<Spanned<Expression>>,
+    ),
 
     // Import: {import:generator-name}
-    Import(String, Span),
+    Import(String),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -124,14 +135,12 @@ pub enum BinaryOperator {
 #[derive(Debug, Clone, PartialEq)]
 pub struct MethodCall {
     pub name: String,
-    pub args: Vec<Expression>,
-    pub span: Span,
+    pub args: Vec<Spanned<Expression>>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Identifier {
     pub name: String,
-    pub span: Span,
 }
 
 impl Default for Program {
@@ -142,18 +151,15 @@ impl Default for Program {
 
 impl Program {
     pub fn new() -> Self {
-        Program {
-            lists: Vec::new(),
-            span: Span::dummy(),
-        }
+        Program { lists: Vec::new() }
     }
 
-    pub fn add_list(&mut self, list: List) {
+    pub fn add_list(&mut self, list: Spanned<List>) {
         self.lists.push(list);
     }
 
-    pub fn find_list(&self, name: &str) -> Option<&List> {
-        self.lists.iter().find(|l| l.name == name)
+    pub fn find_list(&self, name: &str) -> Option<&Spanned<List>> {
+        self.lists.iter().find(|l| l.value.name == name)
     }
 }
 
@@ -163,44 +169,24 @@ impl List {
             name,
             items: Vec::new(),
             output: None,
-            span: Span::dummy(),
         }
     }
 
-    pub fn new_with_span(name: String, span: Span) -> Self {
-        List {
-            name,
-            items: Vec::new(),
-            output: None,
-            span,
-        }
-    }
-
-    pub fn add_item(&mut self, item: Item) {
+    pub fn add_item(&mut self, item: Spanned<Item>) {
         self.items.push(item);
     }
 
-    pub fn set_output(&mut self, output: Vec<ContentPart>) {
+    pub fn set_output(&mut self, output: Vec<Spanned<ContentPart>>) {
         self.output = Some(output);
     }
 }
 
 impl Item {
-    pub fn new(content: Vec<ContentPart>) -> Self {
+    pub fn new(content: Vec<Spanned<ContentPart>>) -> Self {
         Item {
             content,
             weight: None,
             sublists: Vec::new(),
-            span: Span::dummy(),
-        }
-    }
-
-    pub fn new_with_span(content: Vec<ContentPart>, span: Span) -> Self {
-        Item {
-            content,
-            weight: None,
-            sublists: Vec::new(),
-            span,
         }
     }
 
@@ -214,43 +200,27 @@ impl Item {
         self
     }
 
-    pub fn with_dynamic_weight(mut self, expr: Expression) -> Self {
+    pub fn with_dynamic_weight(mut self, expr: Spanned<Expression>) -> Self {
         self.weight = Some(ItemWeight::Dynamic(Box::new(expr)));
         self
     }
 
-    pub fn add_sublist(&mut self, list: List) {
+    pub fn add_sublist(&mut self, list: Spanned<List>) {
         self.sublists.push(list);
     }
 }
 
 impl InlineList {
-    pub fn new(choices: Vec<InlineChoice>) -> Self {
-        InlineList {
-            choices,
-            span: Span::dummy(),
-        }
-    }
-
-    pub fn new_with_span(choices: Vec<InlineChoice>, span: Span) -> Self {
-        InlineList { choices, span }
+    pub fn new(choices: Vec<Spanned<InlineChoice>>) -> Self {
+        InlineList { choices }
     }
 }
 
 impl InlineChoice {
-    pub fn new(content: Vec<ContentPart>) -> Self {
+    pub fn new(content: Vec<Spanned<ContentPart>>) -> Self {
         InlineChoice {
             content,
             weight: None,
-            span: Span::dummy(),
-        }
-    }
-
-    pub fn new_with_span(content: Vec<ContentPart>, span: Span) -> Self {
-        InlineChoice {
-            content,
-            weight: None,
-            span,
         }
     }
 
@@ -267,14 +237,7 @@ impl InlineChoice {
 
 impl Identifier {
     pub fn new(name: String) -> Self {
-        Identifier {
-            name,
-            span: Span::dummy(),
-        }
-    }
-
-    pub fn new_with_span(name: String, span: Span) -> Self {
-        Identifier { name, span }
+        Identifier { name }
     }
 }
 
@@ -283,19 +246,10 @@ impl MethodCall {
         MethodCall {
             name,
             args: Vec::new(),
-            span: Span::dummy(),
         }
     }
 
-    pub fn new_with_span(name: String, span: Span) -> Self {
-        MethodCall {
-            name,
-            args: Vec::new(),
-            span,
-        }
-    }
-
-    pub fn with_args(mut self, args: Vec<Expression>) -> Self {
+    pub fn with_args(mut self, args: Vec<Spanned<Expression>>) -> Self {
         self.args = args;
         self
     }

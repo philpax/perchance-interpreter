@@ -2,7 +2,7 @@
 use crate::ast::*;
 use crate::compiler::*;
 use crate::loader::GeneratorLoader;
-use crate::span::Span;
+use crate::span::{Span, Spanned};
 use async_recursion::async_recursion;
 use rand::Rng;
 use std::collections::HashMap;
@@ -334,32 +334,37 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
     }
 
     #[async_recursion]
-    async fn evaluate_content(&mut self, content: &[ContentPart]) -> Result<String, EvalError> {
+    async fn evaluate_content(
+        &mut self,
+        content: &[Spanned<ContentPart>],
+    ) -> Result<String, EvalError> {
         let mut result = String::new();
 
-        for (i, part) in content.iter().enumerate() {
+        for (i, part_spanned) in content.iter().enumerate() {
+            let part = &part_spanned.value;
             match part {
-                ContentPart::Text(text, _) => {
+                ContentPart::Text(text) => {
                     result.push_str(text);
                     // Track numbers for {s} pluralization
                     if let Some(num) = self.extract_number(text) {
                         self.last_number = Some(num);
                     }
                 }
-                ContentPart::Escape(ch, _) => result.push(*ch),
-                ContentPart::Reference(expr, _) => {
-                    let value = self.evaluate_expression(expr).await?;
+                ContentPart::Escape(ch) => result.push(*ch),
+                ContentPart::Reference(expr_spanned) => {
+                    let value = self.evaluate_expression(expr_spanned).await?;
                     // Track numbers for {s} pluralization
                     if let Ok(num) = value.parse::<i64>() {
                         self.last_number = Some(num);
                     }
                     result.push_str(&value);
                 }
-                ContentPart::Inline(inline, _) => {
+                ContentPart::Inline(inline_spanned) => {
+                    let inline = &inline_spanned.value;
                     // Check if this is a special inline: {a} or {s}
-                    if inline.choices.len() == 1 && inline.choices[0].content.len() == 1 {
-                        match &inline.choices[0].content[0] {
-                            ContentPart::Article(_) => {
+                    if inline.choices.len() == 1 && inline.choices[0].value.content.len() == 1 {
+                        match &inline.choices[0].value.content[0].value {
+                            ContentPart::Article => {
                                 // {a} - choose "a" or "an" based on next word
                                 let next_word = self.peek_next_word(content, i + 1).await?;
                                 if self.starts_with_vowel_sound(&next_word) {
@@ -369,7 +374,7 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                                 }
                                 continue;
                             }
-                            ContentPart::Pluralize(_) => {
+                            ContentPart::Pluralize => {
                                 // {s} - add "s" if last number != 1
                                 if let Some(num) = self.last_number {
                                     if num != 1 && num != -1 {
@@ -386,14 +391,14 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                     }
 
                     // Regular inline evaluation
-                    let value = self.evaluate_inline(inline).await?;
+                    let value = self.evaluate_inline(inline_spanned).await?;
                     // Track numbers for {s} pluralization
                     if let Ok(num) = value.parse::<i64>() {
                         self.last_number = Some(num);
                     }
                     result.push_str(&value);
                 }
-                ContentPart::Article(_) => {
+                ContentPart::Article => {
                     // {a} - choose "a" or "an" based on next word
                     let next_word = self.peek_next_word(content, i + 1).await?;
                     if self.starts_with_vowel_sound(&next_word) {
@@ -402,7 +407,7 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                         result.push('a');
                     }
                 }
-                ContentPart::Pluralize(_) => {
+                ContentPart::Pluralize => {
                     // {s} - add "s" if last number != 1
                     if let Some(num) = self.last_number {
                         if num != 1 && num != -1 {
@@ -420,26 +425,32 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
     }
 
     #[async_recursion]
-    async fn evaluate_inline(&mut self, inline: &InlineList) -> Result<String, EvalError> {
+    async fn evaluate_inline(
+        &mut self,
+        inline_spanned: &Spanned<InlineList>,
+    ) -> Result<String, EvalError> {
+        let inline = &inline_spanned.value;
         if inline.choices.is_empty() {
             return Ok(String::new());
         }
 
         // Check if this is a special case (number range, letter range)
         if inline.choices.len() == 1 {
-            if let Some(ContentPart::Reference(expr, _)) = inline.choices[0].content.first() {
-                match expr {
-                    Expression::NumberRange(start, end, _) => {
-                        let num = self.rng.gen_range(*start..=*end);
-                        return Ok(num.to_string());
+            if let Some(content_part_spanned) = inline.choices[0].value.content.first() {
+                if let ContentPart::Reference(expr_spanned) = &content_part_spanned.value {
+                    match &expr_spanned.value {
+                        Expression::NumberRange(start, end) => {
+                            let num = self.rng.gen_range(*start..=*end);
+                            return Ok(num.to_string());
+                        }
+                        Expression::LetterRange(start, end) => {
+                            let start_byte = *start as u8;
+                            let end_byte = *end as u8;
+                            let random_byte = self.rng.gen_range(start_byte..=end_byte);
+                            return Ok((random_byte as char).to_string());
+                        }
+                        _ => {}
                     }
-                    Expression::LetterRange(start, end, _) => {
-                        let start_byte = *start as u8;
-                        let end_byte = *end as u8;
-                        let random_byte = self.rng.gen_range(start_byte..=end_byte);
-                        return Ok((random_byte as char).to_string());
-                    }
-                    _ => {}
                 }
             }
         }
@@ -448,12 +459,13 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
         let mut actual_weights: Vec<f64> = Vec::new();
         let mut actual_total = 0.0;
 
-        for choice in &inline.choices {
+        for choice_spanned in &inline.choices {
+            let choice = &choice_spanned.value;
             let weight = match &choice.weight {
                 Some(ItemWeight::Static(w)) => *w,
-                Some(ItemWeight::Dynamic(expr)) => {
+                Some(ItemWeight::Dynamic(expr_spanned)) => {
                     // Evaluate the dynamic weight expression
-                    let result = self.evaluate_expression(expr).await?;
+                    let result = self.evaluate_expression(expr_spanned).await?;
                     // Convert to number: "true" -> 1.0, "false" -> 0.0, or parse as number
                     let weight = if result == "true" {
                         1.0
@@ -483,12 +495,14 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
         for (i, weight) in actual_weights.iter().enumerate() {
             cumulative += weight;
             if random_value < cumulative {
-                return self.evaluate_content(&inline.choices[i].content).await;
+                return self
+                    .evaluate_content(&inline.choices[i].value.content)
+                    .await;
             }
         }
 
         // Fallback
-        self.evaluate_content(&inline.choices[inline.choices.len() - 1].content)
+        self.evaluate_content(&inline.choices[inline.choices.len() - 1].value.content)
             .await
     }
 
@@ -511,12 +525,12 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
     #[async_recursion]
     async fn peek_next_word(
         &mut self,
-        content: &[ContentPart],
+        content: &[Spanned<ContentPart>],
         start_idx: usize,
     ) -> Result<String, EvalError> {
-        for part in &content[start_idx..] {
-            match part {
-                ContentPart::Text(text, _) => {
+        for part_spanned in &content[start_idx..] {
+            match &part_spanned.value {
+                ContentPart::Text(text) => {
                     // Get the first word from the text
                     if let Some(word) = text.split_whitespace().next() {
                         if !word.is_empty() {
@@ -524,18 +538,18 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                         }
                     }
                 }
-                ContentPart::Reference(expr, _) => {
+                ContentPart::Reference(expr_spanned) => {
                     // Evaluate the reference to get the word
-                    let value = self.evaluate_expression(expr).await?;
+                    let value = self.evaluate_expression(expr_spanned).await?;
                     if let Some(word) = value.split_whitespace().next() {
                         if !word.is_empty() {
                             return Ok(word.to_string());
                         }
                     }
                 }
-                ContentPart::Inline(inline, _) => {
+                ContentPart::Inline(inline_spanned) => {
                     // Evaluate the inline to get the word
-                    let value = self.evaluate_inline(inline).await?;
+                    let value = self.evaluate_inline(inline_spanned).await?;
                     if let Some(word) = value.split_whitespace().next() {
                         if !word.is_empty() {
                             return Ok(word.to_string());
@@ -563,15 +577,24 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
     }
 
     #[async_recursion]
-    async fn evaluate_expression(&mut self, expr: &Expression) -> Result<String, EvalError> {
+    async fn evaluate_expression(
+        &mut self,
+        expr_spanned: &Spanned<Expression>,
+    ) -> Result<String, EvalError> {
+        let expr = &expr_spanned.value;
+        let expr_span = expr_spanned.span;
+
         match expr {
-            Expression::Simple(ident, span) => {
+            Expression::Simple(ident_spanned) => {
+                let ident = &ident_spanned.value;
+                let span = ident_spanned.span;
+
                 // Check for "this" keyword
                 if ident.name == "this" {
                     return Err(EvalError::TypeError {
                         message: "Cannot use 'this' without property access (use this.property)"
                             .to_string(),
-                        span: *span,
+                        span,
                     });
                 }
 
@@ -585,20 +608,23 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                     Some(list) => self.evaluate_list(list).await,
                     None => Err(EvalError::UndefinedList {
                         name: ident.name.clone(),
-                        span: *span,
+                        span,
                     }),
                 }
             }
 
-            Expression::Property(base, prop, span) => {
+            Expression::Property(base_spanned, prop_spanned) => {
+                let prop = &prop_spanned.value;
+                let span = expr_span;
+
                 // Special handling for "this" keyword
-                if let Expression::Simple(ident, _) = base.as_ref() {
-                    if ident.name == "this" {
+                if let Expression::Simple(ident_spanned) = &base_spanned.value {
+                    if ident_spanned.value.name == "this" {
                         if self.current_item.is_none() {
                             return Err(EvalError::TypeError {
                                 message: "'this' keyword can only be used within $output"
                                     .to_string(),
-                                span: *span,
+                                span,
                             });
                         }
 
@@ -632,84 +658,92 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                         return Err(EvalError::UndefinedProperty {
                             list: "this".to_string(),
                             prop: prop.name.clone(),
-                            span: *span,
+                            span,
                         });
                     }
                 }
 
-                let base_value = self.evaluate_to_value(base).await?;
+                let base_value = self.evaluate_to_value(base_spanned).await?;
                 // Try as property first, then as a zero-argument method
-                match self.get_property(&base_value, &prop.name, *span).await {
+                match self.get_property(&base_value, &prop.name, span).await {
                     Ok(result) => Ok(result),
                     Err(EvalError::UndefinedProperty { .. }) => {
                         // Try as a method call with no arguments
                         let method = MethodCall::new(prop.name.clone());
-                        self.call_method(&base_value, &method).await
+                        self.call_method(&base_value, &method, span).await
                     }
                     Err(e) => Err(e),
                 }
             }
 
-            Expression::PropertyWithFallback(base, prop, fallback, span) => {
+            Expression::PropertyWithFallback(base_spanned, prop_spanned, fallback_spanned) => {
+                let prop = &prop_spanned.value;
+                let span = expr_span;
+
                 // Try to access the property, fall back to the fallback expression if it doesn't exist
-                let base_value = self.evaluate_to_value(base).await?;
-                match self.get_property(&base_value, &prop.name, *span).await {
+                let base_value = self.evaluate_to_value(base_spanned).await?;
+                match self.get_property(&base_value, &prop.name, span).await {
                     Ok(result) => Ok(result),
                     Err(EvalError::UndefinedProperty { .. }) | Err(EvalError::TypeError { .. }) => {
                         // Property doesn't exist, evaluate fallback
-                        self.evaluate_expression(fallback).await
+                        self.evaluate_expression(fallback_spanned).await
                     }
                     Err(e) => Err(e),
                 }
             }
 
-            Expression::Dynamic(base, index, span) => {
-                let base_value = self.evaluate_to_value(base).await?;
-                let index_str = self.evaluate_expression(index).await?;
-                self.get_property(&base_value, &index_str, *span).await
+            Expression::Dynamic(base_spanned, index_spanned) => {
+                let span = expr_span;
+                let base_value = self.evaluate_to_value(base_spanned).await?;
+                let index_str = self.evaluate_expression(index_spanned).await?;
+                self.get_property(&base_value, &index_str, span).await
             }
 
-            Expression::Method(base, method, span) => {
+            Expression::Method(base_spanned, method_spanned) => {
+                let method = &method_spanned.value;
+                let span = expr_span;
+
                 // Check if this is a direct function call (e.g., joinLists(args))
                 // where the base is a Simple identifier that matches the method name
-                if let Expression::Simple(ident, _) = base.as_ref() {
-                    if ident.name == method.name && method.name == "joinLists" {
+                if let Expression::Simple(ident_spanned) = &base_spanned.value {
+                    if ident_spanned.value.name == method.name && method.name == "joinLists" {
                         // Handle as a built-in function call
                         // We create a dummy value to pass to call_method_value
                         let result = self
-                            .call_method_value(&Value::Text(String::new()), method)
+                            .call_method_value(&Value::Text(String::new()), method, span)
                             .await?;
                         return self.value_to_string(result).await;
                     }
 
                     // Special handling for "this" keyword
-                    if ident.name == "this" {
+                    if ident_spanned.value.name == "this" {
                         if let Some(ref item) = self.current_item {
                             let value = Value::ItemInstance(item.clone());
-                            return self.call_method(&value, method).await;
+                            return self.call_method(&value, method, span).await;
                         } else {
                             return Err(EvalError::TypeError {
                                 message: "'this' keyword can only be used within $output"
                                     .to_string(),
-                                span: *span,
+                                span,
                             });
                         }
                     }
                 }
 
-                let base_value = self.evaluate_to_value(base).await?;
-                self.call_method(&base_value, method).await
+                let base_value = self.evaluate_to_value(base_spanned).await?;
+                self.call_method(&base_value, method, span).await
             }
 
-            Expression::Assignment(ident, value, _) => {
-                let mut val = self.evaluate_to_value(value).await?;
+            Expression::Assignment(ident_spanned, value_spanned) => {
+                let ident = &ident_spanned.value;
+                let mut val = self.evaluate_to_value(value_spanned).await?;
 
                 // If assigning a list reference (but not a consumable list), select one item from it
                 // This ensures subsequent uses of the variable get the same selection
                 // Consumable lists and ListInstances are excluded because they have their own selection logic
                 if matches!(val, Value::List(_)) {
                     let method = MethodCall::new("selectOne".to_string());
-                    val = self.call_method_value(&val, &method).await?;
+                    val = self.call_method_value(&val, &method, Span::dummy()).await?;
                 }
 
                 self.variables.insert(ident.name.clone(), val.clone());
@@ -717,21 +751,21 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                 self.value_to_string(val).await
             }
 
-            Expression::Sequence(exprs, output, _) => {
+            Expression::Sequence(exprs, output) => {
                 // Evaluate all expressions in sequence
-                for expr in exprs {
-                    self.evaluate_expression(expr).await?;
+                for expr_sp in exprs {
+                    self.evaluate_expression(expr_sp).await?;
                 }
 
                 // Return the output expression if present
-                if let Some(out_expr) = output {
-                    self.evaluate_expression(out_expr).await
+                if let Some(out_expr_sp) = output {
+                    self.evaluate_expression(out_expr_sp).await
                 } else {
                     Ok(String::new())
                 }
             }
 
-            Expression::Literal(s, _) => {
+            Expression::Literal(s) => {
                 // Evaluate the literal string (it may contain references)
                 // We need to parse and evaluate the string content
                 // For now, we'll use a simple approach: re-parse the string as content
@@ -741,23 +775,26 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                 }
             }
 
-            Expression::Number(n, _) => Ok(self.format_number(*n)),
+            Expression::Number(n) => Ok(self.format_number(*n)),
 
-            Expression::PropertyAssignment(base, prop, value, span) => {
+            Expression::PropertyAssignment(base_spanned, prop_spanned, value_spanned) => {
+                let prop = &prop_spanned.value;
+                let span = expr_span;
+
                 // Handle property assignment like [this.property = value]
                 // Currently only supported for 'this' keyword
-                if let Expression::Simple(ident, _) = base.as_ref() {
-                    if ident.name == "this" {
+                if let Expression::Simple(ident_spanned) = &base_spanned.value {
+                    if ident_spanned.value.name == "this" {
                         if self.current_item.is_none() {
                             return Err(EvalError::TypeError {
                                 message: "'this' keyword can only be used within $output"
                                     .to_string(),
-                                span: *span,
+                                span,
                             });
                         }
 
                         // Evaluate the value and store it
-                        let val_str = self.evaluate_expression(value).await?;
+                        let val_str = self.evaluate_expression(value_spanned).await?;
                         let val = Value::Text(val_str.clone());
 
                         // Store in dynamic_properties for later access
@@ -770,42 +807,43 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
 
                 Err(EvalError::TypeError {
                     message: "Property assignment is only supported for 'this' keyword".to_string(),
-                    span: *span,
+                    span,
                 })
             }
 
-            Expression::NumberRange(start, end, _) => {
+            Expression::NumberRange(start, end) => {
                 let num = self.rng.gen_range(*start..=*end);
                 Ok(num.to_string())
             }
 
-            Expression::LetterRange(start, end, _) => {
+            Expression::LetterRange(start, end) => {
                 let start_byte = *start as u8;
                 let end_byte = *end as u8;
                 let random_byte = self.rng.gen_range(start_byte..=end_byte);
                 Ok((random_byte as char).to_string())
             }
 
-            Expression::Conditional(cond, true_expr, false_expr, _) => {
+            Expression::Conditional(cond_spanned, true_spanned, false_spanned) => {
                 // Evaluate condition
-                let cond_result = self.evaluate_expression(cond).await?;
+                let cond_result = self.evaluate_expression(cond_spanned).await?;
 
                 // Check if condition is truthy
                 if self.is_truthy(&cond_result) {
-                    self.evaluate_expression(true_expr).await
+                    self.evaluate_expression(true_spanned).await
                 } else {
-                    self.evaluate_expression(false_expr).await
+                    self.evaluate_expression(false_spanned).await
                 }
             }
 
-            Expression::BinaryOp(left, op, right, span) => {
+            Expression::BinaryOp(left_spanned, op, right_spanned) => {
                 use BinaryOperator::*;
+                let span = expr_span;
 
                 match op {
                     // Math operations
                     Add | Subtract | Multiply | Divide | Modulo => {
-                        let left_val = self.evaluate_expression(left).await?;
-                        let right_val = self.evaluate_expression(right).await?;
+                        let left_val = self.evaluate_expression(left_spanned).await?;
+                        let right_val = self.evaluate_expression(right_spanned).await?;
 
                         // For addition, check if either value is non-numeric (string concatenation)
                         if matches!(op, Add) {
@@ -825,7 +863,7 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                             let left_num =
                                 left_val.parse::<f64>().map_err(|_| EvalError::TypeError {
                                     message: format!("Left operand is not a number: {}", left_val),
-                                    span: *span,
+                                    span,
                                 })?;
                             let right_num =
                                 right_val.parse::<f64>().map_err(|_| EvalError::TypeError {
@@ -833,7 +871,7 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                                         "Right operand is not a number: {}",
                                         right_val
                                     ),
-                                    span: *span,
+                                    span,
                                 })?;
 
                             let result = match op {
@@ -843,7 +881,7 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                                     if right_num == 0.0 {
                                         return Err(EvalError::TypeError {
                                             message: "Division by zero".to_string(),
-                                            span: *span,
+                                            span,
                                         });
                                     }
                                     left_num / right_num
@@ -852,7 +890,7 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                                     if right_num == 0.0 {
                                         return Err(EvalError::TypeError {
                                             message: "Modulo by zero".to_string(),
-                                            span: *span,
+                                            span,
                                         });
                                     }
                                     left_num % right_num
@@ -866,8 +904,8 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
 
                     // Comparison and logical operations
                     _ => {
-                        let left_val = self.evaluate_expression(left).await?;
-                        let right_val = self.evaluate_expression(right).await?;
+                        let left_val = self.evaluate_expression(left_spanned).await?;
+                        let right_val = self.evaluate_expression(right_spanned).await?;
 
                         let result = match op {
                             Equal => left_val == right_val,
@@ -886,9 +924,10 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                 }
             }
 
-            Expression::Import(generator_name, span) => {
+            Expression::Import(generator_name) => {
+                let span = expr_span;
                 // Load the imported generator
-                let imported_program = self.load_import(generator_name, *span).await?.clone();
+                let imported_program = self.load_import(generator_name, span).await?.clone();
 
                 // Create a new evaluator for the imported program with its own context
                 let mut imported_evaluator = Evaluator::new(&imported_program, self.rng);
@@ -940,15 +979,24 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
     }
 
     #[async_recursion]
-    async fn evaluate_to_value(&mut self, expr: &Expression) -> Result<Value, EvalError> {
+    async fn evaluate_to_value(
+        &mut self,
+        expr_spanned: &Spanned<Expression>,
+    ) -> Result<Value, EvalError> {
+        let expr = &expr_spanned.value;
+        let expr_span = expr_spanned.span;
+
         match expr {
-            Expression::Simple(ident, span) => {
+            Expression::Simple(ident_spanned) => {
+                let ident = &ident_spanned.value;
+                let span = ident_spanned.span;
+
                 // Handle "this" keyword
                 if ident.name == "this" {
                     return Err(EvalError::TypeError {
                         message: "Cannot use 'this' without property access (use this.property)"
                             .to_string(),
-                        span: *span,
+                        span,
                     });
                 }
 
@@ -964,14 +1012,17 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
 
                 Err(EvalError::UndefinedList {
                     name: ident.name.clone(),
-                    span: *span,
+                    span,
                 })
             }
 
-            Expression::Property(base, prop, span) => {
+            Expression::Property(base_spanned, prop_spanned) => {
+                let prop = &prop_spanned.value;
+                let span = expr_span;
+
                 // Special handling for "this" keyword
-                if let Expression::Simple(ident, _) = base.as_ref() {
-                    if ident.name == "this" {
+                if let Expression::Simple(ident_spanned) = &base_spanned.value {
+                    if ident_spanned.value.name == "this" {
                         // Access property from current_item
                         if let Some(ref item) = self.current_item {
                             if let Some(sublist) = item.sublists.get(&prop.name) {
@@ -980,75 +1031,76 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                                 return Err(EvalError::UndefinedProperty {
                                     list: "this".to_string(),
                                     prop: prop.name.clone(),
-                                    span: *span,
+                                    span,
                                 });
                             }
                         } else {
                             return Err(EvalError::TypeError {
                                 message: "'this' keyword can only be used within $output"
                                     .to_string(),
-                                span: *span,
+                                span,
                             });
                         }
                     }
                 }
 
-                let base_value = self.evaluate_to_value(base).await?;
+                let base_value = self.evaluate_to_value(base_spanned).await?;
                 // Try as property first, then as a zero-argument method
-                match self
-                    .get_property_value(&base_value, &prop.name, *span)
-                    .await
-                {
+                match self.get_property_value(&base_value, &prop.name, span).await {
                     Ok(value) => Ok(value),
                     Err(EvalError::UndefinedProperty { .. }) | Err(EvalError::TypeError { .. }) => {
                         // Try as a method call with no arguments
                         let method = MethodCall::new(prop.name.clone());
-                        self.call_method_value(&base_value, &method).await
+                        self.call_method_value(&base_value, &method, span).await
                     }
                     Err(e) => Err(e),
                 }
             }
 
-            Expression::PropertyWithFallback(base, prop, fallback, span) => {
+            Expression::PropertyWithFallback(base_spanned, prop_spanned, fallback_spanned) => {
+                let prop = &prop_spanned.value;
+                let span = expr_span;
+
                 // Try to access the property, fall back to the fallback expression if it doesn't exist
-                let base_value = self.evaluate_to_value(base).await?;
-                match self
-                    .get_property_value(&base_value, &prop.name, *span)
-                    .await
-                {
+                let base_value = self.evaluate_to_value(base_spanned).await?;
+                match self.get_property_value(&base_value, &prop.name, span).await {
                     Ok(value) => Ok(value),
                     Err(EvalError::UndefinedProperty { .. }) | Err(EvalError::TypeError { .. }) => {
                         // Property doesn't exist, evaluate fallback
-                        self.evaluate_to_value(fallback).await
+                        self.evaluate_to_value(fallback_spanned).await
                     }
                     Err(e) => Err(e),
                 }
             }
 
-            Expression::Method(base, method, _) => {
+            Expression::Method(base_spanned, method_spanned) => {
+                let method = &method_spanned.value;
+                let span = method_spanned.span;
+
                 // Check if this is a direct function call (e.g., joinLists(args))
-                if let Expression::Simple(ident, _) = base.as_ref() {
-                    if ident.name == method.name && method.name == "joinLists" {
+                if let Expression::Simple(ident_spanned) = &base_spanned.value {
+                    if ident_spanned.value.name == method.name && method.name == "joinLists" {
                         // Handle as a built-in function call
                         return self
-                            .call_method_value(&Value::Text(String::new()), method)
+                            .call_method_value(&Value::Text(String::new()), method, span)
                             .await;
                     }
                 }
 
-                let base_value = self.evaluate_to_value(base).await?;
-                self.call_method_value(&base_value, method).await
+                let base_value = self.evaluate_to_value(base_spanned).await?;
+                self.call_method_value(&base_value, method, span).await
             }
 
-            Expression::Import(generator_name, span) => {
+            Expression::Import(generator_name) => {
+                let span = expr_span;
                 // Load the imported generator to ensure it exists and is cached
-                let _ = self.load_import(generator_name, *span).await?;
+                let _ = self.load_import(generator_name, span).await?;
                 // Return a reference to the imported generator
                 Ok(Value::ImportedGenerator(generator_name.clone()))
             }
 
             _ => {
-                let result = self.evaluate_expression(expr).await?;
+                let result = self.evaluate_expression(expr_spanned).await?;
                 Ok(Value::Text(result))
             }
         }
@@ -1176,14 +1228,17 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
         if let Some(output_content) = &list.output {
             // Check if the output is a simple import expression
             if output_content.len() == 1 {
-                if let ContentPart::Inline(inline, _) = &output_content[0] {
-                    if inline.choices.len() == 1 && inline.choices[0].content.len() == 1 {
-                        if let ContentPart::Reference(Expression::Import(name, _), _) =
-                            &inline.choices[0].content[0]
+                if let ContentPart::Inline(inline_spanned) = &output_content[0].value {
+                    let inline = &inline_spanned.value;
+                    if inline.choices.len() == 1 && inline.choices[0].value.content.len() == 1 {
+                        if let ContentPart::Reference(expr_spanned) =
+                            &inline.choices[0].value.content[0].value
                         {
-                            // Load the import to ensure it's cached
-                            let _ = self.load_import(name, Span::dummy()).await?;
-                            return Ok(Value::ImportedGenerator(name.clone()));
+                            if let Expression::Import(name) = &expr_spanned.value {
+                                // Load the import to ensure it's cached
+                                let _ = self.load_import(name, Span::dummy()).await?;
+                                return Ok(Value::ImportedGenerator(name.clone()));
+                            }
                         }
                     }
                 }
@@ -1283,7 +1338,7 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                 // Check if this is a grammar method that can be applied to text
                 if self.is_grammar_method(prop_name) {
                     let method = MethodCall::new(prop_name.to_string());
-                    return self.call_method_value(value, &method).await;
+                    return self.call_method_value(value, &method, span).await;
                 }
                 Err(EvalError::TypeError {
                     message: format!("Cannot access property '{}' on text value", prop_name),
@@ -1298,7 +1353,7 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                 // Check if this is a method that can be applied to consumable lists
                 if self.is_grammar_method(prop_name) || prop_name == "selectOne" {
                     let method = MethodCall::new(prop_name.to_string());
-                    return self.call_method_value(value, &method).await;
+                    return self.call_method_value(value, &method, span).await;
                 }
                 Err(EvalError::TypeError {
                     message: format!("Cannot access property '{}' on consumable list", prop_name),
@@ -1342,20 +1397,25 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
 
     /// Helper to extract a simple list reference from content like [listname]
     /// Returns the list name if the content is a simple reference, None otherwise
-    fn extract_simple_list_reference(content: &[ContentPart]) -> Option<String> {
+    fn extract_simple_list_reference(content: &[Spanned<ContentPart>]) -> Option<String> {
         // Check if content is exactly one reference
         if content.len() == 1 {
             // Case 1: Direct reference like in $output = [color]
-            if let ContentPart::Reference(Expression::Simple(ident, _), _) = &content[0] {
-                return Some(ident.name.clone());
+            if let ContentPart::Reference(expr_spanned) = &content[0].value {
+                if let Expression::Simple(ident_spanned) = &expr_spanned.value {
+                    return Some(ident_spanned.value.name.clone());
+                }
             }
             // Case 2: Inline expression with one choice containing one reference
-            if let ContentPart::Inline(inline, _) = &content[0] {
-                if inline.choices.len() == 1 && inline.choices[0].content.len() == 1 {
-                    if let ContentPart::Reference(Expression::Simple(ident, _), _) =
-                        &inline.choices[0].content[0]
+            if let ContentPart::Inline(inline_spanned) = &content[0].value {
+                let inline = &inline_spanned.value;
+                if inline.choices.len() == 1 && inline.choices[0].value.content.len() == 1 {
+                    if let ContentPart::Reference(expr_spanned) =
+                        &inline.choices[0].value.content[0].value
                     {
-                        return Some(ident.name.clone());
+                        if let Expression::Simple(ident_spanned) = &expr_spanned.value {
+                            return Some(ident_spanned.value.name.clone());
+                        }
                     }
                 }
             }
@@ -1379,8 +1439,9 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
         &mut self,
         value: &Value,
         method: &MethodCall,
+        span: Span,
     ) -> Result<String, EvalError> {
-        let value_result = self.call_method_value(value, method).await?;
+        let value_result = self.call_method_value(value, method, span).await?;
         self.value_to_string(value_result).await
     }
 
@@ -1389,6 +1450,7 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
         &mut self,
         value: &Value,
         method: &MethodCall,
+        span: Span,
     ) -> Result<Value, EvalError> {
         match method.name.as_str() {
             "selectOne" => {
@@ -1398,7 +1460,7 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                         let list = self.program.get_list(name).ok_or_else(|| {
                             EvalError::UndefinedList {
                                 name: name.clone(),
-                                span: method.span,
+                                span,
                             }
                         })?;
 
@@ -1502,7 +1564,7 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                         let list = self.program.get_list(name).ok_or_else(|| {
                             EvalError::UndefinedList {
                                 name: name.clone(),
-                                span: method.span,
+                                span,
                             }
                         })?;
 
@@ -1551,7 +1613,7 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                         // selectAll is not meaningful for consumable lists
                         Err(EvalError::InvalidMethodCall {
                             message: "selectAll cannot be called on consumable lists".to_string(),
-                            span: method.span,
+                            span,
                         })
                     }
                     Value::ImportedGenerator(_) => {
@@ -1559,7 +1621,7 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                         Err(EvalError::InvalidMethodCall {
                             message: "selectAll cannot be called on imported generators"
                                 .to_string(),
-                            span: method.span,
+                            span,
                         })
                     }
                 }
@@ -1571,7 +1633,7 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                 let n = if method.args.is_empty() {
                     return Err(EvalError::InvalidMethodCall {
                         message: "selectMany requires at least one argument".to_string(),
-                        span: method.span,
+                        span,
                     });
                 } else if method.args.len() == 1 {
                     // Single argument: exact count
@@ -1583,7 +1645,7 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                                 "selectMany argument must be a number, got: {}",
                                 arg_str
                             ),
-                            span: method.span,
+                            span,
                         })?
                 } else if method.args.len() == 2 {
                     // Two arguments: random count between min and max
@@ -1597,7 +1659,7 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                                     "selectMany min argument must be a number, got: {}",
                                     min_str
                                 ),
-                                span: method.span,
+                                span,
                             })?;
                     let max =
                         max_str
@@ -1607,7 +1669,7 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                                     "selectMany max argument must be a number, got: {}",
                                     max_str
                                 ),
-                                span: method.span,
+                                span,
                             })?;
                     if min > max {
                         return Err(EvalError::InvalidMethodCall {
@@ -1615,14 +1677,14 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                                 "selectMany min ({}) cannot be greater than max ({})",
                                 min, max
                             ),
-                            span: method.span,
+                            span,
                         });
                     }
                     self.rng.gen_range(min..=max)
                 } else {
                     return Err(EvalError::InvalidMethodCall {
                         message: "selectMany accepts 1 or 2 arguments".to_string(),
-                        span: method.span,
+                        span,
                     });
                 };
 
@@ -1631,7 +1693,7 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                         let list = self.program.get_list(name).ok_or_else(|| {
                             EvalError::UndefinedList {
                                 name: name.clone(),
-                                span: method.span,
+                                span,
                             }
                         })?;
 
@@ -1697,14 +1759,14 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                     }
                     Value::ConsumableList(_) => {
                         // selectMany with repetition doesn't make sense for consumable lists
-                        Err(EvalError::InvalidMethodCall { message: "selectMany cannot be called on consumable lists (use selectUnique instead)".to_string(), span: method.span })
+                        Err(EvalError::InvalidMethodCall { message: "selectMany cannot be called on consumable lists (use selectUnique instead)".to_string(), span })
                     }
                     Value::ImportedGenerator(_) => {
                         // selectMany is not meaningful for imported generators
                         Err(EvalError::InvalidMethodCall {
                             message: "selectMany cannot be called on imported generators"
                                 .to_string(),
-                            span: method.span,
+                            span,
                         })
                     }
                 }
@@ -1716,7 +1778,7 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                 let n = if method.args.is_empty() {
                     return Err(EvalError::InvalidMethodCall {
                         message: "selectUnique requires at least one argument".to_string(),
-                        span: method.span,
+                        span,
                     });
                 } else if method.args.len() == 1 {
                     // Single argument: exact count
@@ -1728,7 +1790,7 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                                 "selectUnique argument must be a number, got: {}",
                                 arg_str
                             ),
-                            span: method.span,
+                            span,
                         })?
                 } else if method.args.len() == 2 {
                     // Two arguments: random count between min and max
@@ -1742,7 +1804,7 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                                     "selectUnique min argument must be a number, got: {}",
                                     min_str
                                 ),
-                                span: method.span,
+                                span,
                             })?;
                     let max =
                         max_str
@@ -1752,7 +1814,7 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                                     "selectUnique max argument must be a number, got: {}",
                                     max_str
                                 ),
-                                span: method.span,
+                                span,
                             })?;
                     if min > max {
                         return Err(EvalError::InvalidMethodCall {
@@ -1760,14 +1822,14 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                                 "selectUnique min ({}) cannot be greater than max ({})",
                                 min, max
                             ),
-                            span: method.span,
+                            span,
                         });
                     }
                     self.rng.gen_range(min..=max)
                 } else {
                     return Err(EvalError::InvalidMethodCall {
                         message: "selectUnique accepts 1 or 2 arguments".to_string(),
-                        span: method.span,
+                        span,
                     });
                 };
 
@@ -1776,7 +1838,7 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                         let list = self.program.get_list(name).ok_or_else(|| {
                             EvalError::UndefinedList {
                                 name: name.clone(),
-                                span: method.span,
+                                span,
                             }
                         })?;
 
@@ -1787,7 +1849,7 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                                     n,
                                     list.items.len()
                                 ),
-                                span: method.span,
+                                span,
                             });
                         }
 
@@ -1820,7 +1882,7 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                                     n,
                                     list.items.len()
                                 ),
-                                span: method.span,
+                                span,
                             });
                         }
 
@@ -1851,7 +1913,7 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                             return Err(EvalError::InvalidMethodCall {
                                 message: "Cannot select multiple unique items from a single item"
                                     .to_string(),
-                                span: method.span,
+                                span,
                             });
                         }
                         let result = self.evaluate_content(&item.content).await?;
@@ -1867,7 +1929,7 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                                     n,
                                     items.len()
                                 ),
-                                span: method.span,
+                                span,
                             });
                         }
 
@@ -1895,7 +1957,7 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                         Err(EvalError::InvalidMethodCall {
                             message: "selectUnique cannot be called on imported generators"
                                 .to_string(),
-                            span: method.span,
+                            span,
                         })
                     }
                 }
@@ -1964,7 +2026,7 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                             .get_list(name)
                             .ok_or_else(|| EvalError::UndefinedList {
                                 name: name.clone(),
-                                span: method.span,
+                                span,
                             })?
                             .clone();
 
@@ -1974,7 +2036,7 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                             let result_value = self.evaluate_list_to_value(&list).await?;
                             if matches!(result_value, Value::ImportedGenerator(_)) {
                                 // Recursively call consumableList on the ImportedGenerator
-                                return self.call_method_value(&result_value, method).await;
+                                return self.call_method_value(&result_value, method, span).await;
                             }
                         }
 
@@ -2022,8 +2084,7 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                     }
                     Value::ImportedGenerator(generator_name) => {
                         // For imported generators, get the output list and create a consumable version
-                        let imported_program =
-                            self.load_import(generator_name, method.span).await?;
+                        let imported_program = self.load_import(generator_name, span).await?;
 
                         // Find the output list (check $output, then output, then last list)
                         let mut output_list = if let Some(list) =
@@ -2040,7 +2101,7 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                                         "Cannot find output list in imported generator '{}'",
                                         generator_name
                                     ),
-                                    span: method.span,
+                                    span,
                                 })?
                                 .clone()
                         } else {
@@ -2049,7 +2110,7 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                                     "Imported generator '{}' has no lists",
                                     generator_name
                                 ),
-                                span: method.span,
+                                span,
                             });
                         };
 
@@ -2095,7 +2156,7 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                     }
                     _ => Err(EvalError::InvalidMethodCall {
                         message: "consumableList can only be called on lists".to_string(),
-                        span: method.span,
+                        span,
                     }),
                 }
             }
@@ -2107,7 +2168,7 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                 if method.args.is_empty() {
                     return Err(EvalError::InvalidMethodCall {
                         message: "joinLists requires at least one argument".to_string(),
-                        span: method.span,
+                        span,
                     });
                 }
 
@@ -2124,7 +2185,7 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                             let list = self.program.get_list(&name).ok_or_else(|| {
                                 EvalError::UndefinedList {
                                     name: name.clone(),
-                                    span: method.span,
+                                    span,
                                 }
                             })?;
                             combined_items.extend(list.items.clone());
@@ -2142,7 +2203,7 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                                     "joinLists arguments must be lists, got {:?}",
                                     list_value
                                 ),
-                                span: method.span,
+                                span,
                             });
                         }
                     }
@@ -2161,7 +2222,7 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
 
             _ => Err(EvalError::InvalidMethodCall {
                 message: format!("Unknown method: {}", method.name),
-                span: method.span,
+                span,
             }),
         }
     }
