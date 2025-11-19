@@ -858,10 +858,12 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                 let span = expr_span;
                 // Evaluate the count expression
                 let count_str = self.evaluate_expression(count).await?;
-                let n = count_str.parse::<usize>().map_err(|_| EvalError::TypeError {
-                    message: format!("repeat count must be a number, got: {}", count_str),
-                    span,
-                })?;
+                let n = count_str
+                    .parse::<usize>()
+                    .map_err(|_| EvalError::TypeError {
+                        message: format!("repeat count must be a number, got: {}", count_str),
+                        span,
+                    })?;
 
                 // Evaluate the body n times and concatenate results
                 let mut result = String::new();
