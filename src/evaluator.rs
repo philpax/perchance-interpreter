@@ -127,6 +127,7 @@ pub struct Evaluator<'a, R: Rng> {
     consumable_list_counter: usize,             // Counter for generating unique IDs
     loader: Option<Arc<dyn GeneratorLoader>>,   // Generator loader for imports
     import_cache: HashMap<String, CompiledProgram>, // Cache for imported generators
+    import_sources: HashMap<String, String>,    // Cache for import source templates
     trace_enabled: bool,                        // Whether to collect trace information
     trace_stack: Vec<TraceNode>,                // Stack of trace nodes being built
 }
@@ -144,6 +145,7 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
             consumable_list_counter: 0,
             loader: None,
             import_cache: HashMap::new(),
+            import_sources: HashMap::new(),
             trace_enabled: false,
             trace_stack: Vec::new(),
         }
@@ -221,6 +223,9 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                 span,
             })?;
 
+        // Store the source for tracing
+        self.import_sources.insert(name.to_string(), source.clone());
+
         // Parse and compile the generator
         let program = crate::parser::parse(&source).map_err(|e| EvalError::ImportError {
             message: format!("Failed to parse generator '{}': {}", name, e),
@@ -287,7 +292,7 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
             match &part.value {
                 ContentPart::Text(text) => preview.push_str(text),
                 ContentPart::Reference(expr) => {
-                    preview.push_str(&format!("[{}]", self.get_expr_preview(&expr.value)))
+                    preview.push_str(&format!("[{}]", Self::get_expr_preview(&expr.value)))
                 }
                 ContentPart::Inline(_) => preview.push_str("{...}"),
                 ContentPart::Article => preview.push_str("{a}"),
@@ -307,11 +312,11 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
     }
 
     /// Get a simple preview of an expression
-    fn get_expr_preview(&self, expr: &Expression) -> String {
+    fn get_expr_preview(expr: &Expression) -> String {
         match expr {
             Expression::Simple(ident) => ident.value.name.clone(),
             Expression::Property(base, prop) => {
-                format!("{}.{}", self.get_expr_preview(&base.value), prop.value.name)
+                format!("{}.{}", Self::get_expr_preview(&base.value), prop.value.name)
             }
             Expression::Import(name) => format!("import:{}", name),
             Expression::Literal(s) => format!("\"{}\"", s),
@@ -573,6 +578,9 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
             return Ok(String::new());
         }
 
+        // Start tracing
+        self.trace_start("{...}".to_string(), OperationType::Choice, Some(inline_spanned.span));
+
         // Check if this is a special case (number range, letter range)
         if inline.choices.len() == 1 {
             if let Some(content_part_spanned) = inline.choices[0].value.content.first() {
@@ -580,19 +588,59 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                     match &expr_spanned.value {
                         Expression::NumberRange(start, end) => {
                             let num = self.rng.gen_range(*start..=*end);
-                            return Ok(num.to_string());
+                            let result = num.to_string();
+
+                            // Store inline list content for tracing
+                            if self.trace_enabled {
+                                if let Some(node) = self.trace_stack.last_mut() {
+                                    node.inline_list_content = Some(format!("{{{}-{}}}", start, end));
+                                }
+                            }
+
+                            self.trace_end(result.clone());
+                            return Ok(result);
                         }
                         Expression::LetterRange(start, end) => {
                             let start_byte = *start as u8;
                             let end_byte = *end as u8;
                             let random_byte = self.rng.gen_range(start_byte..=end_byte);
-                            return Ok((random_byte as char).to_string());
+                            let result = (random_byte as char).to_string();
+
+                            // Store inline list content for tracing
+                            if self.trace_enabled {
+                                if let Some(node) = self.trace_stack.last_mut() {
+                                    node.inline_list_content = Some(format!("{{{}-{}}}", start, end));
+                                }
+                            }
+
+                            self.trace_end(result.clone());
+                            return Ok(result);
                         }
                         _ => {}
                     }
                 }
             }
         }
+
+        // Build inline list content string for tracing
+        let inline_content = if self.trace_enabled {
+            let mut parts = Vec::new();
+            for (i, choice_spanned) in inline.choices.iter().enumerate() {
+                let choice = &choice_spanned.value;
+                let preview = self.get_item_preview(&choice.content);
+                let weight_str = match &choice.weight {
+                    Some(ItemWeight::Static(w)) if (*w - 1.0).abs() > 0.001 => format!("^{}", w),
+                    _ => String::new(),
+                };
+                parts.push(format!("{}{}", preview, weight_str));
+                if i < inline.choices.len() - 1 {
+                    parts.push("|".to_string());
+                }
+            }
+            Some(parts.join(" "))
+        } else {
+            None
+        };
 
         // Calculate actual weights for choices with dynamic weights
         let mut actual_weights: Vec<f64> = Vec::new();
@@ -627,22 +675,46 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
             actual_total = inline.choices.len() as f64;
         }
 
+        // Generate choice previews for tracing
+        let choice_previews: Vec<String> = if self.trace_enabled {
+            inline
+                .choices
+                .iter()
+                .map(|choice| self.get_item_preview(&choice.value.content))
+                .collect()
+        } else {
+            Vec::new()
+        };
+
         // Select a choice
         let random_value = self.rng.gen::<f64>() * actual_total;
         let mut cumulative = 0.0;
+        let mut selected_idx = inline.choices.len() - 1;
 
         for (i, weight) in actual_weights.iter().enumerate() {
             cumulative += weight;
             if random_value < cumulative {
-                return self
-                    .evaluate_content(&inline.choices[i].value.content)
-                    .await;
+                selected_idx = i;
+                break;
             }
         }
 
-        // Fallback
-        self.evaluate_content(&inline.choices[inline.choices.len() - 1].value.content)
-            .await
+        // Store trace information
+        if self.trace_enabled {
+            if let Some(node) = self.trace_stack.last_mut() {
+                node.available_items = Some(choice_previews);
+                node.selected_index = Some(selected_idx);
+                node.inline_list_content = inline_content;
+            }
+        }
+
+        // Evaluate the selected choice
+        let result = self
+            .evaluate_content(&inline.choices[selected_idx].value.content)
+            .await?;
+
+        self.trace_end(result.clone());
+        Ok(result)
     }
 
     // Helper function to extract a number from text
@@ -1124,8 +1196,9 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                     imported_evaluator.loader = Some(Arc::clone(loader));
                 }
 
-                // Share the import cache
+                // Share the import cache and sources
                 imported_evaluator.import_cache = self.import_cache.clone();
+                imported_evaluator.import_sources = self.import_sources.clone();
 
                 // Enable tracing for the imported evaluator if we're tracing
                 if self.trace_enabled {
@@ -1138,7 +1211,13 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                 // If we're tracing, add the imported trace as a child
                 if let Ok(ref output) = result {
                     if self.trace_enabled {
-                        if let Some(imported_trace) = imported_evaluator.take_trace() {
+                        if let Some(mut imported_trace) = imported_evaluator.take_trace() {
+                            // Add source template and generator name to the imported trace
+                            if let Some(source) = self.import_sources.get(generator_name) {
+                                imported_trace.source_template = Some(source.clone());
+                                imported_trace.generator_name = Some(generator_name.clone());
+                            }
+
                             if let Some(node) = self.trace_stack.last_mut() {
                                 node.add_child(imported_trace);
                             }

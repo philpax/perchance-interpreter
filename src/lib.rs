@@ -314,7 +314,12 @@ pub async fn run_with_seed_and_trace(
     if let Some(loader) = loader {
         options = options.with_loader(loader);
     }
-    let (output, trace) = evaluate_with_trace(&compiled, options).await?;
+    let (output, mut trace) = evaluate_with_trace(&compiled, options).await?;
+
+    // Add source template to the root trace node
+    trace.source_template = Some(template.to_string());
+    trace.generator_name = Some("<user>".to_string());
+
     Ok((output, trace))
 }
 

@@ -1,6 +1,6 @@
 use perchance_interpreter::{
-    compile, diagnostic, evaluate, parse, run_with_seed, run_with_seed_and_trace,
-    EvaluateOptions, InterpreterError, TraceResult,
+    compile, diagnostic, evaluate, parse, run_with_seed, run_with_seed_and_trace, EvaluateOptions,
+    InterpreterError, TraceResult,
 };
 use rand::rngs::StdRng;
 use rand::SeedableRng;
@@ -43,7 +43,11 @@ pub fn evaluate_perchance_random(template: String) -> js_sys::Promise {
             .await
             .map(|s| JsValue::from_str(&s))
             .map_err(|e| {
-                JsValue::from_str(&diagnostic::report_eval_error("<input>", &template_clone, &e))
+                JsValue::from_str(&diagnostic::report_eval_error(
+                    "<input>",
+                    &template_clone,
+                    &e,
+                ))
             })
     })
 }
@@ -76,11 +80,13 @@ pub fn evaluate_multiple(template: String, count: u32, seed: Option<u64>) -> js_
             for _ in 0..count {
                 let rng = StdRng::from_entropy();
                 let options = EvaluateOptions::new(rng);
-                let output = evaluate(&compiled, options)
-                    .await
-                    .map_err(|e| {
-                        JsValue::from_str(&diagnostic::report_eval_error("<input>", &template_clone, &e))
-                    })?;
+                let output = evaluate(&compiled, options).await.map_err(|e| {
+                    JsValue::from_str(&diagnostic::report_eval_error(
+                        "<input>",
+                        &template_clone,
+                        &e,
+                    ))
+                })?;
                 results.push(output);
             }
         }
@@ -92,12 +98,11 @@ pub fn evaluate_multiple(template: String, count: u32, seed: Option<u64>) -> js_
 /// Validate a template without evaluating it
 #[wasm_bindgen]
 pub fn validate_template(template: &str) -> Result<(), String> {
-    let program = parse(template).map_err(|e| {
-        diagnostic::report_parse_error("<input>", template, &e)
-    })?;
-    compile(&program).map(|_| ()).map_err(|e| {
-        diagnostic::report_compile_error("<input>", template, &e)
-    })
+    let program =
+        parse(template).map_err(|e| diagnostic::report_parse_error("<input>", template, &e))?;
+    compile(&program)
+        .map(|_| ())
+        .map_err(|e| diagnostic::report_compile_error("<input>", template, &e))
 }
 
 /// Get list of all available builtin generators for autocomplete

@@ -38,6 +38,18 @@ pub struct TraceNode {
     /// Template string showing where result was interpolated
     #[serde(skip_serializing_if = "Option::is_none")]
     pub interpolation_context: Option<String>,
+
+    /// Source template for this generator (for root nodes or imports)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub source_template: Option<String>,
+
+    /// Generator name (for imports or root)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub generator_name: Option<String>,
+
+    /// Content of inline list for expandable display
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub inline_list_content: Option<String>,
 }
 
 /// Types of operations that can be traced
@@ -91,6 +103,9 @@ impl TraceNode {
             available_items: None,
             selected_index: None,
             interpolation_context: None,
+            source_template: None,
+            generator_name: None,
+            inline_list_content: None,
         }
     }
 
@@ -138,6 +153,24 @@ impl TraceNode {
     /// Set interpolation context
     pub fn with_interpolation_context(mut self, context: String) -> Self {
         self.interpolation_context = Some(context);
+        self
+    }
+
+    /// Set source template
+    pub fn with_source_template(mut self, template: String) -> Self {
+        self.source_template = Some(template);
+        self
+    }
+
+    /// Set generator name
+    pub fn with_generator_name(mut self, name: String) -> Self {
+        self.generator_name = Some(name);
+        self
+    }
+
+    /// Set inline list content
+    pub fn with_inline_list_content(mut self, content: String) -> Self {
+        self.inline_list_content = Some(content);
         self
     }
 }
