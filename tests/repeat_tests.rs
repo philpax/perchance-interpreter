@@ -72,7 +72,7 @@ output
 "#;
     let output = run(template, 42).await.unwrap();
     // Should generate 3 single-digit numbers
-    assert!(output.trim().len() >= 1 && output.trim().len() <= 3);
+    assert!(!output.trim().is_empty() && output.trim().len() <= 3);
 }
 
 #[tokio::test]
