@@ -193,16 +193,6 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
         }
     }
 
-    /// Add a child trace to the current operation
-    fn trace_add_child(&mut self, child: TraceNode) {
-        if !self.trace_enabled {
-            return;
-        }
-        if let Some(parent) = self.trace_stack.last_mut() {
-            parent.add_child(child);
-        }
-    }
-
     /// Set the generator loader for handling imports
     pub fn with_loader(mut self, loader: Arc<dyn GeneratorLoader>) -> Self {
         self.loader = Some(loader);
