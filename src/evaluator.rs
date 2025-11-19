@@ -334,7 +334,11 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
         match expr {
             Expression::Simple(ident) => ident.value.name.clone(),
             Expression::Property(base, prop) => {
-                format!("{}.{}", Self::get_expr_preview(&base.value), prop.value.name)
+                format!(
+                    "{}.{}",
+                    Self::get_expr_preview(&base.value),
+                    prop.value.name
+                )
             }
             Expression::Import(name) => format!("import:{}", name),
             Expression::Literal(s) => format!("\"{}\"", s),
@@ -345,7 +349,11 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
     }
 
     #[async_recursion]
-    async fn evaluate_list(&mut self, list: &CompiledList, span: Option<Span>) -> Result<String, EvalError> {
+    async fn evaluate_list(
+        &mut self,
+        list: &CompiledList,
+        span: Option<Span>,
+    ) -> Result<String, EvalError> {
         // Start tracing this list evaluation
         self.trace_start(format!("[{}]", list.name), OperationType::ListSelect, span);
 
@@ -597,7 +605,11 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
         }
 
         // Start tracing
-        self.trace_start("{...}".to_string(), OperationType::Choice, Some(inline_spanned.span));
+        self.trace_start(
+            "{...}".to_string(),
+            OperationType::Choice,
+            Some(inline_spanned.span),
+        );
 
         // Check if this is a special case (number range, letter range)
         if inline.choices.len() == 1 {
@@ -611,7 +623,8 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                             // Store inline list content for tracing
                             if self.trace_enabled {
                                 if let Some(node) = self.trace_stack.last_mut() {
-                                    node.inline_list_content = Some(format!("{{{}-{}}}", start, end));
+                                    node.inline_list_content =
+                                        Some(format!("{{{}-{}}}", start, end));
                                 }
                             }
 
@@ -627,7 +640,8 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                             // Store inline list content for tracing
                             if self.trace_enabled {
                                 if let Some(node) = self.trace_stack.last_mut() {
-                                    node.inline_list_content = Some(format!("{{{}-{}}}", start, end));
+                                    node.inline_list_content =
+                                        Some(format!("{{{}-{}}}", start, end));
                                 }
                             }
 
@@ -1224,8 +1238,8 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
 
                     // Set source template and generator name for all child nodes
                     if let Some(source) = self.import_sources.get(generator_name) {
-                        imported_evaluator = imported_evaluator
-                            .with_source(source.clone(), generator_name.clone());
+                        imported_evaluator =
+                            imported_evaluator.with_source(source.clone(), generator_name.clone());
                     }
                 }
 
