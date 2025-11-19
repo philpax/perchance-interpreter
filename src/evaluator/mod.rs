@@ -28,23 +28,22 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 /// Evaluator executes compiled programs with RNG support
-#[allow(private_interfaces)]
 pub struct Evaluator<'a, R: Rng> {
-    pub(super) program: &'a CompiledProgram,
-    pub(super) rng: &'a mut R,
-    pub(super) variables: HashMap<String, Value>,
-    pub(super) last_number: Option<i64>, // Track last number for {s} pluralization
-    pub(super) current_item: Option<CompiledItem>, // Track current item for `this` keyword
-    pub(super) dynamic_properties: HashMap<String, Value>, // Track dynamic properties assigned via `this.property = value`
-    pub(super) consumable_lists: HashMap<String, ConsumableListState>, // Track consumable lists
-    pub(super) consumable_list_counter: usize,             // Counter for generating unique IDs
-    pub(super) loader: Option<Arc<dyn GeneratorLoader>>,   // Generator loader for imports
-    pub(super) import_cache: HashMap<String, CompiledProgram>, // Cache for imported generators
-    pub(super) import_sources: HashMap<String, String>,    // Cache for import source templates
-    pub(super) trace_enabled: bool,                        // Whether to collect trace information
-    pub(super) trace_stack: Vec<TraceNode>,                // Stack of trace nodes being built
-    pub(super) current_source_template: Option<String>,    // Current source template for tracing
-    pub(super) current_generator_name: Option<String>,     // Current generator name for tracing
+    program: &'a CompiledProgram,
+    rng: &'a mut R,
+    variables: HashMap<String, Value>,
+    last_number: Option<i64>, // Track last number for {s} pluralization
+    current_item: Option<CompiledItem>, // Track current item for `this` keyword
+    dynamic_properties: HashMap<String, Value>, // Track dynamic properties assigned via `this.property = value`
+    consumable_lists: HashMap<String, ConsumableListState>, // Track consumable lists
+    consumable_list_counter: usize,             // Counter for generating unique IDs
+    loader: Option<Arc<dyn GeneratorLoader>>,   // Generator loader for imports
+    import_cache: HashMap<String, CompiledProgram>, // Cache for imported generators
+    import_sources: HashMap<String, String>,    // Cache for import source templates
+    trace_enabled: bool,                        // Whether to collect trace information
+    trace_stack: Vec<TraceNode>,                // Stack of trace nodes being built
+    current_source_template: Option<String>,    // Current source template for tracing
+    current_generator_name: Option<String>,     // Current generator name for tracing
 }
 
 impl<'a, R: Rng + Send> Evaluator<'a, R> {
