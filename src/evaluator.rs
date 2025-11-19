@@ -250,16 +250,16 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
         // Priority order: $output, output, then last list
         // Check for $output list first (top-level $output = ...)
         let result = if let Some(output_list) = self.program.get_list("$output") {
-            self.evaluate_list(output_list).await
+            self.evaluate_list(output_list, None).await
         } else {
             // Check for output list
             match self.program.get_list("output") {
-                Some(output_list) => self.evaluate_list(output_list).await,
+                Some(output_list) => self.evaluate_list(output_list, None).await,
                 None => {
                     // Default to the last list if no "output" list is defined
                     if let Some(last_list_name) = self.program.list_order.last() {
                         if let Some(last_list) = self.program.get_list(last_list_name) {
-                            self.evaluate_list(last_list).await
+                            self.evaluate_list(last_list, None).await
                         } else {
                             Err(EvalError::UndefinedList {
                                 name: "output".to_string(),
@@ -327,9 +327,9 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
     }
 
     #[async_recursion]
-    async fn evaluate_list(&mut self, list: &CompiledList) -> Result<String, EvalError> {
+    async fn evaluate_list(&mut self, list: &CompiledList, span: Option<Span>) -> Result<String, EvalError> {
         // Start tracing this list evaluation
-        self.trace_start(format!("[{}]", list.name), OperationType::ListSelect, None);
+        self.trace_start(format!("[{}]", list.name), OperationType::ListSelect, span);
 
         if list.items.is_empty() && list.output.is_none() {
             return Err(EvalError::EmptyList {
@@ -398,7 +398,7 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
             let idx = self.rng.gen_range(0..sublist_names.len());
             let sublist_name = &sublist_names[idx];
             let sublist = item.sublists.get(sublist_name).unwrap();
-            let result = self.evaluate_list(sublist).await;
+            let result = self.evaluate_list(sublist, None).await;
 
             // End trace
             if let Ok(ref output) = result {
@@ -816,7 +816,7 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
 
                 // Otherwise, look up the list and evaluate it
                 match self.program.get_list(&ident.name) {
-                    Some(list) => self.evaluate_list(list).await,
+                    Some(list) => self.evaluate_list(list, Some(span)).await,
                     None => Err(EvalError::UndefinedList {
                         name: ident.name.clone(),
                         span,
@@ -849,7 +849,7 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                             // Direct property access
                             if let Some(sublist) = item.sublists.get(&prop.name) {
                                 let sublist_clone = sublist.clone();
-                                return self.evaluate_list(&sublist_clone).await;
+                                return self.evaluate_list(&sublist_clone, Some(span)).await;
                             }
 
                             // If the item has exactly one sublist, delegate to it
@@ -859,7 +859,7 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                                 for subitem in &single_sublist.items {
                                     if let Some(target_sublist) = subitem.sublists.get(&prop.name) {
                                         let target_clone = target_sublist.clone();
-                                        return self.evaluate_list(&target_clone).await;
+                                        return self.evaluate_list(&target_clone, Some(span)).await;
                                     }
                                 }
                             }
@@ -1403,9 +1403,9 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                             name: name.clone(),
                             span: Span::dummy(),
                         })?;
-                self.evaluate_list(list).await
+                self.evaluate_list(list, None).await
             }
-            Value::ListInstance(list) => self.evaluate_list(&list).await,
+            Value::ListInstance(list) => self.evaluate_list(&list, None).await,
             Value::ItemInstance(item) => {
                 // Evaluate the item's content
                 // If it has sublists, pick one randomly
@@ -1414,7 +1414,7 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                     let idx = self.rng.gen_range(0..sublist_names.len());
                     let sublist_name = &sublist_names[idx];
                     let sublist = item.sublists.get(sublist_name).unwrap();
-                    self.evaluate_list(sublist).await
+                    self.evaluate_list(sublist, None).await
                 } else {
                     self.evaluate_content(&item.content).await
                 }
@@ -1478,7 +1478,7 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                     let sidx = self.rng.gen_range(0..sublist_names.len());
                     let sublist_name = &sublist_names[sidx];
                     let sublist = item.sublists.get(sublist_name).unwrap();
-                    self.evaluate_list(sublist).await
+                    self.evaluate_list(sublist, None).await
                 } else {
                     self.evaluate_content(&item.content).await
                 }
@@ -1531,7 +1531,7 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
         }
 
         // Default: evaluate as text and return as Text value
-        let result = self.evaluate_list(list).await?;
+        let result = self.evaluate_list(list, None).await?;
         Ok(Value::Text(result))
     }
 
@@ -1859,7 +1859,7 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                                 let sublist_names: Vec<_> = item.sublists.keys().cloned().collect();
                                 for sublist_name in sublist_names {
                                     if let Some(sublist) = item.sublists.get(&sublist_name) {
-                                        results.push(self.evaluate_list(sublist).await?);
+                                        results.push(self.evaluate_list(sublist, None).await?);
                                     }
                                 }
                             } else {
@@ -1875,7 +1875,7 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                                 let sublist_names: Vec<_> = item.sublists.keys().cloned().collect();
                                 for sublist_name in sublist_names {
                                     if let Some(sublist) = item.sublists.get(&sublist_name) {
-                                        results.push(self.evaluate_list(sublist).await?);
+                                        results.push(self.evaluate_list(sublist, None).await?);
                                     }
                                 }
                             } else {
@@ -1993,7 +1993,7 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                                 let idx = self.rng.gen_range(0..sublist_names.len());
                                 let sublist_name = &sublist_names[idx];
                                 if let Some(sublist) = item.sublists.get(sublist_name) {
-                                    results.push(self.evaluate_list(sublist).await?);
+                                    results.push(self.evaluate_list(sublist, None).await?);
                                 }
                             } else {
                                 results.push(self.evaluate_content(&item.content).await?);
@@ -2013,7 +2013,7 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                                 let idx = self.rng.gen_range(0..sublist_names.len());
                                 let sublist_name = &sublist_names[idx];
                                 if let Some(sublist) = item.sublists.get(sublist_name) {
-                                    results.push(self.evaluate_list(sublist).await?);
+                                    results.push(self.evaluate_list(sublist, None).await?);
                                 }
                             } else {
                                 results.push(self.evaluate_content(&item.content).await?);
@@ -2151,7 +2151,7 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                                 let sidx = self.rng.gen_range(0..sublist_names.len());
                                 let sublist_name = &sublist_names[sidx];
                                 if let Some(sublist) = item.sublists.get(sublist_name) {
-                                    results.push(self.evaluate_list(sublist).await?);
+                                    results.push(self.evaluate_list(sublist, None).await?);
                                 }
                             } else {
                                 results.push(self.evaluate_content(&item.content).await?);
@@ -2184,7 +2184,7 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                                 let sidx = self.rng.gen_range(0..sublist_names.len());
                                 let sublist_name = &sublist_names[sidx];
                                 if let Some(sublist) = item.sublists.get(sublist_name) {
-                                    results.push(self.evaluate_list(sublist).await?);
+                                    results.push(self.evaluate_list(sublist, None).await?);
                                 }
                             } else {
                                 results.push(self.evaluate_content(&item.content).await?);
