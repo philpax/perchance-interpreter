@@ -21,6 +21,7 @@ pub mod evaluator;
 pub mod loader;
 pub mod parser;
 pub mod span;
+pub mod trace;
 
 #[cfg(feature = "builtin-generators")]
 pub mod builtin_generators;
@@ -35,6 +36,7 @@ pub use compiler::{CompileError, CompiledProgram};
 pub use evaluator::EvalError;
 pub use loader::GeneratorLoader;
 pub use parser::ParseError;
+pub use trace::{OperationType, TraceNode, TraceResult};
 
 /// Combined error type for the interpreter
 #[derive(Debug)]
@@ -80,17 +82,29 @@ pub struct EvaluateOptions<R: Rng + Send> {
     pub rng: R,
     /// Generator loader for imports (optional, defaults to BuiltinGeneratorsLoader if available)
     pub loader: Option<Arc<dyn GeneratorLoader>>,
+    /// Enable trace collection
+    pub trace: bool,
 }
 
 impl<R: Rng + Send> EvaluateOptions<R> {
     /// Create new options with provided RNG
     pub fn new(rng: R) -> Self {
-        EvaluateOptions { rng, loader: None }
+        EvaluateOptions {
+            rng,
+            loader: None,
+            trace: false,
+        }
     }
 
     /// Set the loader
     pub fn with_loader(mut self, loader: Arc<dyn GeneratorLoader>) -> Self {
         self.loader = Some(loader);
+        self
+    }
+
+    /// Enable tracing
+    pub fn with_trace(mut self) -> Self {
+        self.trace = true;
         self
     }
 }
@@ -163,8 +177,63 @@ pub async fn evaluate<R: Rng + Send>(
     if let Some(loader) = loader {
         evaluator = evaluator.with_loader(loader);
     }
+    if options.trace {
+        evaluator = evaluator.with_tracing();
+    }
 
     evaluator.evaluate().await
+}
+
+/// Evaluate a compiled program with tracing enabled
+///
+/// Returns both the output string and the trace tree.
+///
+/// # Example
+/// ```
+/// # tokio_test::block_on(async {
+/// use perchance_interpreter::{parse, compile, evaluate_with_trace, EvaluateOptions};
+/// use rand::SeedableRng;
+/// use rand::rngs::StdRng;
+///
+/// let template = "animal\n\tdog\n\tcat\n\noutput\n\t[animal]\n";
+/// let program = parse(template).unwrap();
+/// let compiled = compile(&program).unwrap();
+///
+/// let rng = StdRng::seed_from_u64(42);
+/// let options = EvaluateOptions::new(rng);
+/// let (result, trace) = evaluate_with_trace(&compiled, options).await.unwrap();
+/// # });
+/// ```
+pub async fn evaluate_with_trace<R: Rng + Send>(
+    program: &CompiledProgram,
+    mut options: EvaluateOptions<R>,
+) -> Result<(String, TraceNode), EvalError> {
+    // Get or create default loader
+    let loader = if let Some(loader) = options.loader {
+        Some(loader)
+    } else {
+        #[cfg(feature = "builtin-generators")]
+        {
+            Some(Arc::new(loader::BuiltinGeneratorsLoader::new()) as Arc<dyn GeneratorLoader>)
+        }
+        #[cfg(not(feature = "builtin-generators"))]
+        {
+            None
+        }
+    };
+
+    // Create evaluator with tracing enabled
+    let mut evaluator = evaluator::Evaluator::new(program, &mut options.rng).with_tracing();
+    if let Some(loader) = loader {
+        evaluator = evaluator.with_loader(loader);
+    }
+
+    let output = evaluator.evaluate().await?;
+    let trace = evaluator
+        .take_trace()
+        .unwrap_or_else(|| TraceNode::new("No trace available".to_string(), output.clone()));
+
+    Ok((output, trace))
 }
 
 /// Parse, compile, and evaluate a template in one step
@@ -216,6 +285,37 @@ pub async fn run_with_seed(
         options = options.with_loader(loader);
     }
     run(template, options).await
+}
+
+/// Parse, compile, and evaluate a template with a seed and tracing
+///
+/// Returns both the output and the complete execution trace.
+///
+/// # Example
+/// ```
+/// # tokio_test::block_on(async {
+/// use perchance_interpreter::run_with_seed_and_trace;
+///
+/// let template = "animal\n\tdog\n\tcat\n\noutput\n\t[animal]\n";
+/// let (result, trace) = run_with_seed_and_trace(template, 42, None).await.unwrap();
+/// println!("Output: {}", result);
+/// println!("Trace: {:?}", trace);
+/// # });
+/// ```
+pub async fn run_with_seed_and_trace(
+    template: &str,
+    seed: u64,
+    loader: Option<Arc<dyn GeneratorLoader>>,
+) -> Result<(String, TraceNode), InterpreterError> {
+    let program = parse(template)?;
+    let compiled = compile(&program)?;
+    let rng = StdRng::seed_from_u64(seed);
+    let mut options = EvaluateOptions::new(rng);
+    if let Some(loader) = loader {
+        options = options.with_loader(loader);
+    }
+    let (output, trace) = evaluate_with_trace(&compiled, options).await?;
+    Ok((output, trace))
 }
 
 /// Get list of available builtin generators

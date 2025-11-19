@@ -3,6 +3,7 @@ use crate::ast::*;
 use crate::compiler::*;
 use crate::loader::GeneratorLoader;
 use crate::span::{Span, Spanned};
+use crate::trace::{OperationType, TraceNode};
 use async_recursion::async_recursion;
 use rand::Rng;
 use std::collections::HashMap;
@@ -126,6 +127,8 @@ pub struct Evaluator<'a, R: Rng> {
     consumable_list_counter: usize,             // Counter for generating unique IDs
     loader: Option<Arc<dyn GeneratorLoader>>,   // Generator loader for imports
     import_cache: HashMap<String, CompiledProgram>, // Cache for imported generators
+    trace_enabled: bool,                        // Whether to collect trace information
+    trace_stack: Vec<TraceNode>,                // Stack of trace nodes being built
 }
 
 impl<'a, R: Rng + Send> Evaluator<'a, R> {
@@ -141,6 +144,62 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
             consumable_list_counter: 0,
             loader: None,
             import_cache: HashMap::new(),
+            trace_enabled: false,
+            trace_stack: Vec::new(),
+        }
+    }
+
+    /// Enable tracing for this evaluator
+    pub fn with_tracing(mut self) -> Self {
+        self.trace_enabled = true;
+        self
+    }
+
+    /// Get the root trace node (call after evaluation completes)
+    pub fn take_trace(&self) -> Option<TraceNode> {
+        if !self.trace_enabled {
+            return None;
+        }
+        // Return the root trace node if it exists
+        self.trace_stack.first().cloned()
+    }
+
+    /// Start a new trace operation
+    fn trace_start(&mut self, operation: String, op_type: OperationType, span: Option<Span>) {
+        if !self.trace_enabled {
+            return;
+        }
+        let mut node = TraceNode::new(operation, String::new()).with_type(op_type);
+        if let Some(s) = span {
+            node = node.with_span(s);
+        }
+        self.trace_stack.push(node);
+    }
+
+    /// Complete the current trace operation with a result
+    fn trace_end(&mut self, result: String) {
+        if !self.trace_enabled {
+            return;
+        }
+        if let Some(mut node) = self.trace_stack.pop() {
+            node.result = result;
+            // If there's a parent, add this as a child; otherwise it's the root
+            if let Some(parent) = self.trace_stack.last_mut() {
+                parent.add_child(node);
+            } else {
+                // This is the root node, keep it
+                self.trace_stack.push(node);
+            }
+        }
+    }
+
+    /// Add a child trace to the current operation
+    fn trace_add_child(&mut self, child: TraceNode) {
+        if !self.trace_enabled {
+            return;
+        }
+        if let Some(parent) = self.trace_stack.last_mut() {
+            parent.add_child(child);
         }
     }
 
@@ -190,38 +249,51 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
     }
 
     pub async fn evaluate(&mut self) -> Result<String, EvalError> {
+        // Start root trace
+        self.trace_start("Evaluate program".to_string(), OperationType::Root, None);
+
         // Priority order: $output, output, then last list
         // Check for $output list first (top-level $output = ...)
-        if let Some(output_list) = self.program.get_list("$output") {
-            return self.evaluate_list(output_list).await;
-        }
-
-        // Check for output list
-        match self.program.get_list("output") {
-            Some(output_list) => self.evaluate_list(output_list).await,
-            None => {
-                // Default to the last list if no "output" list is defined
-                if let Some(last_list_name) = self.program.list_order.last() {
-                    if let Some(last_list) = self.program.get_list(last_list_name) {
-                        self.evaluate_list(last_list).await
+        let result = if let Some(output_list) = self.program.get_list("$output") {
+            self.evaluate_list(output_list).await
+        } else {
+            // Check for output list
+            match self.program.get_list("output") {
+                Some(output_list) => self.evaluate_list(output_list).await,
+                None => {
+                    // Default to the last list if no "output" list is defined
+                    if let Some(last_list_name) = self.program.list_order.last() {
+                        if let Some(last_list) = self.program.get_list(last_list_name) {
+                            self.evaluate_list(last_list).await
+                        } else {
+                            Err(EvalError::UndefinedList {
+                                name: "output".to_string(),
+                                span: Span::dummy(),
+                            })
+                        }
                     } else {
                         Err(EvalError::UndefinedList {
                             name: "output".to_string(),
                             span: Span::dummy(),
                         })
                     }
-                } else {
-                    Err(EvalError::UndefinedList {
-                        name: "output".to_string(),
-                        span: Span::dummy(),
-                    })
                 }
             }
+        };
+
+        // End root trace
+        if let Ok(ref output) = result {
+            self.trace_end(output.clone());
         }
+
+        result
     }
 
     #[async_recursion]
     async fn evaluate_list(&mut self, list: &CompiledList) -> Result<String, EvalError> {
+        // Start tracing this list evaluation
+        self.trace_start(format!("[{}]", list.name), OperationType::ListSelect, None);
+
         if list.items.is_empty() && list.output.is_none() {
             return Err(EvalError::EmptyList {
                 name: list.name.clone(),
@@ -256,6 +328,11 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
             self.current_item = old_item;
             self.dynamic_properties = old_dynamic_properties;
 
+            // End trace
+            if let Ok(ref output) = result {
+                self.trace_end(output.clone());
+            }
+
             return result;
         }
 
@@ -269,11 +346,25 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
             let idx = self.rng.gen_range(0..sublist_names.len());
             let sublist_name = &sublist_names[idx];
             let sublist = item.sublists.get(sublist_name).unwrap();
-            return self.evaluate_list(sublist).await;
+            let result = self.evaluate_list(sublist).await;
+
+            // End trace
+            if let Ok(ref output) = result {
+                self.trace_end(output.clone());
+            }
+
+            return result;
         }
 
         // Evaluate the item's content
-        self.evaluate_content(&item.content).await
+        let result = self.evaluate_content(&item.content).await;
+
+        // End trace
+        if let Ok(ref output) = result {
+            self.trace_end(output.clone());
+        }
+
+        result
     }
 
     #[async_recursion]

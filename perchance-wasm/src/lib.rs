@@ -1,6 +1,7 @@
-use perchance_interpreter::{compile, diagnostic, evaluate, parse, run_with_seed, EvaluateOptions, InterpreterError};
+use perchance_interpreter::{compile, diagnostic, evaluate, evaluate_with_trace, parse, run_with_seed, run_with_seed_and_trace, EvaluateOptions, InterpreterError, TraceResult};
 use rand::rngs::StdRng;
 use rand::SeedableRng;
+use serde::Serialize;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::future_to_promise;
 
@@ -114,4 +115,20 @@ pub fn get_available_generators() -> JsValue {
         let empty: Vec<String> = Vec::new();
         serde_wasm_bindgen::to_value(&empty).unwrap_or(JsValue::NULL)
     }
+}
+
+/// Evaluate a Perchance template with a specific seed and return both output and trace
+/// Returns a Promise that resolves to a JS object with { output: string, trace: TraceNode }
+#[wasm_bindgen]
+pub fn evaluate_perchance_with_trace(template: String, seed: u64) -> js_sys::Promise {
+    future_to_promise(async move {
+        let template_clone = template.clone();
+        let (output, trace) = run_with_seed_and_trace(&template, seed, None)
+            .await
+            .map_err(|e| JsValue::from_str(&format_error(&template_clone, &e)))?;
+
+        let result = TraceResult::new(output, trace);
+        serde_wasm_bindgen::to_value(&result)
+            .map_err(|e| JsValue::from_str(&format!("Serialization error: {}", e)))
+    })
 }

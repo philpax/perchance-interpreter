@@ -1,8 +1,9 @@
 /// Span tracking for source code positions
+use serde::{Deserialize, Serialize};
 use std::ops::Range;
 
 /// Represents a span in the source code (byte offsets)
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Span {
     pub start: usize,
     pub end: usize,

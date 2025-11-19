@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import init, { evaluate_multiple, get_available_generators } from './wasm/perchance_wasm';
+import init, { evaluate_multiple, get_available_generators, evaluate_perchance_with_trace } from './wasm/perchance_wasm';
 import AutocompleteDropdown from './AutocompleteDropdown';
 import AnsiRenderer from './AnsiRenderer';
+import TraceView, { type TraceNode } from './TraceView';
 
 const DEFAULT_TEMPLATE = `animal
 \tdog
@@ -24,6 +25,7 @@ function App() {
   const [seed, setSeed] = useState<string>('42');
   const [sampleCount, setSampleCount] = useState<number>(5);
   const [samples, setSamples] = useState<string[]>([]);
+  const [selectedTrace, setSelectedTrace] = useState<TraceNode | null>(null);
 
   // Autocomplete state
   const [availableGenerators, setAvailableGenerators] = useState<string[]>([]);
@@ -174,6 +176,20 @@ function App() {
     setShowAutocomplete(false);
   };
 
+  // Generate and show trace for a specific sample
+  const handleShowTrace = async (sampleIndex: number) => {
+    if (!wasmReady) return;
+
+    try {
+      // Calculate the seed for this specific sample
+      const sampleSeed = BigInt(parseInt(seed) || 42) + BigInt(sampleIndex);
+      const result = await evaluate_perchance_with_trace(template, sampleSeed);
+      setSelectedTrace(result.trace);
+    } catch (e) {
+      console.error('Failed to generate trace:', e);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white">
       <div className="container mx-auto px-4 py-8">
@@ -319,6 +335,13 @@ function App() {
                               #{i + 1}
                             </span>
                             <p className="text-gray-100 flex-1">{sample}</p>
+                            <button
+                              onClick={() => handleShowTrace(i)}
+                              className="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white text-xs rounded transition-colors flex-shrink-0"
+                              title="View execution trace"
+                            >
+                              🔍 Trace
+                            </button>
                           </div>
                         </div>
                       ))}
@@ -353,6 +376,14 @@ function App() {
           </p>
         </div>
       </div>
+
+      {/* Trace View Modal */}
+      {selectedTrace && (
+        <TraceView
+          trace={selectedTrace}
+          onClose={() => setSelectedTrace(null)}
+        />
+      )}
     </div>
   );
 }
