@@ -30,6 +30,13 @@ This is a **fully-functional** implementation of core Perchance features:
 - **37 builtin generators**: animals, colors, nouns, countries, and more
 
 ### Advanced Features ✅
+- **Math operations**: Expression evaluation (`+`, `-`, `*`, `/`, `%`) with proper precedence
+- **String concatenation**: `+` operator for combining strings
+- **Dynamic odds**: `^[condition]` syntax for conditional item weights
+- **Property fallback**: `||` operator (e.g., `[a.property || "default"]`)
+- **Variable-count selection**: `selectMany(min, max)` and `selectUnique(min, max)` for random counts
+- **evaluateItem method**: Explicit evaluation before storage
+- **this keyword**: Property assignment syntax (`[this.property = value]`)
 - Deterministic RNG with seeded generation
 - Dynamic sub-list referencing (`[list[variable]]`)
 - Chained property access
@@ -37,7 +44,7 @@ This is a **fully-functional** implementation of core Perchance features:
 - Comments with `//`
 - Two-space or tab indentation
 
-### Test Status: **180/180 tests passing** ✨
+### Test Status: **207/207 tests passing** ✨
 
 ## What Remains to be Done
 
@@ -45,17 +52,7 @@ Features not yet implemented:
 
 - **JavaScript execution** - Inline JavaScript code blocks
 - **Plugin system** - Custom plugin loading
-- **`this` keyword** - Full support with property assignment syntax
-- **HTML/CSS rendering** - Proper handling of HTML tags and styles
-- **Math operations** - Expression evaluation (`+`, `-`, `*`, `/`, `%`)
-- **String concatenation** - `+` operator for strings
-- **Additional features**:
-  - Dynamic odds with `^[condition]` syntax
-  - `evaluateItem` method for explicit evaluation before storage
-  - Property fallback `||` operator (e.g., `[a.property || "default"]`)
-  - Variable-count selection (`selectMany(min, max)`, `selectUnique(min, max)`)
-
-**Note**: Binary `||` IS supported in conditionals (e.g., `[a || b ? "yes" : "no"]`)
+- **HTML/CSS rendering** - Proper HTML/CSS interpretation and styling (basic HTML tag pass-through is supported)
 
 ## Installation
 
