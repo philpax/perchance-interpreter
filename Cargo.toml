@@ -8,6 +8,7 @@ rand = "0.8"
 async-trait = "0.1"
 async-recursion = "1.0"
 ariadne = "0.4"
+serde = { version = "1.0", features = ["derive"] }
 
 # Optional tokio support for file-based loader (not available on WASM)
 tokio = { version = "1", features = [

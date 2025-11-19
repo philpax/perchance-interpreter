@@ -1,4 +1,7 @@
-use perchance_interpreter::{compile, diagnostic, evaluate, parse, run_with_seed, EvaluateOptions, InterpreterError};
+use perchance_interpreter::{
+    compile, diagnostic, evaluate, parse, run_with_seed, run_with_seed_and_trace, EvaluateOptions,
+    InterpreterError, TraceResult,
+};
 use rand::rngs::StdRng;
 use rand::SeedableRng;
 use wasm_bindgen::prelude::*;
@@ -40,7 +43,11 @@ pub fn evaluate_perchance_random(template: String) -> js_sys::Promise {
             .await
             .map(|s| JsValue::from_str(&s))
             .map_err(|e| {
-                JsValue::from_str(&diagnostic::report_eval_error("<input>", &template_clone, &e))
+                JsValue::from_str(&diagnostic::report_eval_error(
+                    "<input>",
+                    &template_clone,
+                    &e,
+                ))
             })
     })
 }
@@ -73,11 +80,13 @@ pub fn evaluate_multiple(template: String, count: u32, seed: Option<u64>) -> js_
             for _ in 0..count {
                 let rng = StdRng::from_entropy();
                 let options = EvaluateOptions::new(rng);
-                let output = evaluate(&compiled, options)
-                    .await
-                    .map_err(|e| {
-                        JsValue::from_str(&diagnostic::report_eval_error("<input>", &template_clone, &e))
-                    })?;
+                let output = evaluate(&compiled, options).await.map_err(|e| {
+                    JsValue::from_str(&diagnostic::report_eval_error(
+                        "<input>",
+                        &template_clone,
+                        &e,
+                    ))
+                })?;
                 results.push(output);
             }
         }
@@ -89,12 +98,11 @@ pub fn evaluate_multiple(template: String, count: u32, seed: Option<u64>) -> js_
 /// Validate a template without evaluating it
 #[wasm_bindgen]
 pub fn validate_template(template: &str) -> Result<(), String> {
-    let program = parse(template).map_err(|e| {
-        diagnostic::report_parse_error("<input>", template, &e)
-    })?;
-    compile(&program).map(|_| ()).map_err(|e| {
-        diagnostic::report_compile_error("<input>", template, &e)
-    })
+    let program =
+        parse(template).map_err(|e| diagnostic::report_parse_error("<input>", template, &e))?;
+    compile(&program)
+        .map(|_| ())
+        .map_err(|e| diagnostic::report_compile_error("<input>", template, &e))
 }
 
 /// Get list of all available builtin generators for autocomplete
@@ -114,4 +122,20 @@ pub fn get_available_generators() -> JsValue {
         let empty: Vec<String> = Vec::new();
         serde_wasm_bindgen::to_value(&empty).unwrap_or(JsValue::NULL)
     }
+}
+
+/// Evaluate a Perchance template with a specific seed and return both output and trace
+/// Returns a Promise that resolves to a JS object with { output: string, trace: TraceNode }
+#[wasm_bindgen]
+pub fn evaluate_perchance_with_trace(template: String, seed: u64) -> js_sys::Promise {
+    future_to_promise(async move {
+        let template_clone = template.clone();
+        let (output, trace) = run_with_seed_and_trace(&template, seed, None)
+            .await
+            .map_err(|e| JsValue::from_str(&format_error(&template_clone, &e)))?;
+
+        let result = TraceResult::new(output, trace);
+        serde_wasm_bindgen::to_value(&result)
+            .map_err(|e| JsValue::from_str(&format!("Serialization error: {}", e)))
+    })
 }
