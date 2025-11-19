@@ -28,6 +28,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 /// Evaluator executes compiled programs with RNG support
+#[allow(private_interfaces)]
 pub struct Evaluator<'a, R: Rng> {
     pub(super) program: &'a CompiledProgram,
     pub(super) rng: &'a mut R,

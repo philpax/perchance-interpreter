@@ -11,7 +11,7 @@
 //! Supported methods include:
 //! - Selection: selectOne, selectAll, selectMany, selectUnique
 //! - Grammar: pluralForm, singularForm, upperCase, lowerCase, titleCase, sentenceCase,
-//!           pastTense, presentTense, futureTense, negativeForm, possessiveForm
+//!   pastTense, presentTense, futureTense, negativeForm, possessiveForm
 //! - List operations: consumableList, joinLists, joinItems
 //! - Item operations: evaluateItem
 
