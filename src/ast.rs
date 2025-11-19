@@ -101,6 +101,19 @@ pub enum Expression {
         Box<Spanned<Expression>>,
     ),
 
+    // Long-form if/else: if (cond) {expr} else if (cond) {expr} else {expr}
+    IfElse {
+        condition: Box<Spanned<Expression>>,
+        then_expr: Box<Spanned<Expression>>,
+        else_expr: Option<Box<Spanned<Expression>>>, // Can be another IfElse for chaining
+    },
+
+    // Repeat: repeat(n) {expr}
+    Repeat {
+        count: Box<Spanned<Expression>>,
+        body: Box<Spanned<Expression>>,
+    },
+
     // Binary operations: ==, !=, <, >, <=, >=, &&, ||
     BinaryOp(
         Box<Spanned<Expression>>,

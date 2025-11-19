@@ -485,6 +485,18 @@ impl Parser {
 
     fn parse_ternary_expression(&mut self) -> Result<Spanned<Expression>, ParseError> {
         let start = self.current_pos();
+        self.skip_spaces();
+
+        // Check for long-form if/else first
+        if self.peek_keyword("if") {
+            return self.parse_if_else();
+        }
+
+        // Check for repeat construct
+        if self.peek_keyword("repeat") {
+            return self.parse_repeat();
+        }
+
         // Parse ternary conditional: condition ? true_expr : false_expr
         let first = self.parse_or_expression()?;
 
@@ -514,6 +526,211 @@ impl Parser {
         }
 
         Ok(first)
+    }
+
+    fn parse_if_else(&mut self) -> Result<Spanned<Expression>, ParseError> {
+        let start = self.current_pos();
+
+        // Consume 'if'
+        self.consume_keyword("if")?;
+        self.skip_spaces();
+
+        // Parse condition in parentheses
+        if self.peek_char() != Some('(') {
+            let span = self.make_span(self.pos, self.pos + 1);
+            return Err(ParseError::InvalidSyntax {
+                message: "Expected '(' after 'if'".to_string(),
+                span,
+            });
+        }
+        self.consume_char('(');
+        self.skip_spaces();
+
+        let condition = self.parse_expression()?;
+
+        self.skip_spaces();
+        if self.peek_char() != Some(')') {
+            let span = self.make_span(self.pos, self.pos + 1);
+            return Err(ParseError::InvalidSyntax {
+                message: "Expected ')' after if condition".to_string(),
+                span,
+            });
+        }
+        self.consume_char(')');
+        self.skip_spaces();
+
+        // Parse then expression in curly braces
+        if self.peek_char() != Some('{') {
+            let span = self.make_span(self.pos, self.pos + 1);
+            return Err(ParseError::InvalidSyntax {
+                message: "Expected '{' after if condition".to_string(),
+                span,
+            });
+        }
+        self.consume_char('{');
+        self.skip_spaces();
+
+        let then_expr = self.parse_expression()?;
+
+        self.skip_spaces();
+        if self.peek_char() != Some('}') {
+            let span = self.make_span(self.pos, self.pos + 1);
+            return Err(ParseError::InvalidSyntax {
+                message: "Expected '}' after if body".to_string(),
+                span,
+            });
+        }
+        self.consume_char('}');
+        self.skip_spaces();
+
+        // Check for else
+        let else_expr = if self.peek_keyword("else") {
+            self.consume_keyword("else")?;
+            self.skip_spaces();
+
+            // Check if it's an 'else if' (recursive)
+            if self.peek_keyword("if") {
+                Some(Box::new(self.parse_if_else()?))
+            } else {
+                // Regular else with curly braces
+                if self.peek_char() != Some('{') {
+                    let span = self.make_span(self.pos, self.pos + 1);
+                    return Err(ParseError::InvalidSyntax {
+                        message: "Expected '{' after 'else'".to_string(),
+                        span,
+                    });
+                }
+                self.consume_char('{');
+                self.skip_spaces();
+
+                let expr = self.parse_expression()?;
+
+                self.skip_spaces();
+                if self.peek_char() != Some('}') {
+                    let span = self.make_span(self.pos, self.pos + 1);
+                    return Err(ParseError::InvalidSyntax {
+                        message: "Expected '}' after else body".to_string(),
+                        span,
+                    });
+                }
+                self.consume_char('}');
+
+                Some(Box::new(expr))
+            }
+        } else {
+            None
+        };
+
+        let span = self.span_from(start);
+        Ok(Spanned::new(
+            Expression::IfElse {
+                condition: Box::new(condition),
+                then_expr: Box::new(then_expr),
+                else_expr,
+            },
+            span,
+        ))
+    }
+
+    fn peek_keyword(&self, keyword: &str) -> bool {
+        let keyword_chars: Vec<char> = keyword.chars().collect();
+        let remaining = &self.input[self.pos..];
+
+        // Check if remaining starts with keyword
+        if remaining.len() < keyword_chars.len() {
+            return false;
+        }
+
+        if &remaining[..keyword_chars.len()] == keyword_chars.as_slice() {
+            // Check that it's not part of a longer identifier
+            let after_pos = self.pos + keyword_chars.len();
+            if after_pos < self.input.len() {
+                let next_char = self.input[after_pos];
+                if next_char.is_alphanumeric() || next_char == '_' {
+                    return false;
+                }
+            }
+            true
+        } else {
+            false
+        }
+    }
+
+    fn consume_keyword(&mut self, keyword: &str) -> Result<(), ParseError> {
+        if self.peek_keyword(keyword) {
+            self.pos += keyword.len();
+            Ok(())
+        } else {
+            let span = self.make_span(self.pos, self.pos + 1);
+            Err(ParseError::InvalidSyntax {
+                message: format!("Expected keyword '{}'", keyword),
+                span,
+            })
+        }
+    }
+
+    fn parse_repeat(&mut self) -> Result<Spanned<Expression>, ParseError> {
+        let start = self.current_pos();
+
+        // Consume 'repeat'
+        self.consume_keyword("repeat")?;
+        self.skip_spaces();
+
+        // Parse count in parentheses
+        if self.peek_char() != Some('(') {
+            let span = self.make_span(self.pos, self.pos + 1);
+            return Err(ParseError::InvalidSyntax {
+                message: "Expected '(' after 'repeat'".to_string(),
+                span,
+            });
+        }
+        self.consume_char('(');
+        self.skip_spaces();
+
+        let count = self.parse_expression()?;
+
+        self.skip_spaces();
+        if self.peek_char() != Some(')') {
+            let span = self.make_span(self.pos, self.pos + 1);
+            return Err(ParseError::InvalidSyntax {
+                message: "Expected ')' after repeat count".to_string(),
+                span,
+            });
+        }
+        self.consume_char(')');
+        self.skip_spaces();
+
+        // Parse body in curly braces
+        if self.peek_char() != Some('{') {
+            let span = self.make_span(self.pos, self.pos + 1);
+            return Err(ParseError::InvalidSyntax {
+                message: "Expected '{' after repeat count".to_string(),
+                span,
+            });
+        }
+        self.consume_char('{');
+        self.skip_spaces();
+
+        let body = self.parse_expression()?;
+
+        self.skip_spaces();
+        if self.peek_char() != Some('}') {
+            let span = self.make_span(self.pos, self.pos + 1);
+            return Err(ParseError::InvalidSyntax {
+                message: "Expected '}' after repeat body".to_string(),
+                span,
+            });
+        }
+        self.consume_char('}');
+
+        let span = self.span_from(start);
+        Ok(Spanned::new(
+            Expression::Repeat {
+                count: Box::new(count),
+                body: Box::new(body),
+            },
+            span,
+        ))
     }
 
     fn parse_or_expression(&mut self) -> Result<Spanned<Expression>, ParseError> {

@@ -532,6 +532,8 @@ The following features ARE implemented in this interpreter:
 - ✅ **Variable-count selection** - `selectMany(min, max)` and `selectUnique(min, max)` for random counts
 - ✅ **`this` keyword** - Property assignment syntax (`[this.property = value]`)
 - ✅ Ternary operator for conditionals (`?:`)
+- ✅ **Long-form if/else statements** - `if (cond) {expr} else if (cond) {expr} else {expr}` syntax
+- ✅ **Repeat construct** - `repeat(n) {expr}` for repetition
 - ✅ Binary operators for comparisons and logic
 
 ## Out of Scope (Not Implemented)
@@ -542,8 +544,7 @@ The following features from the full Perchance system are **not** implemented in
 - Plugin system
 - HTML/CSS rendering (HTML tags are passed through as-is, but not rendered)
 - User input handling
-- Long-form if/else statements (ternary operator `?:` is supported as alternative)
-- Loops and repetition constructs (use `selectMany` instead)
+- Traditional `for`/`while` loops (use `repeat(n)`, `selectMany(n)`, or `selectUnique(n)` instead)
 
 ## Grammar Summary
 
