@@ -279,6 +279,48 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
         result
     }
 
+    /// Get a simple text preview of item content (for trace display)
+    fn get_item_preview(&self, content: &[Spanned<ContentPart>]) -> String {
+        let mut preview = String::new();
+        for part in content.iter().take(3) {
+            // Limit to first 3 parts
+            match &part.value {
+                ContentPart::Text(text) => preview.push_str(text),
+                ContentPart::Reference(expr) => {
+                    preview.push_str(&format!("[{}]", self.get_expr_preview(&expr.value)))
+                }
+                ContentPart::Inline(_) => preview.push_str("{...}"),
+                ContentPart::Article => preview.push_str("{a}"),
+                ContentPart::Pluralize => preview.push_str("{s}"),
+                ContentPart::Escape(ch) => preview.push(*ch),
+            }
+            if preview.len() > 50 {
+                preview.truncate(50);
+                preview.push_str("...");
+                break;
+            }
+        }
+        if preview.is_empty() {
+            preview = "(empty)".to_string();
+        }
+        preview
+    }
+
+    /// Get a simple preview of an expression
+    fn get_expr_preview(&self, expr: &Expression) -> String {
+        match expr {
+            Expression::Simple(ident) => ident.value.name.clone(),
+            Expression::Property(base, prop) => {
+                format!("{}.{}", self.get_expr_preview(&base.value), prop.value.name)
+            }
+            Expression::Import(name) => format!("import:{}", name),
+            Expression::Literal(s) => format!("\"{}\"", s),
+            Expression::Number(n) => n.to_string(),
+            Expression::NumberRange(a, b) => format!("{{{}-{}}}", a, b),
+            _ => "...".to_string(),
+        }
+    }
+
     #[async_recursion]
     async fn evaluate_list(&mut self, list: &CompiledList) -> Result<String, EvalError> {
         // Start tracing this list evaluation
@@ -292,14 +334,29 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
         }
 
         // Select an item based on weights (if there are items)
-        let item = if !list.items.is_empty() {
-            Some(
-                self.select_weighted_item(&list.items, list.total_weight)
-                    .await?
-                    .clone(),
-            )
+        let (item_opt, _selected_idx) = if !list.items.is_empty() {
+            // Get previews of all items for trace
+            let item_previews: Vec<String> = list
+                .items
+                .iter()
+                .map(|item| self.get_item_preview(&item.content))
+                .collect();
+
+            let (selected_item, idx) = self
+                .select_weighted_item(&list.items, list.total_weight)
+                .await?;
+
+            // Store trace info about the selection
+            if self.trace_enabled {
+                if let Some(node) = self.trace_stack.last_mut() {
+                    node.available_items = Some(item_previews);
+                    node.selected_index = Some(idx);
+                }
+            }
+
+            (Some(selected_item.clone()), idx)
         } else {
-            None
+            (None, 0)
         };
 
         // Check if list has $output property
@@ -308,7 +365,7 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
             let old_item = self.current_item.take();
             let old_dynamic_properties = std::mem::take(&mut self.dynamic_properties);
 
-            if let Some(ref selected_item) = item {
+            if let Some(ref selected_item) = item_opt {
                 self.current_item = Some(selected_item.clone());
             }
 
@@ -327,7 +384,7 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
         }
 
         // No $output, use normal evaluation
-        let item = item.unwrap(); // Safe because we checked items.is_empty() above
+        let item = item_opt.unwrap(); // Safe because we checked items.is_empty() above
 
         // If the item has sublists, first select a sublist, then select from it
         if !item.sublists.is_empty() {
@@ -362,7 +419,7 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
         &mut self,
         items: &'b [CompiledItem],
         _total_weight: f64,
-    ) -> Result<&'b CompiledItem, EvalError> {
+    ) -> Result<(&'b CompiledItem, usize), EvalError> {
         if items.is_empty() {
             return Err(EvalError::EmptyList {
                 name: "(anonymous)".to_string(),
@@ -406,12 +463,13 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
         for (i, weight) in actual_weights.iter().enumerate() {
             cumulative += weight;
             if random_value < cumulative {
-                return Ok(&items[i]);
+                return Ok((&items[i], i));
             }
         }
 
         // Fallback to last item (in case of floating point errors)
-        Ok(&items[items.len() - 1])
+        let last_idx = items.len() - 1;
+        Ok((&items[last_idx], last_idx))
     }
 
     #[async_recursion]
@@ -1047,6 +1105,14 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
 
             Expression::Import(generator_name) => {
                 let span = expr_span;
+
+                // Start trace for import
+                self.trace_start(
+                    format!("{{import:{}}}", generator_name),
+                    OperationType::Import,
+                    Some(span),
+                );
+
                 // Load the imported generator
                 let imported_program = self.load_import(generator_name, span).await?.clone();
 
@@ -1061,8 +1127,27 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                 // Share the import cache
                 imported_evaluator.import_cache = self.import_cache.clone();
 
+                // Enable tracing for the imported evaluator if we're tracing
+                if self.trace_enabled {
+                    imported_evaluator = imported_evaluator.with_tracing();
+                }
+
                 // Evaluate the imported generator
-                imported_evaluator.evaluate().await
+                let result = imported_evaluator.evaluate().await;
+
+                // If we're tracing, add the imported trace as a child
+                if let Ok(ref output) = result {
+                    if self.trace_enabled {
+                        if let Some(imported_trace) = imported_evaluator.take_trace() {
+                            if let Some(node) = self.trace_stack.last_mut() {
+                                node.add_child(imported_trace);
+                            }
+                        }
+                    }
+                    self.trace_end(output.clone());
+                }
+
+                result
             }
         }
     }
@@ -1585,10 +1670,10 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                             }
                         })?;
 
-                        let item = self
+                        let (item_ref, _idx) = self
                             .select_weighted_item(&list.items, list.total_weight)
-                            .await?
-                            .clone();
+                            .await?;
+                        let item = item_ref.clone();
 
                         // If item has sublists (properties), return the item instance
                         // so properties can be accessed later
@@ -1601,10 +1686,10 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                         Ok(Value::Text(result))
                     }
                     Value::ListInstance(list) => {
-                        let item = self
+                        let (item_ref, _idx) = self
                             .select_weighted_item(&list.items, list.total_weight)
-                            .await?
-                            .clone();
+                            .await?;
+                        let item = item_ref.clone();
 
                         // If item has sublists (properties), return the item instance
                         if !item.sublists.is_empty() {
@@ -1820,10 +1905,10 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
 
                         let mut results = Vec::new();
                         for _ in 0..n {
-                            let item = self
+                            let (item_ref, _idx) = self
                                 .select_weighted_item(&list.items, list.total_weight)
-                                .await?
-                                .clone();
+                                .await?;
+                            let item = item_ref.clone();
                             if !item.sublists.is_empty() {
                                 let sublist_names: Vec<_> = item.sublists.keys().cloned().collect();
                                 let idx = self.rng.gen_range(0..sublist_names.len());
@@ -1840,10 +1925,10 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                     Value::ListInstance(list) => {
                         let mut results = Vec::new();
                         for _ in 0..n {
-                            let item = self
+                            let (item_ref, _idx) = self
                                 .select_weighted_item(&list.items, list.total_weight)
-                                .await?
-                                .clone();
+                                .await?;
+                            let item = item_ref.clone();
                             if !item.sublists.is_empty() {
                                 let sublist_names: Vec<_> = item.sublists.keys().cloned().collect();
                                 let idx = self.rng.gen_range(0..sublist_names.len());

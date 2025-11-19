@@ -7,6 +7,9 @@ export interface TraceNode {
   rng_seed?: number;
   children: TraceNode[];
   operation_type?: string;
+  available_items?: string[];
+  selected_index?: number;
+  interpolation_context?: string;
 }
 
 interface TraceViewProps {
@@ -16,81 +19,129 @@ interface TraceViewProps {
 
 interface TraceNodeComponentProps {
   node: TraceNode;
-  depth: number;
+  isRoot?: boolean;
 }
 
-function TraceNodeComponent({ node, depth }: TraceNodeComponentProps) {
-  const [isExpanded, setIsExpanded] = useState(depth < 2); // Auto-expand first 2 levels
+function TraceNodeComponent({ node, isRoot = false }: TraceNodeComponentProps) {
+  const [isExpanded, setIsExpanded] = useState(true);
 
   const hasChildren = node.children && node.children.length > 0;
-  const indentClass = depth > 0 ? 'ml-4 pl-4 border-l-2 border-slate-600' : '';
 
   // Color based on operation type
-  const getTypeColor = (type?: string) => {
+  const getTypeBgColor = (type?: string) => {
     switch (type) {
       case 'root':
-        return 'text-purple-400';
+        return 'bg-purple-900/30 border-purple-600/40';
       case 'listselect':
-        return 'text-blue-400';
+        return 'bg-blue-900/30 border-blue-600/40';
       case 'import':
-        return 'text-green-400';
+        return 'bg-green-900/30 border-green-600/40';
       case 'range':
-        return 'text-yellow-400';
+        return 'bg-yellow-900/30 border-yellow-600/40';
       case 'choice':
-        return 'text-pink-400';
+        return 'bg-pink-900/30 border-pink-600/40';
       case 'methodcall':
-        return 'text-cyan-400';
+        return 'bg-cyan-900/30 border-cyan-600/40';
       default:
-        return 'text-gray-400';
+        return 'bg-slate-800/50 border-slate-600/40';
     }
   };
 
-  const typeColor = getTypeColor(node.operation_type);
+  const getTypeTextColor = (type?: string) => {
+    switch (type) {
+      case 'root':
+        return 'text-purple-300';
+      case 'listselect':
+        return 'text-blue-300';
+      case 'import':
+        return 'text-green-300';
+      case 'range':
+        return 'text-yellow-300';
+      case 'choice':
+        return 'text-pink-300';
+      case 'methodcall':
+        return 'text-cyan-300';
+      default:
+        return 'text-gray-300';
+    }
+  };
+
+  const bgColor = getTypeBgColor(node.operation_type);
+  const textColor = getTypeTextColor(node.operation_type);
 
   return (
-    <div className={`${indentClass} mb-2`}>
-      <div
-        className={`bg-slate-800/50 rounded-lg p-3 transition-all ${
-          hasChildren ? 'cursor-pointer hover:bg-slate-800' : ''
-        }`}
-        onClick={() => hasChildren && setIsExpanded(!isExpanded)}
-      >
-        <div className="flex items-start gap-2">
+    <div className={isRoot ? '' : 'ml-6 border-l-2 border-slate-700/50 pl-3'}>
+      <div className={`${bgColor} border rounded px-2 py-1 mb-1`}>
+        {/* Header row */}
+        <div className="flex items-center gap-2">
           {hasChildren && (
-            <span className="text-gray-500 select-none flex-shrink-0 mt-0.5">
+            <button
+              onClick={() => setIsExpanded(!isExpanded)}
+              className="text-xs text-gray-500 hover:text-gray-300 flex-shrink-0"
+            >
               {isExpanded ? '▼' : '▶'}
+            </button>
+          )}
+          <code className={`font-mono text-xs ${textColor} font-semibold`}>
+            {node.operation}
+          </code>
+          {node.operation_type && (
+            <span className="text-[10px] px-1.5 py-0.5 bg-slate-900/50 rounded text-gray-500">
+              {node.operation_type}
             </span>
           )}
-          <div className="flex-1 min-w-0">
-            <div className="flex items-start gap-3 flex-wrap">
-              <code className={`font-mono text-sm ${typeColor} font-semibold`}>
-                {node.operation}
-              </code>
-              {node.operation_type && (
-                <span className="text-xs px-2 py-0.5 bg-slate-700 rounded text-gray-400">
-                  {node.operation_type}
-                </span>
-              )}
+        </div>
+
+        {/* Available items (horizontal scrollable) */}
+        {node.available_items && node.available_items.length > 0 && (
+          <div className="mt-1">
+            <div className="flex gap-1 overflow-x-auto pb-1 scrollbar-thin scrollbar-thumb-slate-600 scrollbar-track-slate-800">
+              {node.available_items.map((item, i) => (
+                <div
+                  key={i}
+                  className={`flex-shrink-0 px-2 py-0.5 rounded text-xs ${
+                    i === node.selected_index
+                      ? 'bg-purple-600/40 border border-purple-500/60 text-white font-semibold'
+                      : 'bg-slate-700/50 border border-slate-600/40 text-gray-400'
+                  }`}
+                  title={item}
+                >
+                  <span className="text-[10px] text-gray-500 mr-1">{i}:</span>
+                  {item.length > 30 ? item.substring(0, 30) + '...' : item}
+                </div>
+              ))}
             </div>
-            <div className="mt-2 flex items-start gap-2">
-              <span className="text-xs text-gray-500 flex-shrink-0">→</span>
-              <div className="text-sm text-gray-200 bg-slate-900/50 px-3 py-1.5 rounded flex-1 min-w-0 break-words">
-                {node.result || <span className="text-gray-600 italic">(empty)</span>}
-              </div>
-            </div>
-            {node.span && (
-              <div className="mt-1 text-xs text-gray-600">
-                Position: {node.span.start}-{node.span.end}
-              </div>
-            )}
+          </div>
+        )}
+
+        {/* Result */}
+        <div className="mt-1 flex items-start gap-1">
+          <span className="text-[10px] text-gray-600 flex-shrink-0 mt-0.5">→</span>
+          <div className="text-xs text-gray-100 bg-slate-900/70 px-2 py-0.5 rounded flex-1 min-w-0 break-words font-mono">
+            {node.result || <span className="text-gray-600 italic">(empty)</span>}
           </div>
         </div>
+
+        {/* Interpolation context */}
+        {node.interpolation_context && (
+          <div className="mt-1 text-[10px] text-gray-500 italic">
+            Context: {node.interpolation_context}
+          </div>
+        )}
+
+        {/* Span info */}
+        {node.span && (
+          <div className="mt-0.5 text-[10px] text-gray-600">
+            pos: {node.span.start}-{node.span.end}
+          </div>
+        )}
       </div>
 
+      {/* Children */}
       {hasChildren && isExpanded && (
-        <div className="mt-2 space-y-1">
+        <div className="mt-1">
           {node.children.map((child, i) => (
-            <TraceNodeComponent key={i} node={child} depth={depth + 1} />
+            <TraceNodeComponent key={i} node={child} />
           ))}
         </div>
       )}
@@ -107,60 +158,45 @@ export default function TraceView({ trace, onClose }: TraceViewProps) {
   const totalNodes = countNodes(trace);
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-slate-900 rounded-lg shadow-2xl border border-slate-700 w-full max-w-4xl max-h-[90vh] flex flex-col">
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-2">
+      <div className="bg-slate-900 rounded-lg shadow-2xl border border-slate-700 w-full max-w-6xl max-h-[95vh] flex flex-col">
         {/* Header */}
-        <div className="bg-gradient-to-r from-purple-600 to-pink-600 px-6 py-4 rounded-t-lg flex items-center justify-between">
+        <div className="bg-gradient-to-r from-purple-600 to-pink-600 px-4 py-2 rounded-t-lg flex items-center justify-between">
           <div>
-            <h2 className="text-2xl font-bold text-white">Execution Trace</h2>
-            <p className="text-purple-200 text-sm mt-1">
-              {totalNodes} operation{totalNodes !== 1 ? 's' : ''} traced
+            <h2 className="text-lg font-bold text-white">Execution Trace</h2>
+            <p className="text-purple-200 text-xs">
+              {totalNodes} operation{totalNodes !== 1 ? 's' : ''}
             </p>
           </div>
           <button
             onClick={onClose}
-            className="text-white hover:text-gray-200 transition-colors text-3xl leading-none px-2"
+            className="text-white hover:text-gray-200 transition-colors text-2xl leading-none px-1"
             aria-label="Close"
           >
             ×
           </button>
         </div>
 
-        {/* Legend */}
-        <div className="px-6 py-3 bg-slate-800/30 border-b border-slate-700">
-          <div className="flex flex-wrap gap-3 text-xs">
-            <div className="flex items-center gap-1">
-              <span className="w-3 h-3 rounded-full bg-purple-400"></span>
-              <span className="text-gray-400">Root</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <span className="w-3 h-3 rounded-full bg-blue-400"></span>
-              <span className="text-gray-400">List Select</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <span className="w-3 h-3 rounded-full bg-green-400"></span>
-              <span className="text-gray-400">Import</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <span className="w-3 h-3 rounded-full bg-cyan-400"></span>
-              <span className="text-gray-400">Method Call</span>
-            </div>
-          </div>
-        </div>
-
         {/* Trace Tree */}
-        <div className="p-6 overflow-y-auto flex-1">
-          <TraceNodeComponent node={trace} depth={0} />
+        <div className="p-3 overflow-y-auto flex-1 text-sm">
+          <TraceNodeComponent node={trace} isRoot={true} />
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-3 bg-slate-800/30 border-t border-slate-700 rounded-b-lg flex justify-between items-center">
-          <div className="text-sm text-gray-400">
-            Click nodes to expand/collapse • Scroll to see more
+        <div className="px-3 py-2 bg-slate-800/50 border-t border-slate-700 rounded-b-lg flex justify-between items-center text-xs">
+          <div className="text-gray-400 flex gap-3">
+            <span className="flex items-center gap-1">
+              <span className="w-2 h-2 rounded-full bg-purple-600"></span>
+              Selected item
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="w-2 h-2 rounded-full bg-slate-600"></span>
+              Available options
+            </span>
           </div>
           <button
             onClick={onClose}
-            className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors"
+            className="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white rounded transition-colors"
           >
             Close
           </button>

@@ -26,6 +26,18 @@ pub struct TraceNode {
     /// Additional metadata about the operation type
     #[serde(skip_serializing_if = "Option::is_none")]
     pub operation_type: Option<OperationType>,
+
+    /// Available options for list selections (text of each item)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub available_items: Option<Vec<String>>,
+
+    /// Index of selected item (if this was a selection)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub selected_index: Option<usize>,
+
+    /// Template string showing where result was interpolated
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub interpolation_context: Option<String>,
 }
 
 /// Types of operations that can be traced
@@ -76,6 +88,9 @@ impl TraceNode {
             rng_seed: None,
             children: Vec::new(),
             operation_type: None,
+            available_items: None,
+            selected_index: None,
+            interpolation_context: None,
         }
     }
 
@@ -105,6 +120,24 @@ impl TraceNode {
     /// Add multiple children
     pub fn with_children(mut self, children: Vec<TraceNode>) -> Self {
         self.children = children;
+        self
+    }
+
+    /// Set available items for a selection
+    pub fn with_available_items(mut self, items: Vec<String>) -> Self {
+        self.available_items = Some(items);
+        self
+    }
+
+    /// Set the selected index
+    pub fn with_selected_index(mut self, index: usize) -> Self {
+        self.selected_index = Some(index);
+        self
+    }
+
+    /// Set interpolation context
+    pub fn with_interpolation_context(mut self, context: String) -> Self {
+        self.interpolation_context = Some(context);
         self
     }
 }

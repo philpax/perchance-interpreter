@@ -1,7 +1,9 @@
-use perchance_interpreter::{compile, diagnostic, evaluate, evaluate_with_trace, parse, run_with_seed, run_with_seed_and_trace, EvaluateOptions, InterpreterError, TraceResult};
+use perchance_interpreter::{
+    compile, diagnostic, evaluate, parse, run_with_seed, run_with_seed_and_trace,
+    EvaluateOptions, InterpreterError, TraceResult,
+};
 use rand::rngs::StdRng;
 use rand::SeedableRng;
-use serde::Serialize;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::future_to_promise;
 
