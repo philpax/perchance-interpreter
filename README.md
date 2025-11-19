@@ -30,6 +30,15 @@ This is a **fully-functional** implementation of core Perchance features:
 - **37 builtin generators**: animals, colors, nouns, countries, and more
 
 ### Advanced Features ✅
+- **Math operations**: Expression evaluation (`+`, `-`, `*`, `/`, `%`) with proper precedence
+- **String concatenation**: `+` operator for combining strings
+- **Dynamic odds**: `^[condition]` syntax for conditional item weights
+- **Property fallback**: `||` operator (e.g., `[a.property || "default"]`)
+- **Variable-count selection**: `selectMany(min, max)` and `selectUnique(min, max)` for random counts
+- **evaluateItem method**: Explicit evaluation before storage
+- **this keyword**: Property assignment syntax (`[this.property = value]`)
+- **Long-form if/else**: `if (cond) {expr} else if (cond) {expr} else {expr}` syntax
+- **Repeat construct**: `repeat(n) {expr}` for repetition
 - Deterministic RNG with seeded generation
 - Dynamic sub-list referencing (`[list[variable]]`)
 - Chained property access
@@ -37,7 +46,7 @@ This is a **fully-functional** implementation of core Perchance features:
 - Comments with `//`
 - Two-space or tab indentation
 
-### Test Status: **180/180 tests passing** ✨
+### Test Status: **232/232 tests passing** ✨
 
 ## What Remains to be Done
 
@@ -45,17 +54,9 @@ Features not yet implemented:
 
 - **JavaScript execution** - Inline JavaScript code blocks
 - **Plugin system** - Custom plugin loading
-- **`this` keyword** - Full support with property assignment syntax
-- **HTML/CSS rendering** - Proper handling of HTML tags and styles
-- **Math operations** - Expression evaluation (`+`, `-`, `*`, `/`, `%`)
-- **String concatenation** - `+` operator for strings
-- **Additional features**:
-  - Dynamic odds with `^[condition]` syntax
-  - `evaluateItem` method for explicit evaluation before storage
-  - Property fallback `||` operator (e.g., `[a.property || "default"]`)
-  - Variable-count selection (`selectMany(min, max)`, `selectUnique(min, max)`)
+- **HTML/CSS rendering** - Proper HTML/CSS interpretation and styling (basic HTML tag pass-through is supported)
 
-**Note**: Binary `||` IS supported in conditionals (e.g., `[a || b ? "yes" : "no"]`)
+**Note**: Traditional `for` and `while` loops are not part of Perchance's design. Use `repeat(n)`, `selectMany(n)`, or `selectUnique(n)` instead.
 
 ## Installation
 
@@ -162,6 +163,22 @@ number
 output
 	[n = number, n > 5 ? "High" : "Low"]
 ```
+
+### Long-form If/Else
+```
+score
+	{1-100}
+
+output
+	[s = score, if (s > 90) {"A"} else if (s > 80) {"B"} else if (s > 70) {"C"} else {"F"}]
+```
+
+### Repetition
+```
+output
+	[repeat(5) {"*"}]
+```
+Output: `"*****"`
 
 ### Imports
 ```

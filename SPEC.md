@@ -370,9 +370,9 @@ Methods are called with dot notation: `[listname.methodName]`
 - **selectOne** - Explicitly selects one item from a list
 - **selectAll** - Returns all items as an array
 - **selectMany(n)** - Selects n items with repetition allowed
-  - ❌ `selectMany(min, max)` for random count NOT implemented
+  - ✅ `selectMany(min, max)` for random count between min and max
 - **selectUnique(n)** - Selects n unique items without repetition
-  - ❌ `selectUnique(min, max)` for random count NOT implemented
+  - ✅ `selectUnique(min, max)` for random count between min and max
 
 ### Text Transformation Methods
 
@@ -400,7 +400,7 @@ Methods are called with dot notation: `[listname.methodName]`
 
 ### Other Methods
 
-- **evaluateItem** - ❌ NOT IMPLEMENTED - Would explicitly evaluate inline content before storage
+- **evaluateItem** - ✅ Explicitly evaluates inline content before storage
 - **joinItems(separator)** - Joins array items with separator (default: space)
 - **consumableList** - Creates a stateful list where items are removed after selection
 - **replaceText(find, replace)** - ❌ NOT IMPLEMENTED - Would replace text
@@ -519,23 +519,32 @@ For this implementation:
 - Given the same seed and same input, output must be identical
 - All random selections (list items, inline choices, number ranges) use the provided RNG
 
+## Implemented Features
+
+The following features ARE implemented in this interpreter:
+
+- ✅ Import/export between generators (`{import:name}` syntax)
+- ✅ Mathematical operations (`+`, `-`, `*`, `/`, `%`) with proper precedence
+- ✅ String concatenation with `+` operator
+- ✅ **Dynamic odds** with `^[condition]` syntax (e.g., `item ^[variable == "value"]`)
+- ✅ **`evaluateItem` method** - For explicitly evaluating items before storage
+- ✅ **`||` operator for property fallback** - The syntax `[a.property || "default"]` for missing properties
+- ✅ **Variable-count selection** - `selectMany(min, max)` and `selectUnique(min, max)` for random counts
+- ✅ **`this` keyword** - Property assignment syntax (`[this.property = value]`)
+- ✅ Ternary operator for conditionals (`?:`)
+- ✅ **Long-form if/else statements** - `if (cond) {expr} else if (cond) {expr} else {expr}` syntax
+- ✅ **Repeat construct** - `repeat(n) {expr}` for repetition
+- ✅ Binary operators for comparisons and logic
+
 ## Out of Scope (Not Implemented)
 
 The following features from the full Perchance system are **not** implemented in this core interpreter:
 
 - JavaScript code execution
 - Plugin system
-- Import/export between generators (`{import:name}` syntax)
-- HTML/CSS rendering (HTML tags are passed through as-is)
+- HTML/CSS rendering (HTML tags are passed through as-is, but not rendered)
 - User input handling
-- Long-form if/else statements (ternary operator `?:` is supported)
-- Loops and repetition constructs (use `selectMany` instead)
-- Mathematical operations (+, -, *, /, etc.)
-- String concatenation with `+` operator
-- **Dynamic odds** with `^[condition]` syntax (e.g., `item ^[variable == "value"]`)
-- **`evaluateItem` method** - For explicitly evaluating items before storage
-- **`||` operator for property fallback** - The syntax `[a.property || "default"]` for missing properties
-- **Variable-count selection** - `selectMany(min, max)` and `selectUnique(min, max)` for random counts
+- Traditional `for`/`while` loops (use `repeat(n)`, `selectMany(n)`, or `selectUnique(n)` instead)
 
 ## Grammar Summary
 

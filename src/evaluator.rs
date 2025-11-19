@@ -835,6 +835,46 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                 }
             }
 
+            Expression::IfElse {
+                condition,
+                then_expr,
+                else_expr,
+            } => {
+                // Evaluate condition
+                let cond_result = self.evaluate_expression(condition).await?;
+
+                // Check if condition is truthy
+                if self.is_truthy(&cond_result) {
+                    self.evaluate_expression(then_expr).await
+                } else if let Some(else_branch) = else_expr {
+                    self.evaluate_expression(else_branch).await
+                } else {
+                    // No else branch, return empty string
+                    Ok(String::new())
+                }
+            }
+
+            Expression::Repeat { count, body } => {
+                let span = expr_span;
+                // Evaluate the count expression
+                let count_str = self.evaluate_expression(count).await?;
+                let n = count_str
+                    .parse::<usize>()
+                    .map_err(|_| EvalError::TypeError {
+                        message: format!("repeat count must be a number, got: {}", count_str),
+                        span,
+                    })?;
+
+                // Evaluate the body n times and concatenate results
+                let mut result = String::new();
+                for _ in 0..n {
+                    let iteration_result = self.evaluate_expression(body).await?;
+                    result.push_str(&iteration_result);
+                }
+
+                Ok(result)
+            }
+
             Expression::BinaryOp(left_spanned, op, right_spanned) => {
                 use BinaryOperator::*;
                 let span = expr_span;
