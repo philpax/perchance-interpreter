@@ -130,6 +130,8 @@ pub struct Evaluator<'a, R: Rng> {
     import_sources: HashMap<String, String>,    // Cache for import source templates
     trace_enabled: bool,                        // Whether to collect trace information
     trace_stack: Vec<TraceNode>,                // Stack of trace nodes being built
+    current_source_template: Option<String>,    // Current source template for tracing
+    current_generator_name: Option<String>,     // Current generator name for tracing
 }
 
 impl<'a, R: Rng + Send> Evaluator<'a, R> {
@@ -148,12 +150,21 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
             import_sources: HashMap::new(),
             trace_enabled: false,
             trace_stack: Vec::new(),
+            current_source_template: None,
+            current_generator_name: None,
         }
     }
 
     /// Enable tracing for this evaluator
     pub fn with_tracing(mut self) -> Self {
         self.trace_enabled = true;
+        self
+    }
+
+    /// Set the current source template and generator name for tracing
+    pub fn with_source(mut self, template: String, name: String) -> Self {
+        self.current_source_template = Some(template);
+        self.current_generator_name = Some(name);
         self
     }
 
@@ -174,6 +185,13 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
         let mut node = TraceNode::new(operation, String::new()).with_type(op_type);
         if let Some(s) = span {
             node = node.with_span(s);
+        }
+        // Propagate current source template and generator name to all child nodes
+        if let Some(ref template) = self.current_source_template {
+            node = node.with_source_template(template.clone());
+        }
+        if let Some(ref name) = self.current_generator_name {
+            node = node.with_generator_name(name.clone());
         }
         self.trace_stack.push(node);
     }
@@ -1203,6 +1221,12 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                 // Enable tracing for the imported evaluator if we're tracing
                 if self.trace_enabled {
                     imported_evaluator = imported_evaluator.with_tracing();
+
+                    // Set source template and generator name for all child nodes
+                    if let Some(source) = self.import_sources.get(generator_name) {
+                        imported_evaluator = imported_evaluator
+                            .with_source(source.clone(), generator_name.clone());
+                    }
                 }
 
                 // Evaluate the imported generator
@@ -2459,6 +2483,7 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
 
                 // Collect all items from all list arguments
                 let mut combined_items = Vec::new();
+                let mut list_names = Vec::new();
 
                 for arg in &method.args {
                     // Evaluate the argument to get a list value
@@ -2474,9 +2499,11 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                                 }
                             })?;
                             combined_items.extend(list.items.clone());
+                            list_names.push(name.clone());
                         }
                         Value::ListInstance(list) => {
                             combined_items.extend(list.items.clone());
+                            list_names.push(list.name.clone());
                         }
                         Value::Text(_)
                         | Value::Array(_)
@@ -2494,9 +2521,16 @@ impl<'a, R: Rng + Send> Evaluator<'a, R> {
                     }
                 }
 
+                // Create a descriptive name showing what was joined
+                let joined_name = if list_names.is_empty() {
+                    "joined[]".to_string()
+                } else {
+                    format!("joined[{}]", list_names.join(", "))
+                };
+
                 // Create a new list with all combined items
                 let combined_list = CompiledList {
-                    name: "__joined__".to_string(),
+                    name: joined_name,
                     items: combined_items.clone(),
                     total_weight: combined_items.iter().map(|item| item.weight).sum(),
                     output: None,

@@ -309,16 +309,35 @@ pub async fn run_with_seed_and_trace(
 ) -> Result<(String, TraceNode), InterpreterError> {
     let program = parse(template)?;
     let compiled = compile(&program)?;
-    let rng = StdRng::seed_from_u64(seed);
-    let mut options = EvaluateOptions::new(rng);
-    if let Some(loader) = loader {
-        options = options.with_loader(loader);
-    }
-    let (output, mut trace) = evaluate_with_trace(&compiled, options).await?;
+    let mut rng = StdRng::seed_from_u64(seed);
 
-    // Add source template to the root trace node
-    trace.source_template = Some(template.to_string());
-    trace.generator_name = Some("<user>".to_string());
+    // Get or create default loader
+    let loader = if let Some(loader) = loader {
+        Some(loader)
+    } else {
+        #[cfg(feature = "builtin-generators")]
+        {
+            Some(Arc::new(loader::BuiltinGeneratorsLoader::new()) as Arc<dyn GeneratorLoader>)
+        }
+        #[cfg(not(feature = "builtin-generators"))]
+        {
+            None
+        }
+    };
+
+    // Create evaluator with tracing enabled and source template set
+    let mut evaluator = evaluator::Evaluator::new(&compiled, &mut rng)
+        .with_tracing()
+        .with_source(template.to_string(), "<user>".to_string());
+
+    if let Some(loader) = loader {
+        evaluator = evaluator.with_loader(loader);
+    }
+
+    let output = evaluator.evaluate().await?;
+    let trace = evaluator
+        .take_trace()
+        .unwrap_or_else(|| TraceNode::new("No trace available".to_string(), output.clone()));
 
     Ok((output, trace))
 }
