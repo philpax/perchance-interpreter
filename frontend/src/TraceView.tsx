@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState } from 'react';
 
 export interface TraceNode {
   operation: string;
@@ -19,8 +19,6 @@ interface TraceViewProps {
   trace: TraceNode;
   onClose: () => void;
 }
-
-type LayoutMode = 'tree' | 'profiler';
 
 interface NodeCardProps {
   node: TraceNode;
@@ -101,250 +99,6 @@ function NodeCard({ node, onHover, onClick, isHovered, isSelected }: NodeCardPro
           </span>
         )}
       </div>
-    </div>
-  );
-}
-
-// Tree view with SVG connections, zoom, and pan
-function TreeView({
-  node,
-  onHover,
-  onClick,
-  hoveredNode,
-  selectedNode
-}: {
-  node: TraceNode;
-  onHover: (node: TraceNode | null) => void;
-  onClick: (node: TraceNode) => void;
-  hoveredNode: TraceNode | null;
-  selectedNode: TraceNode | null;
-}) {
-  const [zoom, setZoom] = useState(1);
-  const [pan, setPan] = useState({ x: 0, y: 0 });
-  const [isDragging, setIsDragging] = useState(false);
-  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
-  const containerRef = useRef<HTMLDivElement>(null);
-  const contentRef = useRef<HTMLDivElement>(null);
-
-  // Zoom with mouse wheel
-  const handleWheel = (e: React.WheelEvent) => {
-    e.preventDefault();
-    const delta = e.deltaY > 0 ? 0.9 : 1.1;
-    setZoom(z => Math.max(0.1, Math.min(3, z * delta)));
-  };
-
-  // Pan with drag
-  const handleMouseDown = (e: React.MouseEvent) => {
-    if (e.button === 0) {
-      setIsDragging(true);
-      setDragStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
-    }
-  };
-
-  const handleMouseMove = (e: React.MouseEvent) => {
-    if (isDragging) {
-      setPan({ x: e.clientX - dragStart.x, y: e.clientY - dragStart.y });
-    }
-  };
-
-  const handleMouseUp = () => {
-    setIsDragging(false);
-  };
-
-  // Collect node positions for drawing lines
-  const [nodePositions, setNodePositions] = useState<Map<TraceNode, { x: number; y: number; width: number; height: number }>>(new Map());
-
-  useEffect(() => {
-    if (contentRef.current) {
-      const positions = new Map<TraceNode, { x: number; y: number; width: number; height: number }>();
-
-      const collectPositions = (el: Element, n: TraceNode) => {
-        const rect = el.getBoundingClientRect();
-        const containerRect = contentRef.current!.getBoundingClientRect();
-        positions.set(n, {
-          x: (rect.left - containerRect.left) / zoom,
-          y: (rect.top - containerRect.top) / zoom,
-          width: rect.width / zoom,
-          height: rect.height / zoom
-        });
-      };
-
-      // Walk DOM to collect positions
-      const walk = (el: Element, n: TraceNode) => {
-        if (el.hasAttribute('data-node-id')) {
-          collectPositions(el, n);
-        }
-        if (n.children) {
-          const childContainer = el.querySelector('[data-children]');
-          if (childContainer) {
-            Array.from(childContainer.children).forEach((child, i) => {
-              if (i < n.children.length) {
-                walk(child, n.children[i]);
-              }
-            });
-          }
-        }
-      };
-
-      const rootEl = contentRef.current.querySelector('[data-node-id]');
-      if (rootEl) {
-        walk(rootEl, node);
-      }
-
-      setNodePositions(positions);
-    }
-  }, [node, zoom]);
-
-  return (
-    <div
-      ref={containerRef}
-      className="relative w-full h-full overflow-hidden"
-      onWheel={handleWheel}
-      onMouseDown={handleMouseDown}
-      onMouseMove={handleMouseMove}
-      onMouseUp={handleMouseUp}
-      onMouseLeave={handleMouseUp}
-      style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
-    >
-      {/* Zoom controls */}
-      <div className="absolute top-2 right-2 z-10 flex gap-1">
-        <button
-          onClick={() => setZoom(z => Math.min(3, z * 1.2))}
-          className="bg-slate-700 hover:bg-slate-600 text-white px-2 py-1 rounded text-xs"
-        >
-          +
-        </button>
-        <button
-          onClick={() => setZoom(z => Math.max(0.1, z / 1.2))}
-          className="bg-slate-700 hover:bg-slate-600 text-white px-2 py-1 rounded text-xs"
-        >
-          −
-        </button>
-        <button
-          onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }); }}
-          className="bg-slate-700 hover:bg-slate-600 text-white px-2 py-1 rounded text-xs"
-        >
-          Reset
-        </button>
-      </div>
-
-      <div
-        ref={contentRef}
-        style={{
-          transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
-          transformOrigin: '0 0',
-          transition: isDragging ? 'none' : 'transform 0.1s'
-        }}
-        className="p-4"
-      >
-        {/* SVG for connection lines */}
-        <svg
-          className="absolute top-0 left-0 pointer-events-none"
-          style={{ width: '100%', height: '100%', overflow: 'visible' }}
-        >
-          {Array.from(nodePositions.entries()).map(([n, pos]) =>
-            n.children?.map((child, i) => {
-              const childPos = nodePositions.get(child);
-              if (!childPos) return null;
-
-              const startX = pos.x + pos.width / 2;
-              const startY = pos.y + pos.height;
-              const endX = childPos.x + childPos.width / 2;
-              const endY = childPos.y;
-
-              return (
-                <g key={`${n.operation}-${i}`}>
-                  <line
-                    x1={startX}
-                    y1={startY}
-                    x2={endX}
-                    y2={endY}
-                    stroke="#64748b"
-                    strokeWidth="1.5"
-                    markerEnd="url(#arrowhead)"
-                  />
-                </g>
-              );
-            })
-          )}
-          <defs>
-            <marker
-              id="arrowhead"
-              markerWidth="10"
-              markerHeight="10"
-              refX="5"
-              refY="5"
-              orient="auto"
-            >
-              <polygon points="0 0, 10 5, 0 10" fill="#64748b" />
-            </marker>
-          </defs>
-        </svg>
-
-        <TreeNode
-          node={node}
-          onHover={onHover}
-          onClick={onClick}
-          hoveredNode={hoveredNode}
-          selectedNode={selectedNode}
-        />
-      </div>
-    </div>
-  );
-}
-
-function TreeNode({
-  node,
-  onHover,
-  onClick,
-  hoveredNode,
-  selectedNode
-}: {
-  node: TraceNode;
-  onHover: (node: TraceNode | null) => void;
-  onClick: (node: TraceNode) => void;
-  hoveredNode: TraceNode | null;
-  selectedNode: TraceNode | null;
-}) {
-  const [isExpanded, setIsExpanded] = useState(true);
-  const hasChildren = node.children && node.children.length > 0;
-
-  return (
-    <div className="flex flex-col items-center gap-2" data-node-id>
-      {/* Current node */}
-      <div className="flex flex-col items-center">
-        <NodeCard
-          node={node}
-          onHover={onHover}
-          onClick={onClick}
-          isHovered={hoveredNode === node}
-          isSelected={selectedNode === node}
-        />
-        {hasChildren && (
-          <button
-            onClick={() => setIsExpanded(!isExpanded)}
-            className="text-gray-500 hover:text-gray-300 text-[10px] mt-0.5"
-          >
-            {isExpanded ? '▼' : '▶'}
-          </button>
-        )}
-      </div>
-
-      {/* Children side-by-side */}
-      {isExpanded && hasChildren && (
-        <div className="flex gap-3 items-start flex-wrap justify-center" data-children>
-          {node.children.map((child, i) => (
-            <TreeNode
-              key={i}
-              node={child}
-              onHover={onHover}
-              onClick={onClick}
-              hoveredNode={hoveredNode}
-              selectedNode={selectedNode}
-            />
-          ))}
-        </div>
-      )}
     </div>
   );
 }
@@ -537,7 +291,6 @@ function SourceDisplay({ node }: { node: TraceNode | null }) {
 export default function TraceView({ trace, onClose }: TraceViewProps) {
   const [hoveredNode, setHoveredNode] = useState<TraceNode | null>(null);
   const [selectedNode, setSelectedNode] = useState<TraceNode | null>(null);
-  const [layoutMode, setLayoutMode] = useState<LayoutMode>('tree');
 
   const handleNodeClick = (node: TraceNode) => {
     setSelectedNode(selectedNode === node ? null : node);
@@ -551,11 +304,6 @@ export default function TraceView({ trace, onClose }: TraceViewProps) {
 
   const totalNodes = countNodes(trace);
 
-  const layoutModeLabels: Record<LayoutMode, string> = {
-    tree: 'Tree (horizontal)',
-    profiler: 'Profiler (vertical)'
-  };
-
   return (
     <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-2">
       {/* Fixed size container */}
@@ -565,27 +313,16 @@ export default function TraceView({ trace, onClose }: TraceViewProps) {
           <div>
             <h2 className="text-base font-bold text-white">Execution Trace</h2>
             <p className="text-purple-200 text-[10px]">
-              {totalNodes} operations • {layoutModeLabels[layoutMode]} • {selectedNode ? 'Locked' : 'Hover mode'}
+              {totalNodes} operations • {selectedNode ? 'Locked' : 'Hover mode'}
             </p>
           </div>
-          <div className="flex items-center gap-2">
-            {/* Layout mode switcher */}
-            <select
-              value={layoutMode}
-              onChange={(e) => setLayoutMode(e.target.value as LayoutMode)}
-              className="bg-purple-700 text-white text-xs px-2 py-1 rounded border border-purple-500"
-            >
-              <option value="tree">Tree View</option>
-              <option value="profiler">Profiler View</option>
-            </select>
-            <button
-              onClick={onClose}
-              className="text-white hover:text-gray-200 transition-colors text-xl leading-none px-1"
-              aria-label="Close"
-            >
-              ×
-            </button>
-          </div>
+          <button
+            onClick={onClose}
+            className="text-white hover:text-gray-200 transition-colors text-xl leading-none px-1"
+            aria-label="Close"
+          >
+            ×
+          </button>
         </div>
 
         {/* Main content: Trace (left) + Source (right) - fixed size */}
@@ -596,25 +333,14 @@ export default function TraceView({ trace, onClose }: TraceViewProps) {
               <span className="font-semibold">Trace Tree</span> • Click to expand/collapse • Hover/click to see source
             </div>
             <div className="flex-1 overflow-auto scrollbar-hide min-h-0">
-              {layoutMode === 'tree' && (
-                <TreeView
-                  node={trace}
-                  onHover={setHoveredNode}
-                  onClick={handleNodeClick}
-                  hoveredNode={hoveredNode}
-                  selectedNode={selectedNode}
-                />
-              )}
-              {layoutMode === 'profiler' && (
-                <ProfilerRow
-                  node={trace}
-                  depth={0}
-                  onHover={setHoveredNode}
-                  onClick={handleNodeClick}
-                  hoveredNode={hoveredNode}
-                  selectedNode={selectedNode}
-                />
-              )}
+              <ProfilerRow
+                node={trace}
+                depth={0}
+                onHover={setHoveredNode}
+                onClick={handleNodeClick}
+                hoveredNode={hoveredNode}
+                selectedNode={selectedNode}
+              />
             </div>
           </div>
 
